@@ -1,0 +1,33 @@
+#version 430 core
+
+layout(location = 0) out vec3 fragColor;
+layout(location = 1) out vec3 brightColor;
+
+layout(pixel_center_integer) in vec4 gl_FragCoord;
+uniform float horizionY;
+
+layout(std140, binding = 1) uniform Sun
+{
+	vec3 sunDir;
+	vec3 sunAmbient;
+	vec3 sunDiffuseAndSpecular;
+	vec3 skyColor;
+};
+
+void main()
+{
+	vec3 sunColor = 50.0 * sunDiffuseAndSpecular;
+	if(gl_FragCoord.y < horizionY)
+	{
+		float sunPercentage = gl_FragCoord.y + 1 - horizionY;
+		if(sunPercentage < 0)
+		{
+			discard;
+		}
+		sunColor *= sunPercentage;
+		brightColor = sunColor;
+		fragColor = sunColor + (1 - sunPercentage) * skyColor;
+	}
+	fragColor = sunColor;
+	brightColor = sunColor;
+}

@@ -1,0 +1,15 @@
+#version 430 core
+
+out vec3 fragColor;
+
+layout(binding = 0) uniform sampler2D colorBuffer;
+layout(binding = 1) uniform sampler2D bloomBuffer;
+
+in vec2 texCoord;
+
+void main()
+{
+    ivec2 iTexCoord = ivec2(gl_FragCoord);
+    vec3 color = texelFetch(colorBuffer, iTexCoord, 0).rgb + texture(bloomBuffer, texCoord).rgb;
+    fragColor = 1 - 1 / (1 + color + color * color);
+}

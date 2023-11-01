@@ -1,0 +1,86 @@
+#version 430 core
+
+const int CSMLevels = 4;
+
+out vec3 fragColor;
+
+layout(std140, binding = 1) uniform Sun
+{
+	vec3 sunDir;
+	vec3 sunAmbient;
+	vec3 sunDiffuseAndSpecular;
+	vec3 skyColor;
+};
+layout(std140, binding = 2) uniform Shadow
+{
+	mat4 shadowMat[CSMLevels];
+	mat4 shadowTexMat[CSMLevels];
+};
+
+in vec3 modelPos;
+in vec3 modelPosView;
+in vec3 aNormal;
+in vec2 aTexCoord;
+
+layout(binding = 0) uniform sampler2D texture0;
+layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
+uniform float fogDensity;
+
+void main()
+{
+	vec3 color = texture(texture0, aTexCoord).rgb;
+	
+	vec3 lighting = sunAmbient;
+	float LdotN = dot(sunDir, aNormal);
+	if(LdotN > 0)
+	{
+		const float texPadding = 0.02;
+		float shadow;
+		int level;
+		vec3 shadowCoord;
+		for(level = 0; level < CSMLevels; level++)
+		{
+			shadowCoord = (shadowTexMat[level] * vec4(modelPos, 1.0)).xyz;
+			if(shadowCoord.x > texPadding && shadowCoord.x < 1 - texPadding &&
+				shadowCoord.y > texPadding && shadowCoord.y < 1 - texPadding)
+			{
+				break;
+			}
+		}
+		if(level < CSMLevels)
+		{
+			shadow = 0;
+			vec3 offsetX = mat3(shadowTexMat[level]) * dFdx(modelPos);
+			vec3 offsetY = mat3(shadowTexMat[level]) * dFdy(modelPos);
+			float maxOffsetX = abs(offsetX.x) + abs(offsetY.x);
+			if(maxOffsetX > texPadding)
+			{
+				offsetX *= texPadding / maxOffsetX;
+				offsetY *= texPadding / maxOffsetX;
+			}
+			float maxOffsetY = abs(offsetX.y) + abs(offsetY.y);
+			if(maxOffsetY > texPadding)
+			{
+				offsetX *= texPadding / maxOffsetY;
+				offsetY *= texPadding / maxOffsetY;
+			}
+			const vec2 offsets[8] = { { -0.37, 0.37 }, { 0, 0.25 }, { 0.37, 0.37 }, { -0.25, 0 }, { 0.25, 0 }, { -0.37, -0.37 }, { 0, -0.25 }, { 0.37, -0.37 } };
+			for(int i = 0; i < 8; i++)
+			{
+				vec3 coord = shadowCoord + offsets[i].x * offsetX + offsets[i].y * offsetY;
+				shadow += texture(shadowTex, vec4(coord.xy, level, coord.z)).x;
+			}
+			shadow /= 8;
+		}
+		else
+		{
+			shadow = 1;
+		}
+		lighting += shadow * LdotN * sunDiffuseAndSpecular;
+	}
+	color *= lighting;
+	
+	float temp = fogDensity * fogDensity * dot(modelPosView, modelPosView);
+	float fogFactor = exp(-temp * temp);
+	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
+}

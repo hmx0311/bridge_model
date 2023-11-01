@@ -1,0 +1,109 @@
+#version 430 core
+
+layout(triangles) in;
+
+layout(triangle_strip, max_vertices = 111) out;
+out float gl_ClipDistance[4];
+
+in vec3 aNormal[];
+
+layout(std430, binding = 3) buffer CarLishtMap
+{
+	ivec2 lightIdx[16384];
+};
+layout(std140, binding = 5) uniform CarLishtShadow
+{
+	mat4 carLightShadowMat[1024];
+};
+
+void main()
+{
+	vec2 minCoord = vec2(gl_in[0].gl_Position);
+	vec2 maxCoord = minCoord;
+	minCoord = min(minCoord, vec2(gl_in[1].gl_Position));
+	minCoord = min(minCoord, vec2(gl_in[2].gl_Position));
+	maxCoord = max(maxCoord, vec2(gl_in[1].gl_Position));
+	maxCoord = max(maxCoord, vec2(gl_in[2].gl_Position));
+	ivec2 startIdx = ivec2(minCoord / 1600 + (64 - 1));
+	ivec2 endIdx = ivec2(maxCoord / 1600 + (64 + 1));
+	for(int i = startIdx.x; i <= endIdx.x; i++)
+	{
+		for(int j = startIdx.y; j <= endIdx.y; j++)
+		{
+			int gridIdx = i * 128 + j;
+			int end = lightIdx[gridIdx].y;
+			for(int k = lightIdx[gridIdx].x; k < end; k++)
+			{
+				int layer = findMSB((k >> 3) * 3 + 1) >> 1;
+				if(layer >= 4)
+				{
+					continue;
+				}
+				vec4 pos[3];
+				vec3 test[3];
+				for(int p = 0; p < 3; p++)
+				{
+					pos[p] = carLightShadowMat[k] * gl_in[p].gl_Position;
+					test[p]= pos[p].xyz / pos[p].w;
+				}
+				vec3 projNoraml = cross(test[1] - test[0], test[2] - test[0]);
+				if(pos[0].z >= pos[0].w && pos[1].z >= pos[1].w && pos[2].z >= pos[2].w || projNoraml.z * pos[0].w * pos[1].w * pos[2].w <= 0)
+				{
+					continue;
+				}
+				if(projNoraml.z * pos[0].w * pos[1].w * pos[2].w > 0)
+				{
+					float offsetScale = 0.002 * (1 << layer) * sqrt(dot(projNoraml.xy, projNoraml.xy) / (projNoraml.z * projNoraml.z));
+					pos[0].z += offsetScale * pos[0].w;
+					pos[1].z += offsetScale * pos[1].w;
+					pos[2].z += offsetScale * pos[2].w;
+				}
+				bool surroundTest[3] = { (test[0].x * test[1].y - test[0].y * test[1].x) * pos[2].w > 0,
+										(test[1].x * test[2].y - test[1].y * test[2].x) * pos[0].w > 0,
+										(test[2].x * test[0].y - test[2].y * test[0].x) * pos[1].w > 0 };
+				bool isIn = surroundTest[0] == surroundTest[1] && surroundTest[0] == surroundTest[2];
+				for(int p = 0; p < 3 && !isIn; p++)
+				{
+					vec2 a = test[p].xy;
+					int p2 = (p + 1) % 3;
+					vec2 v = test[p2].xy - a;
+					float lt2 = dot(a, a);
+					if(pos[p2].w < 0)
+					{
+						if(pos[p].w < 0)
+						{
+							continue;
+						}
+						lt2 = min(lt2, 1.0);
+						v = -v;
+					}
+					else if(pos[p].w < 0)
+					{
+						lt2 = min(lt2, 1.0);
+						a = test[p2].xy;
+					}
+					float t = v.x * a.y - v.y * a.x;
+					isIn = lt2 < 1.0 || dot(v, a) < 0 && dot(v, v) > max(t * t, lt2 - 1);
+				}
+				if(isIn)
+				{
+					ivec2 cnt = ivec2(2 << layer, 4 << layer);
+					int idx = k - ((8 << (2 * layer)) - 8) / 3 ;
+					vec2 shadowMapPos = vec2(idx % cnt.x, idx / cnt.x) / (0.5 * cnt) - 1.0;
+					for(int p = 0; p < 3; p++)
+					{
+						gl_Position = pos[p];
+						gl_ClipDistance[0] = gl_Position.w + gl_Position.x;
+						gl_ClipDistance[1] = gl_Position.w - gl_Position.x;
+						gl_ClipDistance[2] = gl_Position.w + gl_Position.y;
+						gl_ClipDistance[3] = gl_Position.w - gl_Position.y;
+						gl_Position.xy = (gl_Position.xy + gl_Position.w) / cnt + shadowMapPos * gl_Position.w;
+						gl_Layer = layer;
+						EmitVertex();
+					}
+					EndPrimitive();	
+				}
+			}
+		}
+	}
+}

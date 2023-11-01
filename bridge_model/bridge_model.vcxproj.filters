@@ -1,0 +1,148 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="资源文件\shaders">
+      <UniqueIdentifier>{9544fae0-c0f2-45b5-a5af-6bf428cf0edb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shaders\draw">
+      <UniqueIdentifier>{470ac5df-d4ee-4760-a8a4-1aee4ef3014b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shaders\shadow">
+      <UniqueIdentifier>{24aa9d7c-2192-458d-a869-87235be33c18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shaders\shadow\day">
+      <UniqueIdentifier>{da458e28-b8cd-411d-9a07-5cddbcfdb243}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shaders\shadow\night">
+      <UniqueIdentifier>{9b377ff0-018f-4a40-ac64-34ce6997ee6d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shaders\draw\day">
+      <UniqueIdentifier>{2719242b-2556-4865-8b8c-1f6b92815c4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shaders\draw\night">
+      <UniqueIdentifier>{25cb70f5-f06b-474f-ba11-effa18e6b298}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="bridge_model.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Car.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Lane.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="scene.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Sun.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Car.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Lane.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="scene.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Sun.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="bridge_model.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="shaders\fs_buffer2screen.txt">
+      <Filter>资源文件\shaders</Filter>
+    </Text>
+    <Text Include="shaders\fs_gaussian_blur.txt">
+      <Filter>资源文件\shaders</Filter>
+    </Text>
+    <Text Include="shaders\fs_tex_blit.txt">
+      <Filter>资源文件\shaders</Filter>
+    </Text>
+    <Text Include="shaders\vs_tex_blit.txt">
+      <Filter>资源文件\shaders</Filter>
+    </Text>
+    <Text Include="shaders\fs_sun.txt">
+      <Filter>资源文件\shaders\draw</Filter>
+    </Text>
+    <Text Include="shaders\fs_shadow.txt">
+      <Filter>资源文件\shaders\shadow</Filter>
+    </Text>
+    <Text Include="shaders\gs_shadow_day.txt">
+      <Filter>资源文件\shaders\shadow\day</Filter>
+    </Text>
+    <Text Include="shaders\vs_shadow_car_day.txt">
+      <Filter>资源文件\shaders\shadow\day</Filter>
+    </Text>
+    <Text Include="shaders\vs_shadow_highway_day.txt">
+      <Filter>资源文件\shaders\shadow\day</Filter>
+    </Text>
+    <Text Include="shaders\vs_shadow_highway_night.txt">
+      <Filter>资源文件\shaders\shadow\night</Filter>
+    </Text>
+    <Text Include="shaders\vs_shadow_car_night.txt">
+      <Filter>资源文件\shaders\shadow\night</Filter>
+    </Text>
+    <Text Include="shaders\gs_shadow_highway_night.txt">
+      <Filter>资源文件\shaders\shadow\night</Filter>
+    </Text>
+    <Text Include="shaders\gs_shadow_car_night.txt">
+      <Filter>资源文件\shaders\shadow\night</Filter>
+    </Text>
+    <Text Include="shaders\vs_car.txt">
+      <Filter>资源文件\shaders\draw</Filter>
+    </Text>
+    <Text Include="shaders\vs_highway.txt">
+      <Filter>资源文件\shaders\draw</Filter>
+    </Text>
+    <Text Include="shaders\fs_car_day.txt">
+      <Filter>资源文件\shaders\draw\day</Filter>
+    </Text>
+    <Text Include="shaders\fs_highway_day.txt">
+      <Filter>资源文件\shaders\draw\day</Filter>
+    </Text>
+    <Text Include="shaders\fs_car_night.txt">
+      <Filter>资源文件\shaders\draw\night</Filter>
+    </Text>
+    <Text Include="shaders\fs_highway_night.txt">
+      <Filter>资源文件\shaders\draw\night</Filter>
+    </Text>
+    <Text Include="shaders\vs_sun.txt">
+      <Filter>资源文件\shaders\draw</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
