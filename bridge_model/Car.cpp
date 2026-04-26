@@ -16,7 +16,7 @@ Car::Car(Lane* lane, float sunHeight)
 		path.push_back(lane);
 		lane = lane->getNextLane();
 	}
-	distb.param(std::uniform_real<float>::param_type(-0.2f, 0.0f));
+	distb.param(std::uniform_real_distribution<float>::param_type(-0.2f, 0.0f));
 	if (sunHeight < distb(rdEng))
 	{
 		lightOn = true;
