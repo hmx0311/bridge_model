@@ -1,4 +1,4 @@
-﻿#pragma comment(lib,"glew32.lib")
+#pragma comment(lib,"glew32.lib")
 #pragma comment(lib,"imm32.lib")
 #include "glew.h"
 #include "freeglut.h"

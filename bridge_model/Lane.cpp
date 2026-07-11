@@ -3,7 +3,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "common.h"
 
-Lane::Lane(float length, float speedLimit, glm::mat4& startMat, glm::mat4(*motion)(float)) :
+Lane::Lane(float length, float speedLimit, const glm::mat4& startMat, glm::mat4(*motion)(float)) :
 	length(length), speedLimit(speedLimit), startMat(startMat), motion(motion) {}
 
 glm::mat4 Lane::transform(float s)

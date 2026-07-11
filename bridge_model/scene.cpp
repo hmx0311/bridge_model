@@ -22,35 +22,35 @@ void initLanes()
 {
 	Lane* iter;
 	Lane* nextLane;
-	Lane* critialLanes[2];
-	lanes[0] = new Lane(200000, 2.5f, (mat4&)(translate(vec3(-100000, -200, 0)) * rotate(-PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+	Lane* criticalLanes[2];
+	lanes[0] = new Lane(200000, 2.5f, (translate(vec3(-100000, -200, 0)) * rotate(-PI / 2, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(s, 0, 0));
 			return transform;
 		});
 
-	lanes[1] = new Lane(93920, 2.5f, (mat4&)(translate(vec3(-100000, -520, 0)) * rotate(-PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+	lanes[1] = new Lane(93920, 2.5f, (translate(vec3(-100000, -520, 0)) * rotate(-PI / 2, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(s, 0, 0));
 			return transform;
 		});
 	iter = lanes[1];
-	nextLane = new Lane(27160, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(27160, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(78920, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(78920, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
-	critialLanes[0] = nextLane;
+	criticalLanes[0] = nextLane;
 	iter = lanes[1];
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-6080, -29480, 0));
 			transform *= rotate(-s / 28960, vec3(0, 0, 1));
@@ -59,7 +59,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, 28120, 0));
 			transform *= rotate(s / 28960, vec3(0, 0, 1));
@@ -68,14 +68,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(3000, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(3000, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(-5.0f / 13) * 2800, 1.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(-5.0f / 13) * 2800, 1.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(3000, -3640, 0));
 			transform *= rotate(-s / 2800, vec3(0, 0, 1));
@@ -84,7 +84,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(asin(61.0f / 1861) * 37220 * 560 / 600, 1.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(asin(61.0f / 1861) * 37220 * 560 / 600, 1.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(3000, -3640, 37220 - 37220 * cos(s * 600 / (560 * 37220))));
 			transform *= rotate(-7444 * sin(s * 600 / (560 * 37220)) / 600, vec3(0, 0, 1));
@@ -94,7 +94,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(6556.4215f, 1.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(6556.4215f, 1.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(3000, -3640, s / 6556.4215f * 305 * (1 - 456.0f / 1860)));
 			transform *= rotate(-s * (acos(-12.0f / 13) - 244.0f / 600) / 6556.4215f, vec3(0, 0, 1));
@@ -103,14 +103,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(2280.0f * 1861 / 1860, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(2280.0f * 1861 / 1860, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, s * 1860 / 1861, s * 61 / 1861));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(2 * asin(61.0f / 1861) * 37220, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(2 * asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, -140, -36895));
 			transform *= rotate(-s / 37220, vec3(1, 0, 0));
@@ -119,14 +119,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(9305, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(9305, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, s * 1860 / 1861, -s * 61 / 1861));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(asin(61.0f / 1861) * 37220, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, 11600, 37220));
 			transform *= rotate(-s / 37220, vec3(-1, 0, 0));
@@ -135,41 +135,41 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(88400, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(88400, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, s, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 
-	lanes[2] = new Lane(200000, 2.5f, (mat4&)(translate(vec3(100000, 200, 0)) * rotate(PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+	lanes[2] = new Lane(200000, 2.5f, (translate(vec3(100000, 200, 0)) * rotate(PI / 2, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;
 		});
 
-	lanes[3] = new Lane(78440, 2.5f, (mat4&)(translate(vec3(100000, 520, 0)) * rotate(PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+	lanes[3] = new Lane(78440, 2.5f, (translate(vec3(100000, 520, 0)) * rotate(PI / 2, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;
 		});
 	iter = lanes[3];
-	nextLane = new Lane(43120, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(43120, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(78440, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(78440, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
-	critialLanes[1] = nextLane;
+	criticalLanes[1] = nextLane;
 	iter = lanes[3];
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(21560, 29480, 0));
 			transform *= rotate(-s / 28960, vec3(0, 0, 1));
@@ -178,7 +178,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(15480, -28120, 0));
 			transform *= rotate(s / 28960, vec3(0, 0, 1));
@@ -187,14 +187,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(3000, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(3000, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(11960 * PI / 2, 1.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(11960 * PI / 2, 1.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(12480, 12800, 0));
 			transform *= rotate(-s / 11960, vec3(0, 0, 1));
@@ -203,20 +203,20 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(87200, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(87200, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, s, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 
-	lanes[4] = new Lane(88400, 2.5f, (mat4&)(translate(vec3(-200, 100000, 0)) * rotate(PI, vec3(0, 0, 1))), [](float s)->mat4
+	lanes[4] = new Lane(88400, 2.5f, (translate(vec3(-200, 100000, 0)) * rotate(PI, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, -s, 0));
 			return transform;
 		});
 	iter = lanes[4];
-	nextLane = new Lane(asin(61.0f / 1861) * 37220, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, 11600, 37220));
 			transform *= rotate(s / 37220, vec3(-1, 0, 0));
@@ -225,14 +225,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(9305, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(9305, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, -s * 1860 / 1861, s * 61 / 1861));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(2 * asin(61.0f / 1861) * 37220, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(2 * asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, -140, -36895));
 			transform *= rotate(s / 37220, vec3(1, 0, 0));
@@ -241,14 +241,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(2280.0f * 1861 / 1860, 2.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(2280.0f * 1861 / 1860, 2.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, -s * 1860 / 1861, -s * 61 / 1861));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(7491.97f, 1.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(7491.97f, 1.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(3000, -3640, -s / 7491.97f * 305 * (1 - 456.0f / 1860)));
 			transform *= rotate(s * (acos(-12.0f / 13) - 244.0f / 600) / 7491.97f, vec3(0, 0, 1));
@@ -257,7 +257,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(asin(61.0f / 1861) * 37220 * 640 / 600, 1.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(asin(61.0f / 1861) * 37220 * 640 / 600, 1.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(3000, -3640, 37220 - 37220 * cos(asin(61.0f / 1861) - s * 600 / (640 * 37220))));
 			transform *= rotate((1220.0f - 37220 * sin(asin(61.0f / 1861) - s * 600 / (640 * 37220))) / 3000, vec3(0, 0, 1));
@@ -267,7 +267,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(asin(12.0f / 13) * 6550, 1.0f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(asin(12.0f / 13) * 6550, 1.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(12000, -7390, 0));
 			transform *= rotate(-s / 6550, vec3(0, 0, 1));
@@ -276,14 +276,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(3000, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(3000, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(15000, 28120, 0));
 			transform *= rotate(s / 28960, vec3(0, 0, 1));
@@ -292,7 +292,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(21080, -29480, 0));
 			transform *= rotate(-s / 28960, vec3(0, 0, 1));
@@ -300,15 +300,15 @@ void initLanes()
 			return transform;
 		});
 	iter->setNextLane(nextLane);
-	nextLane->setNextLane(critialLanes[0]);
+	nextLane->setNextLane(criticalLanes[0]);
 
-	lanes[5] = new Lane(87200, 2.5f, (mat4&)(translate(vec3(-520, 100000, 0)) * rotate(PI, vec3(0, 0, 1))), [](float s)->mat4
+	lanes[5] = new Lane(87200, 2.5f, (translate(vec3(-520, 100000, 0)) * rotate(PI, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, -s, 0));
 			return transform;
 		});
 	iter = lanes[5];
-	nextLane = new Lane(11960 * PI / 2, 1.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(11960 * PI / 2, 1.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-12480, 12800, 0));
 			transform *= rotate(-s / 11960, vec3(0, 0, 1));
@@ -317,14 +317,14 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(3000, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(3000, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-15480, -28120, 0));
 			transform *= rotate(s / 28960, vec3(0, 0, 1));
@@ -333,7 +333,7 @@ void initLanes()
 		});
 	iter->setNextLane(nextLane);
 	iter = nextLane;
-	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, (mat4&)iter->transform(iter->length), [](float s)->mat4
+	nextLane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-21560, 29480, 0));
 			transform *= rotate(-s / 28960, vec3(0, 0, 1));
@@ -341,7 +341,7 @@ void initLanes()
 			return transform;
 		});
 	iter->setNextLane(nextLane);
-	nextLane->setNextLane(critialLanes[1]);
+	nextLane->setNextLane(criticalLanes[1]);
 }
 
 void initTex()

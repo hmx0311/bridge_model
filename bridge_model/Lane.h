@@ -7,7 +7,7 @@ public:
 	const float length;
 	const float speedLimit;
 
-	Lane(float length, float speedLimit, glm::mat4& startMat, glm::mat4(*motion)(float));
+	Lane(float length, float speedLimit, const glm::mat4& startMat, glm::mat4(*motion)(float));
 	glm::mat4 transform(float s);
 	void setNextLane(Lane* nextLane);
 	Lane* getNextLane();
