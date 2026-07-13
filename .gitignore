@@ -20,6 +20,7 @@ mono_crash.*
 [Dd]ebug/
 [Dd]ebugPublic/
 bridge_model/x64/[Rr]elease/
+bridge_model/[Rr]elease/
 [Rr]eleases/
 x86/
 [Ww][Ii][Nn]32/
