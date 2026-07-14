@@ -17,7 +17,6 @@
 using namespace glm;
 
 #define SHADOW_TEX_SIZE 4096
-#define MIN_CSM_RATIO 1.2f
 #define MAX_CSM_RATIO 3.6f
 #define CSM_LEVELS 4
 GLuint shadowFBO;
@@ -64,8 +63,7 @@ GLuint texBlitVAO, texMappingVBO;
 * binding = 0
 *	mat4 projectionMat
 *	mat4 viewMat
-*	vec4 pixelX
-*	vec4 pixelY
+*	mat4 invViewMat
 *
 * binding = 1
 *	vec4 sunDirection
@@ -78,8 +76,8 @@ GLintptr sceneUBOoffset1 = 256;
 
 /*
 * binding = 2
-*	int levels
-*	mat4 viewMat[CSM_LEVELS]
+*	mat4 shadowMat[CSMLevels];
+*	mat4 shadowTexMat[CSMLevels];
 */
 GLuint shadowUBO;
 
@@ -94,9 +92,9 @@ GLuint carLightShadowMatUBO;
 // binding = 6
 GLuint carLightingSSBO;
 
-mat4 projMat;
 struct
 {
+	mat4 projMat;
 	mat4 viewMat;
 	mat4 invViewMat;
 }view;
@@ -112,8 +110,6 @@ ivec2 carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE];
 int numActiveCarLightMapGrids = 0;
 const mat4 carLightShadowProjMat = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 50.0f, 50.0f + 2 * LIGHT_MAP_GRID_LENGTH);
 
-mat4 carModelMat[MAX_CAR_COUNT];
-vec3 carColor[MAX_CAR_COUNT];
 int carLightMap[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE][2];
 vec4 carLightPos[2 * MAX_CAR_COUNT];
 mat4 carLightMats[2 * MAX_CAR_COUNT];
@@ -388,11 +384,11 @@ void init()
 	int UBOOffsetAlignment;
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &UBOOffsetAlignment);
 
-	sceneUBOoffset1 = ((sizeof(mat4) + sizeof(view) - 1) / UBOOffsetAlignment + 1) * UBOOffsetAlignment;
+	sceneUBOoffset1 = ((sizeof(view) - 1) / UBOOffsetAlignment + 1) * UBOOffsetAlignment;
 	glGenBuffers(1, &sceneUBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, sceneUBO);
 	glBufferData(GL_UNIFORM_BUFFER, sceneUBOoffset1 + 4 * sizeof(vec4), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, sceneUBO, 0, sizeof(mat4) + sizeof(view));
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, sceneUBO, 0, sizeof(view));
 	glBindBufferRange(GL_UNIFORM_BUFFER, 1, sceneUBO, sceneUBOoffset1, 4 * sizeof(vec4));
 
 	glGenBuffers(1, &shadowUBO);
@@ -495,7 +491,8 @@ void drawGraphics()
 	clock_t time = clock();
 	uint32_t frameTime = time - lastFrameTime;
 	lastFrameTime = time;
-	const LogicalData& logical_data = getLatestLogicalData();
+	LogicalData& logical_data = getLatestLogicalData();
+	bool isViewUpdated = needUpdateView;
 	if (needUpdateView)
 	{
 		needUpdateView = false;
@@ -808,7 +805,7 @@ void drawGraphics()
 			}
 		}
 
-		mat4 projAndViewMat = projMat * view.viewMat;
+		mat4 projAndViewMat = view.projMat * view.viewMat;
 		bool isLightGridVisible[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE];
 		for (int i = 0; i < LIGHT_MAP_SIZE; i++)
 		{
@@ -859,9 +856,6 @@ void drawGraphics()
 			{
 				return carLightMapGridDistanceToView[a.x][a.y] < carLightMapGridDistanceToView[b.x][b.y];
 			});
-
-		glNamedBufferSubData(sceneUBO, sizeof(mat4), sizeof(view), &view);
-		glProgramUniform1f(spSun, glGetUniformLocation(spSun, "horizionY"), horizonY);
 	}
 
 	struct
@@ -879,12 +873,9 @@ void drawGraphics()
 	sun.skyColor = vec4(0.01f, 0.015f, 0.055f, 0);
 	if (sun.dir.z > -0.2f)
 	{
-		mat3 sunMat = rotate(acos(sun.dir.z), vec3(-sun.dir.y, sun.dir.x, 0));
-		glProgramUniformMatrix3fv(spSun, glGetUniformLocation(spSun, "sunMat"), 1, GL_FALSE, (GLfloat*)&sunMat);
 		sun.ambient += vec4(vec3((sun.dir.z + 0.2f) * 0.1f), 0);
 		sun.skyColor += vec4((sun.dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f), 0);
 	}
-	glNamedBufferSubData(sceneUBO, sceneUBOoffset1, 4 * sizeof(vec4), &sun);
 
 	int numVisibleCars;
 	int numVisibleLightOnCars;
@@ -1006,22 +997,54 @@ void drawGraphics()
 			int* lightMapGrid;
 		};
 		std::vector<CarLightInfo>carLightInfos;
+		for (int i = 0, j = logical_data.numLightOnCars; i < j; i++)
 		{
-			for (int i = 0; i < logical_data.numCars; i++)
+			mat4& modelMat = logical_data.carModelMat[i];
+			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
+			if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] == FLT_MAX)
 			{
-				const mat4& modelMat = logical_data.carModelMat[i];
-				ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
-				if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] < FLT_MAX)
+				for (j--; i < j; j--)
 				{
-					carModelMat[numVisibleCars] = modelMat;
-					carColor[numVisibleCars] = logical_data.carColor[i];
-					numVisibleCars++;
-					if (i < logical_data.numLightOnCars)
+					mat4& backModelMat = logical_data.carModelMat[j];
+					ivec2 backLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(backModelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
+					if (carLightMapGridDistanceToView[backLightMapIdx.x][backLightMapIdx.y] < FLT_MAX)
 					{
-						numVisibleLightOnCars++;
+						std::swap(modelMat, backModelMat);
+						std::swap(logical_data.carColor[i], logical_data.carColor[j]);
+						break;
 					}
 				}
+				if (i == j)
+				{
+					break;
+				}
 			}
+			numVisibleCars++;
+			numVisibleLightOnCars++;
+		}
+		for (int i = logical_data.numLightOnCars, j = logical_data.numCars; i < j; i++)
+		{
+			mat4& modelMat = logical_data.carModelMat[i];
+			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
+			if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] == FLT_MAX)
+			{
+				for (j--; i < j; j--)
+				{
+					mat4& backModelMat = logical_data.carModelMat[j];
+					ivec2 backLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(backModelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
+					if (carLightMapGridDistanceToView[backLightMapIdx.x][backLightMapIdx.y] < FLT_MAX)
+					{
+						std::swap(modelMat, backModelMat);
+						std::swap(logical_data.carColor[i], logical_data.carColor[j]);
+						break;
+					}
+				}
+				if (i == j)
+				{
+					break;
+				}
+			}
+			numVisibleCars++;
 		}
 		int numCarLights = 2 * logical_data.numLightOnCars;
 		for (int i = 0; i < numCarLights; i++)
@@ -1051,7 +1074,7 @@ void drawGraphics()
 		}
 		for (int i = 0; i < numVisibleCars; i++)
 		{
-			mat4 modelMat = carModelMat[i];
+			mat4& modelMat = logical_data.carModelMat[i < numVisibleLightOnCars ? i : i + logical_data.numLightOnCars - numVisibleLightOnCars];
 			ivec2 posIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + LIGHT_MAP_SIZE / 2.0f);
 			int numLighting = 0;
 			for (int j = -1; j < 2; j++)
@@ -1061,7 +1084,7 @@ void drawGraphics()
 					ivec2 idx = posIdx + ivec2(j, k);
 					for (int p = carLightMap[idx.x][idx.y][0]; p < carLightMap[idx.x][idx.y][1]; p++)
 					{
-						mat4 carLightMat = carLightMats[p];
+						mat4& carLightMat = carLightMats[p];
 						for (const vec3& vertex : carBoundray)
 						{
 							vec4 v = carLightMat * modelMat * vec4(vertex, 1.0f);
@@ -1081,7 +1104,13 @@ void drawGraphics()
 		}
 	}
 
+	if (isViewUpdated)
+	{
+		glNamedBufferSubData(sceneUBO, offsetof(decltype(view), viewMat), sizeof(view.viewMat) + sizeof(view.invViewMat), &view.viewMat);
+		glProgramUniform1f(spSun, glGetUniformLocation(spSun, "horizionY"), horizonY);
+	}
 
+	glNamedBufferSubData(sceneUBO, sceneUBOoffset1, 4 * sizeof(vec4), &sun);
 	if (sun.dir.z > 0)
 	{
 		glNamedBufferSubData(shadowUBO, 0, sizeof(sunShadow), &sunShadow);
@@ -1090,12 +1119,20 @@ void drawGraphics()
 	}
 	else
 	{
-		glNamedBufferSubData(carLightMapSSBO, 0, sizeof(carLightMap),carLightMap);
+		glNamedBufferSubData(carLightMapSSBO, 0, sizeof(carLightMap), carLightMap);
 		glNamedBufferSubData(carLightPosUBO, 0, numVisibleCarLights * sizeof(vec4), carLightPos);
 		glNamedBufferSubData(carLightShadowMatUBO, 0, numVisibleCarLights * sizeof(mat4), carLightMats);
 		glNamedBufferSubData(carLightingSSBO, 0, numVisibleCars * sizeof(carLightings[0]), carLightings);
-		glNamedBufferSubData(carMatVBO, 0, numVisibleCars * sizeof(mat4), carModelMat);
-		glNamedBufferSubData(carColorVBO, 0, numVisibleCars * sizeof(vec3), carColor);
+		glNamedBufferSubData(carMatVBO, 0, numVisibleLightOnCars * sizeof(mat4), logical_data.carModelMat);
+		glNamedBufferSubData(carColorVBO, 0, numVisibleLightOnCars * sizeof(vec3), logical_data.carColor);
+		glNamedBufferSubData(carMatVBO, numVisibleLightOnCars * sizeof(mat4), (numVisibleCars - numVisibleLightOnCars) * sizeof(mat4), &logical_data.carModelMat[logical_data.numLightOnCars]);
+		glNamedBufferSubData(carColorVBO, numVisibleLightOnCars * sizeof(vec3), (numVisibleCars - numVisibleLightOnCars) * sizeof(vec3), &logical_data.carColor[logical_data.numLightOnCars]);
+		glProgramUniform1i(spCarNight, glGetUniformLocation(spCarNight, "numLightOnCars"), numVisibleLightOnCars);
+	}
+	if (sun.dir.z > -0.2f)
+	{
+		mat3 sunMat = rotate(acos(sun.dir.z), vec3(-sun.dir.y, sun.dir.x, 0));
+		glProgramUniformMatrix3fv(spSun, glGetUniformLocation(spSun, "sunMat"), 1, GL_FALSE, (GLfloat*)&sunMat);
 	}
 
 	glBindTextureUnit(0, HIGHWAY_TEX);
@@ -1134,7 +1171,6 @@ void drawGraphics()
 	}
 	else
 	{
-		glProgramUniform1i(spCarNight, glGetUniformLocation(spCarNight, "numLightOnCars"), numVisibleLightOnCars);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glDisable(GL_CULL_FACE);
@@ -1251,8 +1287,8 @@ void winReshapeFunc(GLint width, GLint height)
 	GLint maxTexSize;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTexSize);
 	bloomBufferWidth = fmin(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), maxTexSize);
-	projMat = perspective(FOVY, float(width) / height, VIEW_Z_NEAR, VIEW_Z_FAR);
-	glNamedBufferSubData(sceneUBO, 0, sizeof(mat4), &projMat);
+	view.projMat = perspective(FOVY, float(width) / height, VIEW_Z_NEAR, VIEW_Z_FAR);
+	glNamedBufferSubData(sceneUBO, 0, sizeof(view.projMat), &view.projMat);
 
 	int MSAA_level = 8;
 	for (int i = 0; i < 2; i++)
@@ -1395,7 +1431,7 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 	glutInit(&argc, argv);
-	//glutInitContextVersion(4, 6);
+	glutInitContextVersion(4, 6);
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowPosition(10, 0);

@@ -4,10 +4,9 @@
 #include "Car.h"
 #include "scene.h"
 
-#include "gtx/transform.hpp"
-
 #include <chrono>
 #include <vector>
+#include <list>
 
 #define MAX_FRAME_TIME 50
 #define CAR_POS_MAP_SIZE 52
