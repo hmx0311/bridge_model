@@ -1,6 +1,6 @@
 #include "Lane.h"
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
+#include "glm.hpp"
+#include "gtc/matrix_transform.hpp"
 #include "common.h"
 
 Lane::Lane(float length, float speedLimit, const glm::mat4& startMat, glm::mat4(*motion)(float)) :
@@ -13,7 +13,7 @@ glm::mat4 Lane::transform(float s)
 
 void Lane::setNextLane(Lane* nextLane)
 {
-	this->nextLanes[numNextLanes++] = nextLane;
+	nextLanes[numNextLanes++] = nextLane;
 }
 
 Lane* Lane::getNextLane()

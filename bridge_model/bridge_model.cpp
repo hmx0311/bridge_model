@@ -1,26 +1,20 @@
-#pragma comment(lib,"glew32.lib")
 #pragma comment(lib,"imm32.lib")
-#include "glew.h"
-#include "freeglut.h"
-#include "glm\gtx\transform.hpp"
-
-#include <time.h>
-#include <list>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 
 #include "resource.h"
 #include "scene.h"
 #include "mesh.h"
 #include "common.h"
-#include "Lane.h"
 #include "Car.h"
-#include "Sun.h"
+#include "logical_frame.h"
+
+#include "glew.h"
+#include "freeglut.h"
+#include "gtx/transform.hpp"
+
+#include <time.h>
+#include <thread>
 
 using namespace glm;
-
-#define MAX_FRAME_TIME 50
 
 #define SHADOW_TEX_SIZE 4096
 #define MIN_CSM_RATIO 1.2f
@@ -38,12 +32,13 @@ GLuint shadowTex;
 #define MIN_SHADOW_FAR 369.5f
 
 GLint windowWidth, windowHeight;
-mat4 projMat;
-bool isPausing = false;
-int simulateSpeed = 1;
+
 float aimAzimuth = 0.3f, aimRelativeDepression = 0.1f, aimViewDistance = 15000;
+float azimuth = aimAzimuth, relativeDepression = aimRelativeDepression, viewDistance = aimViewDistance;
+vec3 focus(0);
 char focusMoveDir = 0;
-int needUpdateView = 2;
+bool needUpdateView = true;
+clock_t lastFrameTime;
 
 #define MAX_HEIGHT 500
 #define HEIGHT_MAP_SIZE 256
@@ -89,7 +84,7 @@ GLintptr sceneUBOoffset1 = 256;
 GLuint shadowUBO;
 
 #define LIGHT_MAP_SIZE 128
-#define LIGHT_MAP_GRID_LENGTH 1600
+#define LIGHT_MAP_GRID_LENGTH (CAR_LIGHT_RANGE / 2)
 // binding = 3
 GLuint carLightMapSSBO;
 // binding = 4
@@ -99,37 +94,30 @@ GLuint carLightShadowMatUBO;
 // binding = 6
 GLuint carLightingSSBO;
 
-#define CAR_POS_MAP_SIZE 52
-#define CAR_POS_MAP_GRID_LENGTH 4000
-
-struct DrawData
+mat4 projMat;
+struct
 {
-	bool isViewChanged;
-	struct
-	{
-		mat4 viewMat;
-		mat4 invViewMat;
-	}view;
-	float horizonY;
-	vec3 sunDir;
-	struct
-	{
-		mat4 mat[CSM_LEVELS];
-		mat4 texMat[CSM_LEVELS];
-	}sunShadow;
-	int numCars;
-	int numLightOnCars;
-	int numActiveCarLights;
-	mat4 carModelMat[MAX_CAR_COUNT];
-	vec3 carColor[MAX_CAR_COUNT];
-	int carLightMap[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE][2];
-	vec4 carLightPos[2 * MAX_CAR_COUNT];
-	mat4 carLightMats[2 * MAX_CAR_COUNT];
-	int carLightings[MAX_CAR_COUNT][24];
-}drawData[2];
-int frontDrawData = 1;
-
+	mat4 viewMat;
+	mat4 invViewMat;
+}view;
+float horizonY;
+vec3 CSMAreas[CSM_LEVELS][12];
+struct
+{
+	mat4 mat[CSM_LEVELS];
+	mat4 texMat[CSM_LEVELS];
+}sunShadow;
 float carLightMapGridDistanceToView[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE];
+ivec2 carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE];
+int numActiveCarLightMapGrids = 0;
+const mat4 carLightShadowProjMat = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 50.0f, 50.0f + 2 * LIGHT_MAP_GRID_LENGTH);
+
+mat4 carModelMat[MAX_CAR_COUNT];
+vec3 carColor[MAX_CAR_COUNT];
+int carLightMap[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE][2];
+vec4 carLightPos[2 * MAX_CAR_COUNT];
+mat4 carLightMats[2 * MAX_CAR_COUNT];
+int carLightings[MAX_CAR_COUNT][24];
 
 GLuint spHighwayDay;
 GLuint spHighwayNight;
@@ -145,9 +133,6 @@ GLuint spGaussianBlur;
 GLuint spBuffer2Screen;
 
 std::mt19937 rdEng;
-
-std::mutex drawMut;
-std::mutex viewMut;
 
 GLuint loadShader(GLuint shaderID, GLenum type)
 {
@@ -192,7 +177,8 @@ GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
 	}
 	glLinkProgram(sp);
 	glGetProgramiv(sp, GL_LINK_STATUS, &status);
-	if (status == GL_FALSE) {
+	if (status == GL_FALSE)
+	{
 		printf("ERROR: Shader Program %d Link Error\n", sp);
 		char data[1024];
 		int len;
@@ -387,46 +373,50 @@ void init()
 	glewInit();
 	printf("%s\n", (char*)glGetString(GL_VERSION));
 	printf("%s\n", (char*)glGetString(GL_SHADING_LANGUAGE_VERSION));
-	int maxoutput;
-	glGetIntegerv(GL_MAX_VARYING_COMPONENTS, &maxoutput);
-
-	printf("%d\n", maxoutput);
 	initShader();
 	std::random_device rd;
 	rdEng.seed(rd());
 
+	for (int i = 0; i < LIGHT_MAP_SIZE; i++)
+	{
+		for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+		{
+			carLightMapGridDistanceOrder[i * LIGHT_MAP_SIZE + j] = ivec2(i, j);
+		}
+	}
+
 	int UBOOffsetAlignment;
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &UBOOffsetAlignment);
 
-	sceneUBOoffset1 = ((sizeof(mat4) + sizeof(DrawData::view) - 1) / UBOOffsetAlignment + 1) * UBOOffsetAlignment;
+	sceneUBOoffset1 = ((sizeof(mat4) + sizeof(view) - 1) / UBOOffsetAlignment + 1) * UBOOffsetAlignment;
 	glGenBuffers(1, &sceneUBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, sceneUBO);
 	glBufferData(GL_UNIFORM_BUFFER, sceneUBOoffset1 + 4 * sizeof(vec4), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, sceneUBO, 0, sizeof(mat4) + sizeof(DrawData::view));
+	glBindBufferRange(GL_UNIFORM_BUFFER, 0, sceneUBO, 0, sizeof(mat4) + sizeof(view));
 	glBindBufferRange(GL_UNIFORM_BUFFER, 1, sceneUBO, sceneUBOoffset1, 4 * sizeof(vec4));
 
 	glGenBuffers(1, &shadowUBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, shadowUBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(DrawData::sunShadow), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 2, shadowUBO, 0, sizeof(DrawData::sunShadow));
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(sunShadow), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 2, shadowUBO, 0, sizeof(sunShadow));
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 	glGenBuffers(1, &carLightMapSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, carLightMapSSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(DrawData::carLightMap), nullptr, GL_STREAM_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, carLightMapSSBO, 0, sizeof(DrawData::carLightMap));
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(carLightMap), nullptr, GL_STREAM_DRAW);
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, carLightMapSSBO, 0, sizeof(carLightMap));
 	glGenBuffers(1, &carLightPosUBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, carLightPosUBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(DrawData::carLightPos), nullptr, GL_STREAM_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 4, carLightPosUBO, 0, sizeof(DrawData::carLightPos));
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(carLightPos), nullptr, GL_STREAM_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 4, carLightPosUBO, 0, sizeof(carLightPos));
 	glGenBuffers(1, &carLightShadowMatUBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, carLightShadowMatUBO);
 	glBufferData(GL_UNIFORM_BUFFER, 2 * MAX_CAR_COUNT * sizeof(mat4), nullptr, GL_STREAM_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, 5, carLightShadowMatUBO, 0, 2 * MAX_CAR_COUNT * sizeof(mat4));
 	glGenBuffers(1, &carLightingSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, carLightingSSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(DrawData::carLightings), nullptr, GL_STREAM_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, carLightingSSBO, 0, sizeof(DrawData::carLightings));
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(carLightings), nullptr, GL_STREAM_DRAW);
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, carLightingSSBO, 0, sizeof(carLightings));
 
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
@@ -497,310 +487,264 @@ void init()
 
 	initScene();
 	buildHeightMap();
+	initLogic();
 }
 
-float tickRate = 60;
-
-void computeFrame()
+void drawGraphics()
 {
-	float azimuth = aimAzimuth, relativeDepression = aimRelativeDepression, viewDistance = aimViewDistance;
-	vec3 focus(0);
-	std::uniform_int_distribution<uint64_t> distb(0, 480);
-	uint64_t elapsedTime = 2000;
-	clock_t lastTime = clock();
-	uint64_t nextCarTime[6];
-	for (int i = 0; i < 6; i++)
+	clock_t time = clock();
+	uint32_t frameTime = time - lastFrameTime;
+	lastFrameTime = time;
+	const LogicalData& logical_data = getLatestLogicalData();
+	if (needUpdateView)
 	{
-		nextCarTime[i] = elapsedTime + distb(rdEng);
-	}
-	Sun sun(39.9f);
-	vec3 CSMAreas[CSM_LEVELS][12];
-	std::list<Car> vehicles;
-	ivec2 carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE];
-	for (int i = 0; i < LIGHT_MAP_SIZE; i++)
-	{
-		for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+		needUpdateView = false;
+		if (azimuth != aimAzimuth)
 		{
-			carLightMapGridDistanceOrder[i * LIGHT_MAP_SIZE + j] = ivec2(i, j);
-		}
-	}
-	int numActiveCarLightMapGrids = 0;
-	const mat4 carLightShadowProjMat = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 50.0f, 50.0f + 2 * LIGHT_MAP_GRID_LENGTH);
-	while (true)
-	{
-		clock_t time = clock();
-		uint32_t frameTime = time - lastTime;
-		lastTime = time;
-		tickRate = (0.1f * tickRate + 1) / (frameTime * 0.001f + 0.1f);
-		uint32_t logicalTime = frameTime * simulateSpeed;
-		if (isPausing)
-		{
-			logicalTime = 0;
-		}
-		else if (logicalTime > MAX_FRAME_TIME)
-		{
-			logicalTime = MAX_FRAME_TIME;
-		}
-		elapsedTime += logicalTime;
-		int backDrawData = 1 - frontDrawData;
-
-		sun.updatePosition(elapsedTime);
-		drawData[backDrawData].sunDir = sun.dir;
-
-		for (int i = 0; i < 6; i++)
-		{
-			if (elapsedTime > nextCarTime[i])
+			constexpr float rotateSpeed = 0.01f;
+			float maxRotateAngle = rotateSpeed * frameTime;
+			if (abs(azimuth - aimAzimuth) > maxRotateAngle)
 			{
-				vehicles.emplace_back(lanes[i], sun.dir.z);
-				nextCarTime[i] += (i < 4 ? 1 : 6) * distb(rdEng) + REACT_TIME + CAR_LENGTH / lanes[i]->speedLimit;
-			}
-		}
-		ivec2 carPosMap[CAR_POS_MAP_SIZE][CAR_POS_MAP_SIZE]{};
-		struct CarPosInfo
-		{
-			Car* car;
-			ivec2* posMapGrids;
-		};
-		std::vector<CarPosInfo> carPosInfos;
-		for (auto iter = vehicles.begin(); iter != vehicles.end(); )
-		{
-			if (iter->update(logicalTime, sun.dir.z))
-			{
-				const mat4& modelMat = iter->getModelMat();
-				vec2 carXYPos(modelMat[3]);
-				ivec2 posMapIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * carXYPos + 0.5f * CAR_POS_MAP_SIZE);
-				carPosInfos.emplace_back(CarPosInfo{ &*iter, &carPosMap[posMapIdx.x][posMapIdx.y] });
-				carPosMap[posMapIdx.x][posMapIdx.y].x++;
-				iter++;
+				if (azimuth > aimAzimuth)
+				{
+					azimuth -= maxRotateAngle;
+				}
+				else
+				{
+					azimuth += maxRotateAngle;
+				}
+				needUpdateView = true;
 			}
 			else
 			{
-				iter = vehicles.erase(iter);
+				aimAzimuth -= int(aimAzimuth / (2 * PI)) * (2 * PI);
+				azimuth = aimAzimuth;
 			}
 		}
-		Car* carPos[MAX_CAR_COUNT];
-		int numCarPos = 0;
-		for (CarPosInfo& carPosInfo : carPosInfos)
+		if (relativeDepression != aimRelativeDepression)
 		{
-			if (carPosInfo.posMapGrids->y == 0)
+			constexpr float rotateSpeed = 0.005f;
+			float maxRotateAngle = rotateSpeed * frameTime;
+			if (abs(relativeDepression - aimRelativeDepression) > maxRotateAngle)
 			{
-				carPosInfo.posMapGrids->y = numCarPos;
-				numCarPos += carPosInfo.posMapGrids->x;
-				carPosInfo.posMapGrids->x = carPosInfo.posMapGrids->y;
-			}
-			carPos[carPosInfo.posMapGrids->y++] = carPosInfo.car;
-		}
-		for (Car& car : vehicles)
-		{
-			constexpr float posOffset = -30.0f / CAR_POS_MAP_GRID_LENGTH + 0.5f;
-			ivec2 posIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + posOffset * vec2(car.getDir()) + (CAR_POS_MAP_SIZE / 2 - 0.5f));
-			constexpr ivec2 offset[4] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
-			for (int i = 0; i < 4; i++)
-			{
-				ivec2 idx = posIdx + offset[i];
-				for (int k = carPosMap[idx.x][idx.y].x; k < carPosMap[idx.x][idx.y].y; k++)
+				if (relativeDepression > aimRelativeDepression)
 				{
-					car.collisionTest(carPos[k]);
-				}
-			}
-		}
-
-		if (needUpdateView == 1)
-		{
-			drawData[backDrawData].isViewChanged = drawData[frontDrawData].isViewChanged;
-			drawData[backDrawData].view = drawData[frontDrawData].view;
-			drawData[backDrawData].horizonY = drawData[frontDrawData].horizonY;
-			needUpdateView = 0;
-		}
-		else if (needUpdateView == 2)
-		{
-			needUpdateView = 1;
-			drawData[backDrawData].isViewChanged = true;
-			viewMut.lock();
-			if (azimuth != aimAzimuth)
-			{
-				constexpr float rotateSpeed = 0.01f;
-				float maxRotateAngle = rotateSpeed * frameTime;
-				if (abs(azimuth - aimAzimuth) > maxRotateAngle)
-				{
-					if (azimuth > aimAzimuth)
-					{
-						azimuth -= maxRotateAngle;
-					}
-					else
-					{
-						azimuth += maxRotateAngle;
-					}
-					needUpdateView = 2;
+					relativeDepression -= maxRotateAngle;
 				}
 				else
 				{
-					aimAzimuth -= int(aimAzimuth / (2 * PI)) * (2 * PI);
-					azimuth = aimAzimuth;
+					relativeDepression += maxRotateAngle;
 				}
+				needUpdateView = true;
 			}
-			if (relativeDepression != aimRelativeDepression)
+			else
 			{
-				constexpr float rotateSpeed = 0.005f;
-				float maxRotateAngle = rotateSpeed * frameTime;
-				if (abs(relativeDepression - aimRelativeDepression) > maxRotateAngle)
+				relativeDepression = aimRelativeDepression;
+			}
+		}
+		if (viewDistance != aimViewDistance)
+		{
+			constexpr float zoomSpeed = 0.005f;
+			float maxZoomDistance = zoomSpeed * viewDistance * frameTime;
+			if (abs(viewDistance - aimViewDistance) > maxZoomDistance)
+			{
+				if (viewDistance > aimViewDistance)
 				{
-					if (relativeDepression > aimRelativeDepression)
-					{
-						relativeDepression -= maxRotateAngle;
-					}
-					else
-					{
-						relativeDepression += maxRotateAngle;
-					}
-					needUpdateView = 2;
+					viewDistance -= maxZoomDistance;
 				}
 				else
 				{
-					relativeDepression = aimRelativeDepression;
+					viewDistance += maxZoomDistance;
 				}
+				needUpdateView = true;
 			}
-			if (viewDistance != aimViewDistance)
+			else
 			{
-				constexpr float zoomSpeed = 0.005f;
-				float maxZoomDistance = zoomSpeed * viewDistance * frameTime;
-				if (abs(viewDistance - aimViewDistance) > maxZoomDistance)
+				viewDistance = aimViewDistance;
+			}
+		}
+		if (focusMoveDir != 0)
+		{
+			float moveSpeed = 0.001f * viewDistance + 1.0f;
+			float moveDistance = moveSpeed * frameTime;
+			switch (focusMoveDir)
+			{
+			case 'a':
+				focus.x -= cos(azimuth) * moveDistance;
+				focus.y -= sin(azimuth) * moveDistance;
+				break;
+			case 'd':
+				focus.x += cos(azimuth) * moveDistance;
+				focus.y += sin(azimuth) * moveDistance;
+				break;
+			case 'w':
+				focus.x -= sin(azimuth) * moveDistance;
+				focus.y += cos(azimuth) * moveDistance;
+				break;
+			case 's':
+				focus.x += sin(azimuth) * moveDistance;
+				focus.y -= cos(azimuth) * moveDistance;
+				break;
+			}
+			focus.x = clamp(focus.x, -30000.0f, 30000.0f);
+			focus.y = clamp(focus.y, -10000.0f, 20000.0f);
+			needUpdateView = true;
+		}
+
+		float depression = PI / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * viewDistance / MAX_VIEW_DISTANCE) * (1 - relativeDepression)));
+		vec3 viewDir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
+		focus.z = FOCUS_HEIGHT;
+		vec3 eye = focus - viewDistance * viewDir;
+		if (eye.z < FOCUS_HEIGHT + MAX_HEIGHT)
+		{
+			vec2 heightMapCoord((eye.x - HEIGHT_MAP_AREA.left) / (HEIGHT_MAP_AREA.right - HEIGHT_MAP_AREA.left) * HEIGHT_MAP_SIZE - 0.5f,
+				(eye.y - HEIGHT_MAP_AREA.bottom) / (HEIGHT_MAP_AREA.top - HEIGHT_MAP_AREA.bottom) * HEIGHT_MAP_SIZE - 0.5f);
+			if (0 < heightMapCoord.x && heightMapCoord.x < HEIGHT_MAP_SIZE - 1 && 0 < heightMapCoord.y && heightMapCoord.y < HEIGHT_MAP_SIZE - 1)
+			{
+				float heightOffset = heightMap[int(heightMapCoord.y)][int(heightMapCoord.x)] * (int(heightMapCoord.x) + 1 - heightMapCoord.x) * (int(heightMapCoord.y) + 1 - heightMapCoord.y) +
+					heightMap[int(heightMapCoord.y)][int(heightMapCoord.x) + 1] * (heightMapCoord.x - int(heightMapCoord.x)) * (int(heightMapCoord.y) + 1 - heightMapCoord.y) +
+					heightMap[int(heightMapCoord.y) + 1][int(heightMapCoord.x)] * (int(heightMapCoord.x) + 1 - heightMapCoord.x) * (heightMapCoord.y - int(heightMapCoord.y)) +
+					heightMap[int(heightMapCoord.y) + 1][int(heightMapCoord.x) + 1] * (heightMapCoord.x - int(heightMapCoord.x)) * (heightMapCoord.y - int(heightMapCoord.y));
+				heightOffset *= 1 - (eye.z - FOCUS_HEIGHT) / (MAX_HEIGHT);
+				eye.z += heightOffset;
+				focus.z += heightOffset;
+			}
+		}
+		view.viewMat = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
+		view.invViewMat = inverse(view.viewMat);
+		vec3 topView(0, tanf(FOVY / 2), -1);
+		vec3 bottomView(0, -topView.y, -1);
+		vec3 viewX = vec3(topView.y / windowHeight * windowWidth, 0, 0);
+		topView = mat3(view.invViewMat) * topView;
+		bottomView = mat3(view.invViewMat) * bottomView;
+		viewX = mat3(view.invViewMat) * viewX;
+		horizonY = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * windowHeight / 2;
+
+		if (eye.z > MAX_HEIGHT)
+		{
+			float shadowNear = fmax(-(eye.z - MAX_HEIGHT) / bottomView.z, VIEW_Z_NEAR);
+			float shadowFar = fmax(shadowNear, MIN_SHADOW_FAR);
+			float bottomFar = -eye.z / bottomView.z;
+			float topNear = VIEW_Z_FAR;
+			float topFar = VIEW_Z_FAR;
+			if (topView.z < 0)
+			{
+				topNear = fmin(-(eye.z - MAX_HEIGHT) / topView.z, VIEW_Z_FAR);
+				topFar = fmin(-eye.z / topView.z, VIEW_Z_FAR);
+			}
+			float CSMRatio = fmin(pow(topFar / shadowFar, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
+			vec3 shadowHexa[6];
+			shadowHexa[4] = shadowNear * bottomView;
+			shadowHexa[5] = shadowHexa[4];
+			for (int i = 0; i < CSM_LEVELS; i++)
+			{
+				shadowFar *= CSMRatio;
+				shadowHexa[0] = shadowHexa[4];
+				shadowHexa[1] = shadowHexa[5];
+				if (shadowNear < bottomFar && bottomFar < shadowFar)
 				{
-					if (viewDistance > aimViewDistance)
-					{
-						viewDistance -= maxZoomDistance;
-					}
-					else
-					{
-						viewDistance += maxZoomDistance;
-					}
-					needUpdateView = 2;
+					shadowHexa[2] = bottomFar * bottomView;
 				}
 				else
 				{
-					viewDistance = aimViewDistance;
+					shadowHexa[2] = shadowHexa[0];
+				}
+				if (shadowNear < topNear && topNear < shadowFar)
+				{
+					shadowHexa[3] = topNear * topView;
+				}
+				else
+				{
+					shadowHexa[3] = shadowHexa[0];
+				}
+				if (topFar < shadowFar)
+				{
+					shadowHexa[4] = topView * topFar;
+					shadowHexa[5] = shadowHexa[4];
+				}
+				else
+				{
+					if (bottomFar < shadowFar)
+					{
+						shadowHexa[4] = shadowFar * bottomView - (eye.z + shadowFar * bottomView.z) / (viewDir.z - bottomView.z) * (viewDir - bottomView);
+					}
+					else
+					{
+						shadowHexa[4] = shadowFar * bottomView;
+					}
+					if (topNear > shadowFar)
+					{
+						shadowHexa[5] = shadowFar * topView + (eye.z + shadowFar * topView.z - MAX_HEIGHT) / (topView.z - viewDir.z) * (viewDir - topView);
+					}
+					else
+					{
+						shadowHexa[5] = shadowFar * topView;
+					}
+				}
+				shadowNear = shadowFar;
+				for (int j = 0; j < 6; j++)
+				{
+					float distance = dot(shadowHexa[j], viewDir);
+					CSMAreas[i][2 * j] = eye + shadowHexa[j] + distance * viewX;
+					CSMAreas[i][2 * j + 1] = eye + shadowHexa[j] - distance * viewX;
 				}
 			}
-			if (focusMoveDir != 0)
+		}
+		else
+		{
+			float shadowNear = VIEW_Z_NEAR;
+			float bottom = -eye.z / bottomView.z;
+			float shadowFar = MIN_SHADOW_FAR;
+			if (topView.z > 0)
 			{
-				float moveSpeed = 0.001f * viewDistance + 1.0f;
-				float moveDistance = moveSpeed * frameTime;
-				switch (focusMoveDir)
-				{
-				case 'a':
-					focus.x -= cos(azimuth) * moveDistance;
-					focus.y -= sin(azimuth) * moveDistance;
-					break;
-				case 'd':
-					focus.x += cos(azimuth) * moveDistance;
-					focus.y += sin(azimuth) * moveDistance;
-					break;
-				case 'w':
-					focus.x -= sin(azimuth) * moveDistance;
-					focus.y += cos(azimuth) * moveDistance;
-					break;
-				case 's':
-					focus.x += sin(azimuth) * moveDistance;
-					focus.y -= cos(azimuth) * moveDistance;
-					break;
-				}
-				focus.x = clamp(focus.x, -30000.0f, 30000.0f);
-				focus.y = clamp(focus.y, -10000.0f, 20000.0f);
-				needUpdateView = 2;
-			}
-			viewMut.unlock();
-
-			float depression = PI / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * viewDistance / MAX_VIEW_DISTANCE) * (1 - relativeDepression)));
-			vec3 viewDir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
-			focus.z = FOCUS_HEIGHT;
-			vec3 eye = focus - viewDistance * viewDir;
-			if (eye.z < FOCUS_HEIGHT + MAX_HEIGHT)
-			{
-				vec2 heightMapCoord((eye.x - HEIGHT_MAP_AREA.left) / (HEIGHT_MAP_AREA.right - HEIGHT_MAP_AREA.left) * HEIGHT_MAP_SIZE - 0.5f,
-					(eye.y - HEIGHT_MAP_AREA.bottom) / (HEIGHT_MAP_AREA.top - HEIGHT_MAP_AREA.bottom) * HEIGHT_MAP_SIZE - 0.5f);
-				if (0 < heightMapCoord.x && heightMapCoord.x < HEIGHT_MAP_SIZE - 1 && 0 < heightMapCoord.y && heightMapCoord.y < HEIGHT_MAP_SIZE - 1)
-				{
-					float heightOffset = heightMap[int(heightMapCoord.y)][int(heightMapCoord.x)] * (int(heightMapCoord.x) + 1 - heightMapCoord.x) * (int(heightMapCoord.y) + 1 - heightMapCoord.y) +
-						heightMap[int(heightMapCoord.y)][int(heightMapCoord.x) + 1] * (heightMapCoord.x - int(heightMapCoord.x)) * (int(heightMapCoord.y) + 1 - heightMapCoord.y) +
-						heightMap[int(heightMapCoord.y) + 1][int(heightMapCoord.x)] * (int(heightMapCoord.x) + 1 - heightMapCoord.x) * (heightMapCoord.y - int(heightMapCoord.y)) +
-						heightMap[int(heightMapCoord.y) + 1][int(heightMapCoord.x) + 1] * (heightMapCoord.x - int(heightMapCoord.x)) * (heightMapCoord.y - int(heightMapCoord.y));
-					heightOffset *= 1 - (eye.z - FOCUS_HEIGHT) / (MAX_HEIGHT);
-					eye.z += heightOffset;
-					focus.z += heightOffset;
-				}
-			}
-			mat4 viewMat = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
-			mat4 invViewMat = inverse(viewMat);
-			vec3 topView(0, tanf(FOVY / 2), -1);
-			vec3 bottomView(0, -topView.y, -1);
-			vec3 viewX = vec3(topView.y / windowHeight * windowWidth, 0, 0);
-			topView = mat3(invViewMat) * topView;
-			bottomView = mat3(invViewMat) * bottomView;
-			viewX = mat3(invViewMat) * viewX;
-			drawData[backDrawData].view.viewMat = viewMat;
-			drawData[backDrawData].view.invViewMat = invViewMat;
-			drawData[backDrawData].horizonY = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * windowHeight / 2;
-
-			if (eye.z > MAX_HEIGHT)
-			{
-				float shadowNear = fmax(-(eye.z - MAX_HEIGHT) / bottomView.z, VIEW_Z_NEAR);
-				float shadowFar = fmax(shadowNear, MIN_SHADOW_FAR);
-				float bottomFar = -eye.z / bottomView.z;
-				float topNear = VIEW_Z_FAR;
-				float topFar = VIEW_Z_FAR;
-				if (topView.z < 0)
-				{
-					topNear = fmin(-(eye.z - MAX_HEIGHT) / topView.z, VIEW_Z_FAR);
-					topFar = fmin(-eye.z / topView.z, VIEW_Z_FAR);
-				}
-				float CSMRatio = fmin(pow(topFar / shadowFar, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
+				float top = fmin((MAX_HEIGHT - eye.z) / topView.z, VIEW_Z_FAR);
+				float CSMRatio = fmin(pow(VIEW_Z_FAR / shadowFar, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 				vec3 shadowHexa[6];
 				shadowHexa[4] = shadowNear * bottomView;
-				shadowHexa[5] = shadowHexa[4];
+				if (top < shadowNear)
+				{
+					shadowHexa[5] = shadowNear * topView - (eye.z + shadowNear * topView.z - MAX_HEIGHT) / (viewDir.z - topView.z) * (viewDir - topView);
+				}
+				else
+				{
+					shadowHexa[5] = shadowNear * topView;
+				}
 				for (int i = 0; i < CSM_LEVELS; i++)
 				{
 					shadowFar *= CSMRatio;
 					shadowHexa[0] = shadowHexa[4];
 					shadowHexa[1] = shadowHexa[5];
-					if (shadowNear < bottomFar && bottomFar < shadowFar)
+					if (shadowNear < bottom && bottom < shadowFar)
 					{
-						shadowHexa[2] = bottomFar * bottomView;
+						shadowHexa[2] = bottom * bottomView;
 					}
 					else
 					{
 						shadowHexa[2] = shadowHexa[0];
 					}
-					if (shadowNear < topNear && topNear < shadowFar)
+					if (shadowNear < top && top < shadowFar)
 					{
-						shadowHexa[3] = topNear * topView;
+						shadowHexa[3] = top * topView;
 					}
 					else
 					{
 						shadowHexa[3] = shadowHexa[0];
 					}
-					if (topFar < shadowFar)
+					if (bottom < shadowFar)
 					{
-						shadowHexa[4] = topView * topFar;
-						shadowHexa[5] = shadowHexa[4];
+						shadowHexa[4] = shadowFar * bottomView - (eye.z + shadowFar * bottomView.z) / (viewDir.z - bottomView.z) * (viewDir - bottomView);
 					}
 					else
 					{
-						if (bottomFar < shadowFar)
-						{
-							shadowHexa[4] = shadowFar * bottomView - (eye.z + shadowFar * bottomView.z) / (viewDir.z - bottomView.z) * (viewDir - bottomView);
-						}
-						else
-						{
-							shadowHexa[4] = shadowFar * bottomView;
-						}
-						if (topNear > shadowFar)
-						{
-							shadowHexa[5] = shadowFar * topView + (eye.z + shadowFar * topView.z - MAX_HEIGHT) / (topView.z - viewDir.z) * (viewDir - topView);
-						}
-						else
-						{
-							shadowHexa[5] = shadowFar * topView;
-						}
+						shadowHexa[4] = shadowFar * bottomView;
+					}
+					if (top < shadowFar)
+					{
+						shadowHexa[5] = shadowFar * topView - (eye.z + shadowFar * topView.z - MAX_HEIGHT) / (viewDir.z - topView.z) * (viewDir - topView);
+					}
+					else
+					{
+						shadowHexa[5] = shadowFar * topView;
 					}
 					shadowNear = shadowFar;
 					for (int j = 0; j < 6; j++)
@@ -813,44 +757,36 @@ void computeFrame()
 			}
 			else
 			{
-				float shadowNear = VIEW_Z_NEAR;
-				float bottom = -eye.z / bottomView.z;
-				float shadowFar = MIN_SHADOW_FAR;
-				if (topView.z > 0)
+				float top = VIEW_Z_FAR;
+				if (topView.z < 0)
 				{
-					float top = fmin((MAX_HEIGHT - eye.z) / topView.z, VIEW_Z_FAR);
-					float CSMRatio = fmin(pow(VIEW_Z_FAR / shadowFar, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
-					vec3 shadowHexa[6];
-					shadowHexa[4] = shadowNear * bottomView;
-					if (top < shadowNear)
+					top = fmin(-eye.z / topView.z, VIEW_Z_FAR);
+				}
+				float CSMRatio = fmin(pow(top / shadowFar, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
+				vec3 shadowHexa[6];
+				shadowHexa[4] = shadowNear * bottomView;
+				shadowHexa[5] = shadowNear * topView;
+				for (int i = 0; i < CSM_LEVELS; i++)
+				{
+					shadowFar *= CSMRatio;
+					shadowHexa[0] = shadowHexa[4];
+					shadowHexa[1] = shadowHexa[5];
+					if (shadowNear < bottom && bottom < shadowFar)
 					{
-						shadowHexa[5] = shadowNear * topView - (eye.z + shadowNear * topView.z - MAX_HEIGHT) / (viewDir.z - topView.z) * (viewDir - topView);
+						shadowHexa[2] = bottom * bottomView;
 					}
 					else
 					{
-						shadowHexa[5] = shadowNear * topView;
+						shadowHexa[2] = shadowHexa[0];
 					}
-					for (int i = 0; i < CSM_LEVELS; i++)
+					shadowHexa[3] = shadowHexa[0];
+					if (top < shadowFar)
 					{
-						shadowFar *= CSMRatio;
-						shadowHexa[0] = shadowHexa[4];
-						shadowHexa[1] = shadowHexa[5];
-						if (shadowNear < bottom && bottom < shadowFar)
-						{
-							shadowHexa[2] = bottom * bottomView;
-						}
-						else
-						{
-							shadowHexa[2] = shadowHexa[0];
-						}
-						if (shadowNear < top && top < shadowFar)
-						{
-							shadowHexa[3] = top * topView;
-						}
-						else
-						{
-							shadowHexa[3] = shadowHexa[0];
-						}
+						shadowHexa[4] = topView * top;
+						shadowHexa[5] = shadowHexa[4];
+					}
+					else
+					{
 						if (bottom < shadowFar)
 						{
 							shadowHexa[4] = shadowFar * bottomView - (eye.z + shadowFar * bottomView.z) / (viewDir.z - bottomView.z) * (viewDir - bottomView);
@@ -859,356 +795,75 @@ void computeFrame()
 						{
 							shadowHexa[4] = shadowFar * bottomView;
 						}
-						if (top < shadowFar)
-						{
-							shadowHexa[5] = shadowFar * topView - (eye.z + shadowFar * topView.z - MAX_HEIGHT) / (viewDir.z - topView.z) * (viewDir - topView);
-						}
-						else
-						{
-							shadowHexa[5] = shadowFar * topView;
-						}
-						shadowNear = shadowFar;
-						for (int j = 0; j < 6; j++)
-						{
-							float distance = dot(shadowHexa[j], viewDir);
-							CSMAreas[i][2 * j] = eye + shadowHexa[j] + distance * viewX;
-							CSMAreas[i][2 * j + 1] = eye + shadowHexa[j] - distance * viewX;
-						}
+						shadowHexa[5] = shadowFar * topView;
 					}
+					shadowNear = shadowFar;
+					for (int j = 0; j < 6; j++)
+					{
+						float distance = dot(shadowHexa[j], viewDir);
+						CSMAreas[i][2 * j] = eye + shadowHexa[j] + distance * viewX;
+						CSMAreas[i][2 * j + 1] = eye + shadowHexa[j] - distance * viewX;
+					}
+				}
+			}
+		}
+
+		mat4 projAndViewMat = projMat * view.viewMat;
+		bool isLightGridVisible[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE];
+		for (int i = 0; i < LIGHT_MAP_SIZE; i++)
+		{
+			float offsetX = (-LIGHT_MAP_SIZE / 2 + i) * LIGHT_MAP_GRID_LENGTH;
+			for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+			{
+				float offsetY = (-LIGHT_MAP_SIZE / 2 + j) * LIGHT_MAP_GRID_LENGTH;
+				constexpr vec4 gridAABB[8] = { vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1),
+					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1),
+					vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1),
+					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1) };
+				int left = 0, right = 0, bottom = 0, top = 0, back = 0, front = 0;
+				for (vec4 vert : gridAABB)
+				{
+					vert.x += offsetX;
+					vert.y += offsetY;
+					vert = projAndViewMat * vert;
+					left += vert.x < -vert.w;
+					right += vert.x > vert.w;
+					bottom += vert.y < -vert.w;
+					top += vert.y > vert.w;
+					back += vert.z < -vert.w;
+					front += vert.z > vert.w;
+				}
+				isLightGridVisible[i][j] = left != 8 && right != 8 && bottom != 8 && top != 8 && back != 8 && front != 8;
+			}
+		}
+		numActiveCarLightMapGrids = 0;
+		for (int i = 0; i < LIGHT_MAP_SIZE; i++)
+		{
+			float offsetX = (-LIGHT_MAP_SIZE / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
+			for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+			{
+				float offsetY = (-LIGHT_MAP_SIZE / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
+				if (isLightGridVisible[i][j])
+				{
+					vec2 distance = vec2(eye) - vec2(offsetX, offsetY);
+					carLightMapGridDistanceToView[i][j] = dot(distance, distance);
+					numActiveCarLightMapGrids++;
 				}
 				else
 				{
-					float top = VIEW_Z_FAR;
-					if (topView.z < 0)
-					{
-						top = fmin(-eye.z / topView.z, VIEW_Z_FAR);
-					}
-					float CSMRatio = fmin(pow(top / shadowFar, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
-					vec3 shadowHexa[6];
-					shadowHexa[4] = shadowNear * bottomView;
-					shadowHexa[5] = shadowNear * topView;
-					for (int i = 0; i < CSM_LEVELS; i++)
-					{
-						shadowFar *= CSMRatio;
-						shadowHexa[0] = shadowHexa[4];
-						shadowHexa[1] = shadowHexa[5];
-						if (shadowNear < bottom && bottom < shadowFar)
-						{
-							shadowHexa[2] = bottom * bottomView;
-						}
-						else
-						{
-							shadowHexa[2] = shadowHexa[0];
-						}
-						shadowHexa[3] = shadowHexa[0];
-						if (top < shadowFar)
-						{
-							shadowHexa[4] = topView * top;
-							shadowHexa[5] = shadowHexa[4];
-						}
-						else
-						{
-							if (bottom < shadowFar)
-							{
-								shadowHexa[4] = shadowFar * bottomView - (eye.z + shadowFar * bottomView.z) / (viewDir.z - bottomView.z) * (viewDir - bottomView);
-							}
-							else
-							{
-								shadowHexa[4] = shadowFar * bottomView;
-							}
-							shadowHexa[5] = shadowFar * topView;
-						}
-						shadowNear = shadowFar;
-						for (int j = 0; j < 6; j++)
-						{
-							float distance = dot(shadowHexa[j], viewDir);
-							CSMAreas[i][2 * j] = eye + shadowHexa[j] + distance * viewX;
-							CSMAreas[i][2 * j + 1] = eye + shadowHexa[j] - distance * viewX;
-						}
-					}
+					carLightMapGridDistanceToView[i][j] = FLT_MAX;
 				}
 			}
+		}
+		std::sort(carLightMapGridDistanceOrder, &carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE], [](ivec2 a, ivec2 b)->bool
+			{
+				return carLightMapGridDistanceToView[a.x][a.y] < carLightMapGridDistanceToView[b.x][b.y];
+			});
 
-			mat4 projAndViewMat = projMat * viewMat;
-			bool isLightGridVisible[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE];
-			for (int i = 0; i < LIGHT_MAP_SIZE; i++)
-			{
-				float offsetX = (-LIGHT_MAP_SIZE / 2 + i) * LIGHT_MAP_GRID_LENGTH;
-				for (int j = 0; j < LIGHT_MAP_SIZE; j++)
-				{
-					float offsetY = (-LIGHT_MAP_SIZE / 2 + j) * LIGHT_MAP_GRID_LENGTH;
-					constexpr vec4 gridAABB[8] = { vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1),
-						vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1),
-						vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1),
-						vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1) };
-					int left = 0, right = 0, bottom = 0, top = 0, back = 0, front = 0;
-					for (vec4 vert : gridAABB)
-					{
-						vert.x += offsetX;
-						vert.y += offsetY;
-						vert = projAndViewMat * vert;
-						left += vert.x < -vert.w;
-						right += vert.x > vert.w;
-						bottom += vert.y < -vert.w;
-						top += vert.y > vert.w;
-						back += vert.z < -vert.w;
-						front += vert.z > vert.w;
-					}
-					isLightGridVisible[i][j] = left != 8 && right != 8 && bottom != 8 && top != 8 && back != 8 && front != 8;
-				}
-			}
-			numActiveCarLightMapGrids = 0;
-			for (int i = 0; i < LIGHT_MAP_SIZE; i++)
-			{
-				float offsetX = (-LIGHT_MAP_SIZE / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
-				for (int j = 0; j < LIGHT_MAP_SIZE; j++)
-				{
-					float offsetY = (-LIGHT_MAP_SIZE / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
-					if (isLightGridVisible[i][j])
-					{
-						vec2 distance = vec2(eye) - vec2(offsetX, offsetY);
-						carLightMapGridDistanceToView[i][j] = dot(distance, distance);
-						numActiveCarLightMapGrids++;
-					}
-					else
-					{
-						carLightMapGridDistanceToView[i][j] = FLT_MAX;
-					}
-				}
-			}
-			std::sort(carLightMapGridDistanceOrder, &carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE], [](ivec2 a, ivec2 b)->bool
-				{
-					return carLightMapGridDistanceToView[a.x][a.y] < carLightMapGridDistanceToView[b.x][b.y];
-				});
-		}
-
-		if (sun.dir.z > 0)
-		{
-			int numCars = 0;
-			for (Car& car : vehicles)
-			{
-				drawData[backDrawData].carModelMat[numCars] = car.getModelMat();
-				drawData[backDrawData].carColor[numCars] = car.getColor();
-				numCars++;
-			}
-			drawData[backDrawData].numCars = numCars;
-			mat4 sunMat = lookAt(vec3(0.0f), -vec3(sun.dir), vec3(-sun.dir.x, -sun.dir.y, sun.dir.z));
-			float zFar = FLT_MAX;
-			float slope = sqrt(1.0f / (sun.dir.z * sun.dir.z) - 1.0f);
-			float maxX[CSM_LEVELS], minX[CSM_LEVELS], maxY[CSM_LEVELS], minY[CSM_LEVELS], zFars[CSM_LEVELS];
-			for (int i = CSM_LEVELS - 1; i >= 0; i--)
-			{
-				minX[i] = FLT_MAX, maxX[i] = -FLT_MAX, minY[i] = FLT_MAX, maxY[i] = -FLT_MAX;
-				for (int j = 0; j < 12; j++)
-				{
-					vec3 point = vec3(sunMat * vec4(CSMAreas[i][j], 1.0f));
-					if (point.z < zFar)
-					{
-						zFar = point.z;
-					}
-					if (point.x < minX[i])
-					{
-						minX[i] = point.x;
-					}
-					if (point.x > maxX[i])
-					{
-						maxX[i] = point.x;
-					}
-					if (point.y < minY[i])
-					{
-						minY[i] = point.y;
-					}
-					if (point.y > maxY[i])
-					{
-						maxY[i] = point.y;
-					}
-				}
-				zFar = fmax(-maxY[i] * slope, zFar);
-				zFars[i] = zFar;
-			}
-			for (int i = 0; i < CSM_LEVELS - 3; i += 4)
-			{
-				float xMin = FLT_MAX, xMax = -FLT_MAX, yMin = FLT_MAX, yMax = -FLT_MAX, furthestZFar = FLT_MAX;
-				for (int j = 0; j < 4; j++)
-				{
-					if (zFars[4 * i + j] < furthestZFar)
-					{
-						furthestZFar = zFars[4 * i + j];
-					}
-					if (minX[4 * i + j] < xMin)
-					{
-						xMin = minX[4 * i + j];
-					}
-					if (maxX[4 * i + j] > xMax)
-					{
-						xMax = maxX[4 * i + j];
-					}
-					if (minY[4 * i + j] < yMin)
-					{
-						yMin = minY[4 * i + j];
-					}
-					if (maxY[4 * i + j] > yMax)
-					{
-						yMax = maxY[4 * i + j];
-					}
-				}
-				if (4 * (maxX[4 * i] - minX[4 * i]) * (maxY[4 * i] - minY[4 * i]) > (xMax - xMin) * (yMax - yMin))
-				{
-					minX[4 * i] = xMin;
-					maxX[4 * i] = (xMin + xMax) / 2;
-					minY[4 * i] = yMin;
-					maxY[4 * i] = (xMin + yMax) / 2;
-					zFars[4 * i] = furthestZFar;
-					minX[4 * i + 1] = (xMin + xMax) / 2;
-					maxX[4 * i + 1] = xMax;
-					minY[4 * i + 1] = yMin;
-					maxY[4 * i + 1] = (xMin + yMax) / 2;
-					zFars[4 * i + 1] = furthestZFar;
-					minX[4 * i + 2] = xMin;
-					maxX[4 * i + 2] = (xMin + xMax) / 2;
-					minY[4 * i + 2] = (xMin + yMax) / 2;
-					maxY[4 * i + 2] = yMax;
-					zFars[4 * i + 2] = furthestZFar;
-					minX[4 * i + 3] = (xMin + xMax) / 2;
-					maxX[4 * i + 3] = xMax;
-					minY[4 * i + 3] = (xMin + yMax) / 2;
-					maxY[4 * i + 3] = yMax;
-					zFars[4 * i + 3] = furthestZFar;
-				}
-			}
-			for (int i = 0; i < CSM_LEVELS; i++)
-			{
-				float zNear = fmin(MAX_HEIGHT / sun.dir.z - minY[i] * slope, 5 * VIEW_Z_FAR + zFars[i]);
-				constexpr float texPadding = (1 / (1 - 2 * 0.02f) - 1) / 2;
-				mat4 shadowMat = ortho(minX[i] - texPadding * (maxX[i] - minX[i]), maxX[i] + texPadding * (maxX[i] - minX[i]),
-					minY[i] - texPadding * (maxY[i] - minY[i]), maxY[i] + texPadding * (maxY[i] - minY[i]),
-					-zNear, -zFars[i]);
-				shadowMat = shadowMat * sunMat;
-				drawData[backDrawData].sunShadow.mat[i] = shadowMat;
-				drawData[backDrawData].sunShadow.texMat[i] = mat4(
-					0.5f, 0.0f, 0.0f, 0.0f,
-					0.0f, 0.5f, 0.0f, 0.0f,
-					0.0f, 0.0f, 0.5f, 0.0f,
-					0.5f, 0.5f, 0.5f, 1.0f) * shadowMat;
-			}
-		}
-		else
-		{
-			memset(drawData[backDrawData].carLightMap, 0, sizeof(DrawData::carLightMap));
-			struct CarLightInfo
-			{
-				vec4 pos;
-				vec4 dir;
-				int* lightMapGrid;
-			};
-			std::vector<CarLightInfo>carLightInfos;
-			int numCars = 0;
-			int numLightOnCars = 0;
-			for (Car& car : vehicles)
-			{
-				const mat4& modelMat = car.getModelMat();
-				if (car.isLightOn())
-				{
-					constexpr float posOffset = 50.0f / LIGHT_MAP_GRID_LENGTH + 1.0f;
-					vec4 leftLightPos = modelMat * CAR_LEFT_LIGHT_POS;
-					vec4 leftLightDir = modelMat * CAR_LEFT_LIGHT_DIR;
-					ivec2 leftLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(leftLightPos) + posOffset * vec2(leftLightDir) + 0.5f * LIGHT_MAP_SIZE);
-					if (carLightMapGridDistanceToView[leftLightMapIdx.x][leftLightMapIdx.y] < FLT_MAX)
-					{
-						carLightInfos.emplace_back(CarLightInfo{ leftLightPos, leftLightDir, drawData[backDrawData].carLightMap[leftLightMapIdx.x][leftLightMapIdx.y] });
-						drawData[backDrawData].carLightMap[leftLightMapIdx.x][leftLightMapIdx.y][0]++;
-					}
-					vec4 rightLightPos = modelMat * CAR_RIGHT_LIGHT_POS;
-					vec4 rightLightDir = modelMat * CAR_RIGHT_LIGHT_DIR;
-					ivec2 rightLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(rightLightPos) + posOffset * vec2(rightLightDir) + 0.5f * LIGHT_MAP_SIZE);
-					if (carLightMapGridDistanceToView[rightLightMapIdx.x][rightLightMapIdx.y] < FLT_MAX)
-					{
-						carLightInfos.emplace_back(CarLightInfo{ rightLightPos, rightLightDir, drawData[backDrawData].carLightMap[rightLightMapIdx.x][rightLightMapIdx.y] });
-						drawData[backDrawData].carLightMap[rightLightMapIdx.x][rightLightMapIdx.y][0]++;
-					}
-				}
-				ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
-				if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] < FLT_MAX)
-				{
-					if (car.isLightOn())
-					{
-						drawData[backDrawData].carModelMat[numCars] = drawData[backDrawData].carModelMat[numLightOnCars];
-						drawData[backDrawData].carColor[numCars] = drawData[backDrawData].carColor[numLightOnCars];
-						drawData[backDrawData].carModelMat[numLightOnCars] = modelMat;
-						drawData[backDrawData].carColor[numLightOnCars] = car.getColor();
-						numLightOnCars++;
-					}
-					else
-					{
-						drawData[backDrawData].carModelMat[numCars] = modelMat;
-						drawData[backDrawData].carColor[numCars] = car.getColor();
-					}
-					numCars++;
-				}
-			}
-			drawData[backDrawData].numCars = numCars;
-			drawData[backDrawData].numLightOnCars = numLightOnCars;
-			int numCarLights = 0;
-			for (int i = 0; i < numActiveCarLightMapGrids; i++)
-			{
-				ivec2& idx = carLightMapGridDistanceOrder[i];
-				drawData[backDrawData].carLightMap[idx.x][idx.y][1] = numCarLights;
-				numCarLights += drawData[backDrawData].carLightMap[idx.x][idx.y][0];
-				drawData[backDrawData].carLightMap[idx.x][idx.y][0] = drawData[backDrawData].carLightMap[idx.x][idx.y][1];
-			}
-			drawData[backDrawData].numActiveCarLights = numCarLights;
-			for (CarLightInfo& carLightInfo : carLightInfos)
-			{
-				int idx = carLightInfo.lightMapGrid[1]++;
-				drawData[backDrawData].carLightPos[idx] = carLightInfo.pos;
-				drawData[backDrawData].carLightMats[idx] = carLightShadowProjMat * lookAt(vec3(carLightInfo.pos), vec3(carLightInfo.pos) + vec3(carLightInfo.dir), vec3(0.0f, 0.0f, 1.0f));
-			}
-			for (int i = 0; i < numCars; i++)
-			{
-				mat4 modelMat = drawData[backDrawData].carModelMat[i];
-				ivec2 posIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + LIGHT_MAP_SIZE / 2.0f);
-				int numLighting = 0;
-				for (int j = -1; j < 2; j++)
-				{
-					for (int k = -1; k < 2; k++)
-					{
-						ivec2 idx = posIdx + ivec2(j, k);
-						for (int p = drawData[backDrawData].carLightMap[idx.x][idx.y][0]; p < drawData[backDrawData].carLightMap[idx.x][idx.y][1]; p++)
-						{
-							mat4 carLightMat = drawData[backDrawData].carLightMats[p];
-							for (const vec3& vertex : carBoundray)
-							{
-								vec4 v = carLightMat * modelMat * vec4(vertex, 1.0f);
-								v.x /= v.w;
-								v.y /= v.w;
-								if (-v.w < v.z && v.z < v.w && v.x * v.x + v.y * v.y < 1.0f)
-								{
-									numLighting++;
-									drawData[backDrawData].carLightings[i][numLighting] = p;
-									break;
-								}
-							}
-						}
-					}
-				}
-				drawData[backDrawData].carLightings[i][0] = numLighting;
-			}
-		}
-		drawMut.lock();
-		frontDrawData = backDrawData;
-		drawMut.unlock();
+		glNamedBufferSubData(sceneUBO, sizeof(mat4), sizeof(view), &view);
+		glProgramUniform1f(spSun, glGetUniformLocation(spSun, "horizionY"), horizonY);
 	}
-}
 
-void drawGraphics()
-{
-	drawMut.lock();
-	if (drawData[frontDrawData].isViewChanged)
-	{
-		drawData[frontDrawData].isViewChanged = false;
-		glNamedBufferSubData(sceneUBO, sizeof(mat4), sizeof(DrawData::view), &drawData[frontDrawData].view);
-		glProgramUniform1f(spSun, glGetUniformLocation(spSun, "horizionY"), drawData[frontDrawData].horizonY);
-	}
 	struct
 	{
 		vec4 dir;
@@ -1216,25 +871,11 @@ void drawGraphics()
 		vec4 diffuseAndSpecular;
 		vec4 skyColor;
 	}sun;
-	sun.dir = vec4(drawData[frontDrawData].sunDir, 0);
-	int numCars = drawData[frontDrawData].numCars;
-	int numLightOnCars = drawData[frontDrawData].numLightOnCars;
-	if (sun.dir.z > 0)
-	{
-		glNamedBufferSubData(shadowUBO, 0, sizeof(DrawData::sunShadow), &drawData[frontDrawData].sunShadow);
-	}
-	else
-	{
-		glNamedBufferSubData(carLightMapSSBO, 0, sizeof(DrawData::carLightMap), drawData[frontDrawData].carLightMap);
-		glNamedBufferSubData(carLightPosUBO, 0, drawData[frontDrawData].numActiveCarLights * 2 * sizeof(vec4), drawData[frontDrawData].carLightPos);
-		glNamedBufferSubData(carLightShadowMatUBO, 0, drawData[frontDrawData].numActiveCarLights * sizeof(mat4), drawData[frontDrawData].carLightMats);
-		glNamedBufferSubData(carLightingSSBO, 0, numCars * sizeof(DrawData::carLightings[0]), drawData[frontDrawData].carLightings);
-	}
-	glNamedBufferSubData(carMatVBO, 0, numCars * sizeof(mat4), drawData[frontDrawData].carModelMat);
-	glNamedBufferSubData(carColorVBO, 0, numCars * sizeof(vec3), drawData[frontDrawData].carColor);
-	drawMut.unlock();
-
+	sun.dir = vec4(logical_data.sunDir, 0);
 	sun.ambient = vec4(vec3(0.01f), 0);
+	constexpr float atomosphere = EARTH_RADIUS + 2e6f;
+	float absorbFactor = -1e-7f * (-EARTH_RADIUS * sun.dir.z + sqrt(atomosphere * atomosphere - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.dir.z * sun.dir.z)));
+	sun.diffuseAndSpecular = vec4(0.5f * vec3(exp(0.2f * absorbFactor), exp(0.3f * absorbFactor), exp(1.1f * absorbFactor)), 0);
 	sun.skyColor = vec4(0.01f, 0.015f, 0.055f, 0);
 	if (sun.dir.z > -0.2f)
 	{
@@ -1243,11 +884,219 @@ void drawGraphics()
 		sun.ambient += vec4(vec3((sun.dir.z + 0.2f) * 0.1f), 0);
 		sun.skyColor += vec4((sun.dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f), 0);
 	}
-	constexpr float atomosphere = EARTH_RADIUS + 2e6f;
-	float absorbFactor = -1e-7f * (-EARTH_RADIUS * sun.dir.z + sqrt(atomosphere * atomosphere - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.dir.z * sun.dir.z)));
-	sun.diffuseAndSpecular = vec4(0.5f * vec3(exp(0.2f * absorbFactor), exp(0.3f * absorbFactor), exp(1.1f * absorbFactor)), 0);
 	glNamedBufferSubData(sceneUBO, sceneUBOoffset1, 4 * sizeof(vec4), &sun);
-	glProgramUniform1i(spCarNight, glGetUniformLocation(spCarNight, "numLightOnCars"), numLightOnCars);
+
+	int numVisibleCars;
+	int numVisibleLightOnCars;
+	int numVisibleCarLights;
+
+	if (sun.dir.z > 0)
+	{
+		numVisibleCars = logical_data.numCars;
+		mat4 sunMat = lookAt(vec3(0.0f), -vec3(sun.dir), vec3(-sun.dir.x, -sun.dir.y, sun.dir.z));
+		float zFar = FLT_MAX;
+		float slope = sqrt(1.0f / (sun.dir.z * sun.dir.z) - 1.0f);
+		float maxX[CSM_LEVELS], minX[CSM_LEVELS], maxY[CSM_LEVELS], minY[CSM_LEVELS], zFars[CSM_LEVELS];
+		for (int i = CSM_LEVELS - 1; i >= 0; i--)
+		{
+			minX[i] = FLT_MAX, maxX[i] = -FLT_MAX, minY[i] = FLT_MAX, maxY[i] = -FLT_MAX;
+			for (int j = 0; j < 12; j++)
+			{
+				vec3 point = vec3(sunMat * vec4(CSMAreas[i][j], 1.0f));
+				if (point.z < zFar)
+				{
+					zFar = point.z;
+				}
+				if (point.x < minX[i])
+				{
+					minX[i] = point.x;
+				}
+				if (point.x > maxX[i])
+				{
+					maxX[i] = point.x;
+				}
+				if (point.y < minY[i])
+				{
+					minY[i] = point.y;
+				}
+				if (point.y > maxY[i])
+				{
+					maxY[i] = point.y;
+				}
+			}
+			zFar = fmax(-maxY[i] * slope, zFar);
+			zFars[i] = zFar;
+		}
+		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
+		{
+			float xMin = FLT_MAX, xMax = -FLT_MAX, yMin = FLT_MAX, yMax = -FLT_MAX, furthestZFar = FLT_MAX;
+			for (int j = 0; j < 4; j++)
+			{
+				if (zFars[4 * i + j] < furthestZFar)
+				{
+					furthestZFar = zFars[4 * i + j];
+				}
+				if (minX[4 * i + j] < xMin)
+				{
+					xMin = minX[4 * i + j];
+				}
+				if (maxX[4 * i + j] > xMax)
+				{
+					xMax = maxX[4 * i + j];
+				}
+				if (minY[4 * i + j] < yMin)
+				{
+					yMin = minY[4 * i + j];
+				}
+				if (maxY[4 * i + j] > yMax)
+				{
+					yMax = maxY[4 * i + j];
+				}
+			}
+			if (4 * (maxX[4 * i] - minX[4 * i]) * (maxY[4 * i] - minY[4 * i]) > (xMax - xMin) * (yMax - yMin))
+			{
+				minX[4 * i] = xMin;
+				maxX[4 * i] = (xMin + xMax) / 2;
+				minY[4 * i] = yMin;
+				maxY[4 * i] = (xMin + yMax) / 2;
+				zFars[4 * i] = furthestZFar;
+				minX[4 * i + 1] = (xMin + xMax) / 2;
+				maxX[4 * i + 1] = xMax;
+				minY[4 * i + 1] = yMin;
+				maxY[4 * i + 1] = (xMin + yMax) / 2;
+				zFars[4 * i + 1] = furthestZFar;
+				minX[4 * i + 2] = xMin;
+				maxX[4 * i + 2] = (xMin + xMax) / 2;
+				minY[4 * i + 2] = (xMin + yMax) / 2;
+				maxY[4 * i + 2] = yMax;
+				zFars[4 * i + 2] = furthestZFar;
+				minX[4 * i + 3] = (xMin + xMax) / 2;
+				maxX[4 * i + 3] = xMax;
+				minY[4 * i + 3] = (xMin + yMax) / 2;
+				maxY[4 * i + 3] = yMax;
+				zFars[4 * i + 3] = furthestZFar;
+			}
+		}
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			float zNear = fmin(MAX_HEIGHT / sun.dir.z - minY[i] * slope, 5 * VIEW_Z_FAR + zFars[i]);
+			constexpr float texPadding = (1 / (1 - 2 * 0.02f) - 1) / 2;
+			mat4 shadowMat = ortho(minX[i] - texPadding * (maxX[i] - minX[i]), maxX[i] + texPadding * (maxX[i] - minX[i]),
+				minY[i] - texPadding * (maxY[i] - minY[i]), maxY[i] + texPadding * (maxY[i] - minY[i]),
+				-zNear, -zFars[i]);
+			shadowMat = shadowMat * sunMat;
+			sunShadow.mat[i] = shadowMat;
+			sunShadow.texMat[i] = mat4(
+				0.5f, 0.0f, 0.0f, 0.0f,
+				0.0f, 0.5f, 0.0f, 0.0f,
+				0.0f, 0.0f, 0.5f, 0.0f,
+				0.5f, 0.5f, 0.5f, 1.0f) * shadowMat;
+		}
+	}
+	else
+	{
+		numVisibleCars = 0;
+		numVisibleLightOnCars = 0;
+		numVisibleCarLights = 0;
+		memset(carLightMap, 0, sizeof(carLightMap));
+		struct CarLightInfo
+		{
+			vec4 pos;
+			vec4 dir;
+			int* lightMapGrid;
+		};
+		std::vector<CarLightInfo>carLightInfos;
+		{
+			for (int i = 0; i < logical_data.numCars; i++)
+			{
+				const mat4& modelMat = logical_data.carModelMat[i];
+				ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
+				if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] < FLT_MAX)
+				{
+					carModelMat[numVisibleCars] = modelMat;
+					carColor[numVisibleCars] = logical_data.carColor[i];
+					numVisibleCars++;
+					if (i < logical_data.numLightOnCars)
+					{
+						numVisibleLightOnCars++;
+					}
+				}
+			}
+		}
+		int numCarLights = 2 * logical_data.numLightOnCars;
+		for (int i = 0; i < numCarLights; i++)
+		{
+			constexpr float posOffset = 50.0f / LIGHT_MAP_GRID_LENGTH + 1.0f;
+			vec4 lightPos = logical_data.carLightPos[i];
+			vec4 lightDir = logical_data.carLightDir[i];
+			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(lightPos) + posOffset * vec2(lightDir) + 0.5f * LIGHT_MAP_SIZE);
+			if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] < FLT_MAX)
+			{
+				carLightInfos.emplace_back(CarLightInfo{ lightPos, lightDir, carLightMap[lightMapIdx.x][lightMapIdx.y] });
+				carLightMap[lightMapIdx.x][lightMapIdx.y][0]++;
+			}
+		}
+		for (int i = 0; i < numActiveCarLightMapGrids; i++)
+		{
+			ivec2& idx = carLightMapGridDistanceOrder[i];
+			carLightMap[idx.x][idx.y][1] = numVisibleCarLights;
+			numVisibleCarLights += carLightMap[idx.x][idx.y][0];
+			carLightMap[idx.x][idx.y][0] = carLightMap[idx.x][idx.y][1];
+		}
+		for (CarLightInfo& carLightInfo : carLightInfos)
+		{
+			int idx = carLightInfo.lightMapGrid[1]++;
+			carLightPos[idx] = carLightInfo.pos;
+			carLightMats[idx] = carLightShadowProjMat * lookAt(vec3(carLightInfo.pos), vec3(carLightInfo.pos) + vec3(carLightInfo.dir), vec3(0.0f, 0.0f, 1.0f));
+		}
+		for (int i = 0; i < numVisibleCars; i++)
+		{
+			mat4 modelMat = carModelMat[i];
+			ivec2 posIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + LIGHT_MAP_SIZE / 2.0f);
+			int numLighting = 0;
+			for (int j = -1; j < 2; j++)
+			{
+				for (int k = -1; k < 2; k++)
+				{
+					ivec2 idx = posIdx + ivec2(j, k);
+					for (int p = carLightMap[idx.x][idx.y][0]; p < carLightMap[idx.x][idx.y][1]; p++)
+					{
+						mat4 carLightMat = carLightMats[p];
+						for (const vec3& vertex : carBoundray)
+						{
+							vec4 v = carLightMat * modelMat * vec4(vertex, 1.0f);
+							v.x /= v.w;
+							v.y /= v.w;
+							if (-v.w < v.z && v.z < v.w && v.x * v.x + v.y * v.y < 1.0f)
+							{
+								numLighting++;
+								carLightings[i][numLighting] = p;
+								break;
+							}
+						}
+					}
+				}
+			}
+			carLightings[i][0] = numLighting;
+		}
+	}
+
+
+	if (sun.dir.z > 0)
+	{
+		glNamedBufferSubData(shadowUBO, 0, sizeof(sunShadow), &sunShadow);
+		glNamedBufferSubData(carMatVBO, 0, numVisibleCars * sizeof(mat4), logical_data.carModelMat);
+		glNamedBufferSubData(carColorVBO, 0, numVisibleCars * sizeof(vec3), logical_data.carColor);
+	}
+	else
+	{
+		glNamedBufferSubData(carLightMapSSBO, 0, sizeof(carLightMap),carLightMap);
+		glNamedBufferSubData(carLightPosUBO, 0, numVisibleCarLights * sizeof(vec4), carLightPos);
+		glNamedBufferSubData(carLightShadowMatUBO, 0, numVisibleCarLights * sizeof(mat4), carLightMats);
+		glNamedBufferSubData(carLightingSSBO, 0, numVisibleCars * sizeof(carLightings[0]), carLightings);
+		glNamedBufferSubData(carMatVBO, 0, numVisibleCars * sizeof(mat4), carModelMat);
+		glNamedBufferSubData(carColorVBO, 0, numVisibleCars * sizeof(vec3), carColor);
+	}
 
 	glBindTextureUnit(0, HIGHWAY_TEX);
 	glBindTextureUnit(1, shadowTex);
@@ -1263,7 +1112,7 @@ void drawGraphics()
 		glDrawElements(GL_TRIANGLES, bridgeEBOsize, GL_UNSIGNED_INT, 0);
 		glUseProgram(spShadowCarDay);
 		glBindVertexArray(carShadowVAO);
-		glDrawElementsInstanced(GL_TRIANGLES, carShadowEBOsize, GL_UNSIGNED_INT, 0, numCars);
+		glDrawElementsInstanced(GL_TRIANGLES, carShadowEBOsize, GL_UNSIGNED_INT, 0, numVisibleCars);
 		glEnable(GL_CULL_FACE);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multiSampleRenderFBO);
@@ -1281,10 +1130,11 @@ void drawGraphics()
 		glDrawElements(GL_TRIANGLES, bridgeEBOsize, GL_UNSIGNED_INT, 0);
 		glUseProgram(spCarDay);
 		glBindVertexArray(carVAO);
-		glDrawElementsInstanced(GL_TRIANGLES, carEBOsize, GL_UNSIGNED_INT, 0, numCars);
+		glDrawElementsInstanced(GL_TRIANGLES, carEBOsize, GL_UNSIGNED_INT, 0, numVisibleCars);
 	}
 	else
 	{
+		glProgramUniform1i(spCarNight, glGetUniformLocation(spCarNight, "numLightOnCars"), numVisibleLightOnCars);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glDisable(GL_CULL_FACE);
@@ -1298,7 +1148,7 @@ void drawGraphics()
 		glDrawElements(GL_TRIANGLES, bridgeEBOsize, GL_UNSIGNED_INT, 0);
 		glUseProgram(spShadowCarNight);
 		glBindVertexArray(carShadowVAO);
-		glDrawElementsInstanced(GL_TRIANGLES, carShadowEBOsize, GL_UNSIGNED_INT, 0, numCars);
+		glDrawElementsInstanced(GL_TRIANGLES, carShadowEBOsize, GL_UNSIGNED_INT, 0, numVisibleCars);
 		for (int i = 0; i < 4; i++)
 		{
 			glDisable(GL_CLIP_DISTANCE0 + i);
@@ -1322,7 +1172,7 @@ void drawGraphics()
 		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 		glDrawBuffers(2, attachments);
 		glBindVertexArray(carVAO);
-		glDrawElementsInstanced(GL_TRIANGLES, carEBOsize, GL_UNSIGNED_INT, 0, numCars);
+		glDrawElementsInstanced(GL_TRIANGLES, carEBOsize, GL_UNSIGNED_INT, 0, numVisibleCars);
 	}
 	if (sun.dir.z > -0.2f)
 	{
@@ -1338,7 +1188,7 @@ void drawGraphics()
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderFBO);
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 	glBlitFramebuffer(0, 0, windowWidth, windowHeight, 0, 0, windowWidth, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	
+
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bloomFBOs[0]);
 	glBindVertexArray(texBlitVAO);
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
@@ -1379,11 +1229,7 @@ void drawGraphics()
 	glUseProgram(0);
 
 	static float fps = 60;
-	static clock_t lastTime = 0;
-	clock_t time = clock();
-	clock_t frameTime = time - lastTime;
 	fps = (fps + 1) / (frameTime * 0.001f + 1.0f);
-	lastTime = time;
 	glWindowPos2i(10, 10);
 	char str[40];
 	sprintf_s(str, 40, "fps: %d|%d", int(fps), int(tickRate));
@@ -1398,11 +1244,9 @@ void lineSegment()
 
 void winReshapeFunc(GLint width, GLint height)
 {
-	viewMut.lock();
 	windowWidth = width;
 	windowHeight = height;
-	viewMut.unlock();
-	needUpdateView = 2;
+	needUpdateView = true;
 
 	GLint maxTexSize;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTexSize);
@@ -1433,7 +1277,7 @@ void winKeyboardFunc(GLubyte key, GLint x, GLint y)
 	switch (key)
 	{
 	case ' ':
-		isPausing = !isPausing;
+		isPaused = !isPaused;
 		return;
 	case '=':
 		if (simulateSpeed < 5)
@@ -1458,14 +1302,12 @@ void winKeyboardFunc(GLubyte key, GLint x, GLint y)
 	case 'd':
 	case 'w':
 	case 's':
-		viewMut.lock();
 		focusMoveDir = key;
-		viewMut.unlock();
 		break;
 	default:
 		return;
 	}
-	needUpdateView = 2;
+	needUpdateView = true;
 }
 
 void winKeyboardUpFunc(GLubyte key, GLint x, GLint y)
@@ -1476,16 +1318,14 @@ void winKeyboardUpFunc(GLubyte key, GLint x, GLint y)
 	case 'd':
 	case 'w':
 	case 's':
-		viewMut.lock();
 		focusMoveDir = 0;
-		viewMut.unlock();
+		break;
 	}
 }
 
 void mouseWheel(GLint button, GLint dir, GLint x, GLint y)
 {
 	float viewDistance;
-	viewMut.lock();
 	if (dir > 0)
 	{
 		viewDistance = aimViewDistance * 0.91f;
@@ -1505,16 +1345,14 @@ void mouseWheel(GLint button, GLint dir, GLint x, GLint y)
 	if (aimViewDistance != viewDistance)
 	{
 		aimViewDistance = viewDistance;
-		needUpdateView = 2;
+		needUpdateView = true;
 	}
-	viewMut.unlock();
 }
 
 void rotateView(GLint xMouse, GLint yMouse)
 {
 	if (xMouse != windowWidth / 2 || yMouse != windowHeight / 2)
 	{
-		viewMut.lock();
 		float azimuth = aimAzimuth + 0.001f * (windowWidth / 2 - xMouse);
 		float relativeDepression = aimRelativeDepression - 0.001f * (windowHeight / 2 - yMouse);
 		if (relativeDepression > 1)
@@ -1529,9 +1367,8 @@ void rotateView(GLint xMouse, GLint yMouse)
 		{
 			aimAzimuth = azimuth;
 			aimRelativeDepression = relativeDepression;
-			needUpdateView = 2;
+			needUpdateView = true;
 		}
-		viewMut.unlock();
 		SetCursorPos(glutGet(GLUT_WINDOW_X) + windowWidth / 2, glutGet(GLUT_WINDOW_Y) + windowHeight / 2);
 	}
 }
@@ -1565,12 +1402,13 @@ int main(int argc, char** argv)
 	glutInitWindowSize(1900, 1000);
 	glutCreateWindow("");
 	init();
-	std::thread logicalThread(computeFrame);
+	std::thread logicalThread(logicalFrame);
 	glutDisplayFunc(lineSegment);
 	glutReshapeFunc(winReshapeFunc);
 	glutKeyboardFunc(winKeyboardFunc);
 	glutKeyboardUpFunc(winKeyboardUpFunc);
 	glutMouseFunc(winMouseFunc);
 	glutMouseWheelFunc(mouseWheel);
+	lastFrameTime = clock();
 	glutMainLoop();
 }

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "glm\matrix.hpp"
+#include "matrix.hpp"
 
-class Lane {
+class Lane 
+{
 public:
 	const float length;
 	const float speedLimit;

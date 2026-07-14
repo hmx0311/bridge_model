@@ -184,17 +184,17 @@ bool Car::isLightOn()
 	return lightOn;
 }
 
-const glm::vec3 Car::getColor()
+const vec3& Car::getColor()
 {
 	return color;
 }
 
-const glm::mat4& Car::getModelMat()
+const mat4& Car::getModelMat()
 {
 	return modelMat;
 }
 
-const glm::vec3& Car::getDir()
+const vec3& Car::getDir()
 {
 	return dir;
 }

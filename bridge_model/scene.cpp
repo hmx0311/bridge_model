@@ -5,8 +5,8 @@
 
 #include <cmath>
 
-#include "glm\gtx\transform.hpp"
-#include "glm\matrix.hpp"
+#include "gtx\transform.hpp"
+#include "matrix.hpp"
 
 using namespace glm;
 

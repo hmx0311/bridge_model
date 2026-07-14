@@ -1,7 +1,7 @@
 #pragma once
 
 #include "glew.h"
-#include "glm\glm.hpp"
+#include "glm.hpp"
 
 constexpr int groundEBOsize = 3906;
 constexpr int bridgeEBOsize = 18966;
