@@ -8,13 +8,14 @@
 #include <vector>
 #include <list>
 
-#define MAX_FRAME_TIME 50
-#define CAR_POS_MAP_SIZE 52
-#define CAR_POS_MAP_GRID_LENGTH 4000
-
-#define INITIAL_TIME 2000
-
 using namespace glm;
+
+static constexpr ivec2 CAR_POS_MAP_SIZE = ivec2(54, 50);
+static constexpr float CAR_POS_MAP_GRID_LENGTH = 4000;
+
+static constexpr uint32_t MAX_FRAME_TIME = 50;
+static constexpr uint64_t INITIAL_TIME = 2000;
+
 
 static LogicalData logicalData[3];
 static std::atomic<int> latest_data = 0;
@@ -22,6 +23,7 @@ static std::atomic<int> reading_data = 0;
 std::atomic<float> tickRate = 60;
 std::atomic<bool> isPaused = false;
 std::atomic<int> simulateSpeed = 1;
+std::mt19937 rdEng;
 
 static Sun sun(39.9f);
 
@@ -39,7 +41,9 @@ LogicalData& getLatestLogicalData()
 
 void logicalFrame()
 {
-	std::uniform_int_distribution<uint64_t> distb(0, 480);
+	std::random_device rd;
+	rdEng.seed(rd());
+	std::uniform_int_distribution<uint64_t> distb(0, 320);
 	uint64_t elapsedTime = INITIAL_TIME;
 	clock_t lastTime = clock();
 	uint64_t nextCarTime[6];
@@ -50,15 +54,7 @@ void logicalFrame()
 	std::list<Car> vehicles;
 	while (true)
 	{
-		int writing_data;
-		if ((latest_data + 1) % 3 == reading_data)
-		{
-			writing_data = (latest_data + 2) % 3;
-		}
-		else
-		{
-			writing_data = (latest_data + 1) % 3;
-		}
+		int writing_data = (latest_data + ((latest_data + 1) % 3 == reading_data ? 2 :1)) % 3;
 
 		clock_t time = clock();
 		uint32_t frameTime = time - lastTime;
@@ -83,10 +79,10 @@ void logicalFrame()
 			if (elapsedTime > nextCarTime[i])
 			{
 				vehicles.emplace_back(lanes[i], sun.dir.z);
-				nextCarTime[i] += (i < 4 ? 1 : 6) * distb(rdEng) + REACT_TIME + CAR_LENGTH / lanes[i]->speedLimit;
+				nextCarTime[i] += (i < 4 ? 1 : 8) * distb(rdEng) + REACT_TIME + CAR_LENGTH / lanes[i]->speedLimit;
 			}
 		}
-		ivec2 carPosMap[CAR_POS_MAP_SIZE][CAR_POS_MAP_SIZE]{};
+		ivec2 carPosMap[CAR_POS_MAP_SIZE.x][CAR_POS_MAP_SIZE.y]{};
 		struct CarPosInfo
 		{
 			Car* car;
@@ -99,7 +95,7 @@ void logicalFrame()
 			{
 				const mat4& modelMat = iter->getModelMat();
 				vec2 carXYPos(modelMat[3]);
-				ivec2 posMapIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * carXYPos + 0.5f * CAR_POS_MAP_SIZE);
+				ivec2 posMapIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * carXYPos + 0.5f * vec2(CAR_POS_MAP_SIZE));
 				carPosInfos.push_back(CarPosInfo{ &*iter, &carPosMap[posMapIdx.x][posMapIdx.y] });
 				carPosMap[posMapIdx.x][posMapIdx.y].x++;
 				iter++;
@@ -109,7 +105,7 @@ void logicalFrame()
 				iter = vehicles.erase(iter);
 			}
 		}
-		Car* carPos[MAX_CAR_COUNT];
+		Car* carPos[MAX_CAR_CNT];
 		int numCarPos = 0;
 		for (CarPosInfo& carPosInfo : carPosInfos)
 		{
@@ -124,7 +120,7 @@ void logicalFrame()
 		for (Car& car : vehicles)
 		{
 			constexpr float posOffset = -30.0f / CAR_POS_MAP_GRID_LENGTH + 0.5f;
-			ivec2 posIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + posOffset * vec2(car.getDir()) + (CAR_POS_MAP_SIZE / 2 - 0.5f));
+			ivec2 posIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + posOffset * vec2(car.getDir()) + 0.5f * vec2(CAR_POS_MAP_SIZE) - 0.5f);
 			constexpr ivec2 offset[4] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
 			for (int i = 0; i < 4; i++)
 			{

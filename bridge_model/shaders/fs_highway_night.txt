@@ -1,5 +1,10 @@
 #version 430 core
 
+#define MAX_CAR_CNT 512
+#define LIGHT_MAP_SIZE_X 134
+#define LIGHT_MAP_SIZE_Y 122
+#define LIGHT_MAP_GRID_LENGTH 1600
+
 out vec3 fragColor;
 
 layout(std140, binding = 1) uniform Sun
@@ -9,17 +14,17 @@ layout(std140, binding = 1) uniform Sun
 	vec3 sunDiffuseAndSpecular;
 	vec3 skyColor;
 };
-layout(std430, binding = 3) buffer CarLishtMap
+layout(std430, binding = 3) buffer CarLightMap
 {
-	ivec2 lightIdx[16384];
+	ivec2 lightIdx[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
 };
-layout(std140, binding = 4) uniform CarLishts
+layout(std140, binding = 4) uniform CarLights
 {
-	vec3 carLightPos[1024];
+	vec3 carLightPos[2 * MAX_CAR_CNT];
 };
-layout(std140, binding = 5) uniform CarLishtShadow
+layout(std140, binding = 5) uniform CarLightShadow
 {
-	mat4 carLightShadowMat[1024];
+	mat4 carLightShadowMat[2 * MAX_CAR_CNT];
 };
 
 in vec3 modelPos;
@@ -36,7 +41,7 @@ void main()
 	vec3 color = texture(texture0, aTexCoord).rgb;
 	
 	vec3 lighting = sunAmbient;
-	const int idxOffsets[9] = { -129, -128, -127, -1, 0, 1, 127, 128, 129 };
+	const int idxOffsets[9] = { -LIGHT_MAP_SIZE_Y - 1, -LIGHT_MAP_SIZE_Y, -LIGHT_MAP_SIZE_Y + 1, -1, 0, 1, LIGHT_MAP_SIZE_Y - 1, LIGHT_MAP_SIZE_Y, LIGHT_MAP_SIZE_Y + 1 };
 	vec3 offsetX = dFdx(modelPos);
 	vec3 offsetY = dFdy(modelPos);
 	for(int i = 0, j = 0, end = 0; true; j++)
@@ -48,7 +53,7 @@ void main()
 				i++;
 				break;
 			}
-			ivec2 lightRange =  lightIdx[int(modelPos.x / 1600 + 64) * 128 + int(modelPos.y / 1600 + 64) + idxOffsets[i]];
+			ivec2 lightRange =  lightIdx[int(modelPos.x / LIGHT_MAP_GRID_LENGTH + 0.5 * LIGHT_MAP_SIZE_X) * LIGHT_MAP_SIZE_Y + int(modelPos.y / LIGHT_MAP_GRID_LENGTH + 0.5 * LIGHT_MAP_SIZE_Y) + idxOffsets[i]];
 			j = lightRange.x;
 			end = lightRange.y;
 			i++;
@@ -100,7 +105,7 @@ void main()
 	}
 	color *= lighting;
 	
-	float temp = fogDensity * fogDensity * dot(modelPosView, modelPosView);
+	float temp = fogDensity * max(0, length(modelPosView) - 30000);
 	float fogFactor = exp(-temp * temp);
 	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
 	return;

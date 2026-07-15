@@ -17,32 +17,32 @@ void buildGroundMesh()
 	vec2 texCoords[vertSize];
 	GLuint indices[groundEBOsize];
 
-	positions[0] = vec3(-100000, -100000, 0);
-	positions[1] = vec3(100000, -100000, 0);
-	positions[2] = vec3(100000, 100000, 0);
-	positions[3] = vec3(-100000, 100000, 0);
+	positions[0] = vec3(-105000, -95000, 0);
+	positions[1] = vec3(105000, -95000, 0);
+	positions[2] = vec3(105000, 95000, 0);
+	positions[3] = vec3(-105000, 95000, 0);
 	for (int i = 0; i < 4; i++)
 	{
 		texCoords[i] = vec2(0.09375f, 1.0f);
 	}
 
-	positions[4] = vec3(-100000, -720, 0);
-	texCoords[4] = vec2(0.63671875f, -100000.0f / 2048);
-	positions[5] = vec3(100000, -720, 0);
-	texCoords[5] = vec2(0.63671875f, 100000.0f / 2048);
-	positions[6] = vec3(100000, 720, 0);
-	texCoords[6] = vec2(0.98828125f, 100000.0f / 2048);
-	positions[7] = vec3(-100000, 720, 0);
-	texCoords[7] = vec2(0.98828125f, -100000.0f / 2048);
+	positions[4] = vec3(-105000, -720, 0);
+	texCoords[4] = vec2(0.63671875f, -105000.0f / 2048);
+	positions[5] = vec3(105000, -720, 0);
+	texCoords[5] = vec2(0.63671875f, 105000.0f / 2048);
+	positions[6] = vec3(105000, 720, 0);
+	texCoords[6] = vec2(0.98828125f, 105000.0f / 2048);
+	positions[7] = vec3(-105000, 720, 0);
+	texCoords[7] = vec2(0.98828125f, -105000.0f / 2048);
 
 	positions[8] = vec3(-720, 12800, 0);
 	texCoords[8] = vec2(0.63671875f, 12800.0f / 2048);
 	positions[9] = vec3(720, 12800, 0);
 	texCoords[9] = vec2(0.98828125f, 12800.0f / 2048);
-	positions[10] = vec3(720, 100000, 0);
-	texCoords[10] = vec2(0.98828125f, 100000.0f / 2048);
-	positions[11] = vec3(-720, 100000, 0);
-	texCoords[11] = vec2(0.63671875f, 100000.0f / 2048);
+	positions[10] = vec3(720, 95000, 0);
+	texCoords[10] = vec2(0.98828125f, 95000.0f / 2048);
+	positions[11] = vec3(-720, 95000, 0);
+	texCoords[11] = vec2(0.63671875f, 95000.0f / 2048);
 	
 	positions[12] = vec3(376, 12800, 0);
 	texCoords[12] = vec2(0.59179687f, 0.5859375f);
@@ -1170,7 +1170,7 @@ void buildCarMesh()
 
 	glGenBuffers(1, &carMatVBO);
 	glBindBuffer(GL_ARRAY_BUFFER, carMatVBO);
-	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_COUNT * sizeof(mat4), nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_CNT * sizeof(mat4), nullptr, GL_STREAM_DRAW);
 	glEnableVertexAttribArray(3);
 	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)0);
 	glVertexAttribDivisor(3, 1);
@@ -1186,7 +1186,7 @@ void buildCarMesh()
 
 	glGenBuffers(1, &carColorVBO);
 	glBindBuffer(GL_ARRAY_BUFFER, carColorVBO);
-	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_COUNT * sizeof(vec3), nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_CNT * sizeof(vec3), nullptr, GL_STREAM_DRAW);
 	glEnableVertexAttribArray(7);
 	glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glVertexAttribDivisor(7, 1);

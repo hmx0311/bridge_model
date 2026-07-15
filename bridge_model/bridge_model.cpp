@@ -22,13 +22,14 @@ using namespace glm;
 GLuint shadowFBO;
 GLuint shadowTex;
 
-#define FOVY (PI / 4)
-#define VIEW_Z_NEAR 90.0f
-#define VIEW_Z_FAR 90000.0f
-#define FOCUS_HEIGHT 200
-#define MIN_VIEW_DISTANCE 200
-#define MAX_VIEW_DISTANCE 25000
-#define MIN_SHADOW_FAR 369.5f
+constexpr float FOVY = pi<float>() / 4;
+constexpr float VIEW_Z_NEAR = 90.0f;
+constexpr float VIEW_Z_FAR = 90000.0f;
+constexpr float FOCUS_HEIGHT = 200;
+constexpr float MIN_VIEW_DISTANCE = 200;
+constexpr float MAX_VIEW_DISTANCE = 25000;
+constexpr float MIN_SHADOW_FAR = 369.5f;
+constexpr float FOG_DENSITY = 0.00003f;
 
 GLint windowWidth, windowHeight;
 
@@ -40,7 +41,7 @@ bool needUpdateView = true;
 clock_t lastFrameTime;
 
 #define MAX_HEIGHT 500
-#define HEIGHT_MAP_SIZE 256
+constexpr int HEIGHT_MAP_SIZE = 256;
 constexpr RECT HEIGHT_MAP_AREA = { -10240, 12800, 10240, -7680 };
 float heightMap[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
 
@@ -72,7 +73,7 @@ GLuint texBlitVAO, texMappingVBO;
 *	vec4 skyColor
 */
 GLuint sceneUBO;
-GLintptr sceneUBOoffset1 = 256;
+GLintptr sceneUBOoffset1;
 
 /*
 * binding = 2
@@ -81,8 +82,6 @@ GLintptr sceneUBOoffset1 = 256;
 */
 GLuint shadowUBO;
 
-#define LIGHT_MAP_SIZE 128
-#define LIGHT_MAP_GRID_LENGTH (CAR_LIGHT_RANGE / 2)
 // binding = 3
 GLuint carLightMapSSBO;
 // binding = 4
@@ -105,15 +104,19 @@ struct
 	mat4 mat[CSM_LEVELS];
 	mat4 texMat[CSM_LEVELS];
 }sunShadow;
-float carLightMapGridDistanceToView[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE];
-ivec2 carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE];
-int numActiveCarLightMapGrids = 0;
+constexpr ivec2 LIGHT_MAP_SIZE = ivec2(134, 122);
+constexpr float LIGHT_MAP_GRID_LENGTH = (CAR_LIGHT_RANGE / 2);
+constexpr int MAX_LIGHT_PER_CAR = 24;
 const mat4 carLightShadowProjMat = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 50.0f, 50.0f + 2 * LIGHT_MAP_GRID_LENGTH);
 
-int carLightMap[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE][2];
-vec4 carLightPos[2 * MAX_CAR_COUNT];
-mat4 carLightMats[2 * MAX_CAR_COUNT];
-int carLightings[MAX_CAR_COUNT][24];
+int numActiveCarLightMapGrids = 0;
+float carLightMapGridDistance2ToView[LIGHT_MAP_SIZE.x][LIGHT_MAP_SIZE.y];
+ivec2 carLightMapGridDistanceOrder[LIGHT_MAP_SIZE.x * LIGHT_MAP_SIZE.y];
+
+int carLightMap[LIGHT_MAP_SIZE.x][LIGHT_MAP_SIZE.y][2];
+vec4 carLightPos[2 * MAX_CAR_CNT];
+mat4 carLightMats[2 * MAX_CAR_CNT];
+int carLightings[MAX_CAR_CNT][MAX_LIGHT_PER_CAR];
 
 GLuint spHighwayDay;
 GLuint spHighwayNight;
@@ -127,8 +130,6 @@ GLuint spShadowCarNight;
 GLuint spTexBlit;
 GLuint spGaussianBlur;
 GLuint spBuffer2Screen;
-
-std::mt19937 rdEng;
 
 GLuint loadShader(GLuint shaderID, GLenum type)
 {
@@ -200,8 +201,8 @@ void initShader()
 	glDeleteShader(vsHighway);
 	glDeleteShader(fsHighwayDay);
 	glDeleteShader(fsHighwayNight);
-	glProgramUniform1f(spHighwayDay, glGetUniformLocation(spHighwayDay, "fogDensity"), 0.000016f);
-	glProgramUniform1f(spHighwayNight, glGetUniformLocation(spHighwayNight, "fogDensity"), 0.000016f);
+	glProgramUniform1f(spHighwayDay, glGetUniformLocation(spHighwayDay, "fogDensity"), FOG_DENSITY);
+	glProgramUniform1f(spHighwayNight, glGetUniformLocation(spHighwayNight, "fogDensity"), FOG_DENSITY);
 
 	GLuint vsCar = loadShader(IDR_VS_CAR, GL_VERTEX_SHADER);
 	GLuint fsCarDay = loadShader(IDR_FS_CAR_DAY, GL_FRAGMENT_SHADER);
@@ -211,8 +212,8 @@ void initShader()
 	glDeleteShader(vsCar);
 	glDeleteShader(fsCarDay);
 	glDeleteShader(fsCarNight);
-	glProgramUniform1f(spCarDay, glGetUniformLocation(spCarDay, "fogDensity"), 0.000016f);
-	glProgramUniform1f(spCarNight, glGetUniformLocation(spCarNight, "fogDensity"), 0.000016f);
+	glProgramUniform1f(spCarDay, glGetUniformLocation(spCarDay, "fogDensity"), FOG_DENSITY);
+	glProgramUniform1f(spCarNight, glGetUniformLocation(spCarNight, "fogDensity"), FOG_DENSITY);
 
 	GLuint vsSun = loadShader(IDR_VS_SUN, GL_VERTEX_SHADER);
 	GLuint fsSun = loadShader(IDR_FS_SUN, GL_FRAGMENT_SHADER);
@@ -370,14 +371,12 @@ void init()
 	printf("%s\n", (char*)glGetString(GL_VERSION));
 	printf("%s\n", (char*)glGetString(GL_SHADING_LANGUAGE_VERSION));
 	initShader();
-	std::random_device rd;
-	rdEng.seed(rd());
 
-	for (int i = 0; i < LIGHT_MAP_SIZE; i++)
+	for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
 	{
-		for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+		for (int j = 0; j < LIGHT_MAP_SIZE.y; j++)
 		{
-			carLightMapGridDistanceOrder[i * LIGHT_MAP_SIZE + j] = ivec2(i, j);
+			carLightMapGridDistanceOrder[i * LIGHT_MAP_SIZE.y + j] = ivec2(i, j);
 		}
 	}
 
@@ -407,8 +406,8 @@ void init()
 	glBindBufferRange(GL_UNIFORM_BUFFER, 4, carLightPosUBO, 0, sizeof(carLightPos));
 	glGenBuffers(1, &carLightShadowMatUBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, carLightShadowMatUBO);
-	glBufferData(GL_UNIFORM_BUFFER, 2 * MAX_CAR_COUNT * sizeof(mat4), nullptr, GL_STREAM_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 5, carLightShadowMatUBO, 0, 2 * MAX_CAR_COUNT * sizeof(mat4));
+	glBufferData(GL_UNIFORM_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_STREAM_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, 5, carLightShadowMatUBO, 0, 2 * MAX_CAR_CNT * sizeof(mat4));
 	glGenBuffers(1, &carLightingSSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, carLightingSSBO);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(carLightings), nullptr, GL_STREAM_DRAW);
@@ -806,13 +805,13 @@ void drawGraphics()
 		}
 
 		mat4 projAndViewMat = view.projMat * view.viewMat;
-		bool isLightGridVisible[LIGHT_MAP_SIZE][LIGHT_MAP_SIZE];
-		for (int i = 0; i < LIGHT_MAP_SIZE; i++)
+		bool isLightGridVisible[LIGHT_MAP_SIZE.x][LIGHT_MAP_SIZE.y];
+		for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
 		{
-			float offsetX = (-LIGHT_MAP_SIZE / 2 + i) * LIGHT_MAP_GRID_LENGTH;
-			for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+			float offsetX = (-LIGHT_MAP_SIZE.x / 2 + i) * LIGHT_MAP_GRID_LENGTH;
+			for (int j = 0; j < LIGHT_MAP_SIZE.y; j++)
 			{
-				float offsetY = (-LIGHT_MAP_SIZE / 2 + j) * LIGHT_MAP_GRID_LENGTH;
+				float offsetY = (-LIGHT_MAP_SIZE.y / 2 + j) * LIGHT_MAP_GRID_LENGTH;
 				constexpr vec4 gridAABB[8] = { vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1),
 					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1),
 					vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1),
@@ -834,27 +833,27 @@ void drawGraphics()
 			}
 		}
 		numActiveCarLightMapGrids = 0;
-		for (int i = 0; i < LIGHT_MAP_SIZE; i++)
+		for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
 		{
-			float offsetX = (-LIGHT_MAP_SIZE / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
-			for (int j = 0; j < LIGHT_MAP_SIZE; j++)
+			float offsetX = (-LIGHT_MAP_SIZE.x / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
+			for (int j = 0; j < LIGHT_MAP_SIZE.y; j++)
 			{
-				float offsetY = (-LIGHT_MAP_SIZE / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
+				float offsetY = (-LIGHT_MAP_SIZE.y / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
 				if (isLightGridVisible[i][j])
 				{
 					vec2 distance = vec2(eye) - vec2(offsetX, offsetY);
-					carLightMapGridDistanceToView[i][j] = dot(distance, distance);
+					carLightMapGridDistance2ToView[i][j] = dot(distance, distance);
 					numActiveCarLightMapGrids++;
 				}
 				else
 				{
-					carLightMapGridDistanceToView[i][j] = FLT_MAX;
+					carLightMapGridDistance2ToView[i][j] = FLT_MAX;
 				}
 			}
 		}
-		std::sort(carLightMapGridDistanceOrder, &carLightMapGridDistanceOrder[LIGHT_MAP_SIZE * LIGHT_MAP_SIZE], [](ivec2 a, ivec2 b)->bool
+		std::sort(carLightMapGridDistanceOrder, &carLightMapGridDistanceOrder[LIGHT_MAP_SIZE.x * LIGHT_MAP_SIZE.y], [](ivec2 a, ivec2 b)->bool
 			{
-				return carLightMapGridDistanceToView[a.x][a.y] < carLightMapGridDistanceToView[b.x][b.y];
+				return carLightMapGridDistance2ToView[a.x][a.y] < carLightMapGridDistance2ToView[b.x][b.y];
 			});
 	}
 
@@ -1000,14 +999,14 @@ void drawGraphics()
 		for (int i = 0, j = logical_data.numLightOnCars; i < j; i++)
 		{
 			mat4& modelMat = logical_data.carModelMat[i];
-			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
-			if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] == FLT_MAX)
+			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			if (carLightMapGridDistance2ToView[lightMapIdx.x][lightMapIdx.y] == FLT_MAX)
 			{
 				for (j--; i < j; j--)
 				{
 					mat4& backModelMat = logical_data.carModelMat[j];
-					ivec2 backLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(backModelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
-					if (carLightMapGridDistanceToView[backLightMapIdx.x][backLightMapIdx.y] < FLT_MAX)
+					ivec2 backLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(backModelMat[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+					if (carLightMapGridDistance2ToView[backLightMapIdx.x][backLightMapIdx.y] < FLT_MAX)
 					{
 						std::swap(modelMat, backModelMat);
 						std::swap(logical_data.carColor[i], logical_data.carColor[j]);
@@ -1025,14 +1024,14 @@ void drawGraphics()
 		for (int i = logical_data.numLightOnCars, j = logical_data.numCars; i < j; i++)
 		{
 			mat4& modelMat = logical_data.carModelMat[i];
-			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
-			if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] == FLT_MAX)
+			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			if (carLightMapGridDistance2ToView[lightMapIdx.x][lightMapIdx.y] == FLT_MAX)
 			{
 				for (j--; i < j; j--)
 				{
 					mat4& backModelMat = logical_data.carModelMat[j];
-					ivec2 backLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(backModelMat[3]) + 0.5f * LIGHT_MAP_SIZE);
-					if (carLightMapGridDistanceToView[backLightMapIdx.x][backLightMapIdx.y] < FLT_MAX)
+					ivec2 backLightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(backModelMat[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+					if (carLightMapGridDistance2ToView[backLightMapIdx.x][backLightMapIdx.y] < FLT_MAX)
 					{
 						std::swap(modelMat, backModelMat);
 						std::swap(logical_data.carColor[i], logical_data.carColor[j]);
@@ -1052,8 +1051,8 @@ void drawGraphics()
 			constexpr float posOffset = 50.0f / LIGHT_MAP_GRID_LENGTH + 1.0f;
 			vec4 lightPos = logical_data.carLightPos[i];
 			vec4 lightDir = logical_data.carLightDir[i];
-			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(lightPos) + posOffset * vec2(lightDir) + 0.5f * LIGHT_MAP_SIZE);
-			if (carLightMapGridDistanceToView[lightMapIdx.x][lightMapIdx.y] < FLT_MAX)
+			ivec2 lightMapIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(lightPos) + posOffset * vec2(lightDir) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			if (carLightMapGridDistance2ToView[lightMapIdx.x][lightMapIdx.y] < FLT_MAX)
 			{
 				carLightInfos.emplace_back(CarLightInfo{ lightPos, lightDir, carLightMap[lightMapIdx.x][lightMapIdx.y] });
 				carLightMap[lightMapIdx.x][lightMapIdx.y][0]++;
@@ -1075,7 +1074,7 @@ void drawGraphics()
 		for (int i = 0; i < numVisibleCars; i++)
 		{
 			mat4& modelMat = logical_data.carModelMat[i < numVisibleLightOnCars ? i : i + logical_data.numLightOnCars - numVisibleLightOnCars];
-			ivec2 posIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + LIGHT_MAP_SIZE / 2.0f);
+			ivec2 posIdx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(modelMat[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
 			int numLighting = 0;
 			for (int j = -1; j < 2; j++)
 			{
@@ -1431,7 +1430,7 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 	glutInit(&argc, argv);
-	glutInitContextVersion(4, 6);
+	//glutInitContextVersion(4, 6);
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowPosition(10, 0);

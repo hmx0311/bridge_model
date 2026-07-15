@@ -106,8 +106,8 @@ void main()
 		}
 	}
 	vec3 color = ambientAndDiffuseLighting * material.ambientAndDiffuse + specularLighting * material.specular;
-
-	float temp = fogDensity * fogDensity * dot(viewRay, viewRay);
+	
+	float temp = fogDensity * max(0, length(viewRay) - 30000);
 	float fogFactor = exp(-temp * temp);
 	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
 }

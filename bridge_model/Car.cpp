@@ -4,6 +4,11 @@
 
 using namespace glm;
 
+static constexpr float acceleration = 0.0002f;	// cm/ms^2
+static constexpr float breakIntensity = 0.0004f;	// cm/ms^2
+static constexpr float BREAK_DISTANCE = 12000;
+
+
 Car::Car(Lane* lane, float sunHeight)
 {
 	std::uniform_real_distribution<float> distb(0.1f, 0.95f);

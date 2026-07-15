@@ -80,7 +80,7 @@ void main()
 	}
 	color *= lighting;
 	
-	float temp = fogDensity * fogDensity * dot(modelPosView, modelPosView);
+	float temp = fogDensity * max(0, length(modelPosView) - 30000);
 	float fogFactor = exp(-temp * temp);
 	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
 }

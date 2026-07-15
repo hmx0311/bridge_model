@@ -1,5 +1,10 @@
 #version 430 core
 
+#define MAX_CAR_CNT 512
+#define LIGHT_MAP_SIZE_X 134
+#define LIGHT_MAP_SIZE_Y 122
+#define LIGHT_MAP_GRID_LENGTH 1600
+
 layout(triangles) in;
 
 layout(triangle_strip, max_vertices = 111) out;
@@ -7,13 +12,13 @@ out float gl_ClipDistance[4];
 
 in vec3 aNormal[];
 
-layout(std430, binding = 3) buffer CarLishtMap
+layout(std430, binding = 3) buffer CarLightMap
 {
-	ivec2 lightIdx[16384];
+	ivec2 lightIdx[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
 };
-layout(std140, binding = 5) uniform CarLishtShadow
+layout(std140, binding = 5) uniform CarLightShadow
 {
-	mat4 carLightShadowMat[1024];
+	mat4 carLightShadowMat[2 * MAX_CAR_CNT];
 };
 
 void main()
@@ -24,13 +29,13 @@ void main()
 	minCoord = min(minCoord, vec2(gl_in[2].gl_Position));
 	maxCoord = max(maxCoord, vec2(gl_in[1].gl_Position));
 	maxCoord = max(maxCoord, vec2(gl_in[2].gl_Position));
-	ivec2 startIdx = ivec2(minCoord / 1600 + (64 - 1));
-	ivec2 endIdx = ivec2(maxCoord / 1600 + (64 + 1));
+	ivec2 startIdx = ivec2(minCoord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) -1);
+	ivec2 endIdx = ivec2(maxCoord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) + 1);
 	for(int i = startIdx.x; i <= endIdx.x; i++)
 	{
 		for(int j = startIdx.y; j <= endIdx.y; j++)
 		{
-			int gridIdx = i * 128 + j;
+			int gridIdx = i * LIGHT_MAP_SIZE_Y + j;
 			int end = lightIdx[gridIdx].y;
 			for(int k = lightIdx[gridIdx].x; k < end; k++)
 			{

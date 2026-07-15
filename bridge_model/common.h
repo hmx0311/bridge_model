@@ -4,9 +4,9 @@
 #include "glew.h"
 
 #define PI 3.14159265f
-constexpr float EARTH_RADIUS = 6.317e8f;
+constexpr float EARTH_RADIUS = 6.371e8f;
 
-#define MAX_CAR_COUNT 512
+constexpr int MAX_CAR_CNT = 512;
 
 constexpr GLfloat COLOR_WHITE[4] = { 1.0f,1.0f,1.0f,1.0f };
 constexpr GLfloat COLOR_BLACK[4] = { 0.0f,0.0f,0.0f,1.0f };
