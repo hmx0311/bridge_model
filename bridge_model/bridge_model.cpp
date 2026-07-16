@@ -36,7 +36,7 @@ GLint windowWidth, windowHeight;
 float aimAzimuth = 0.3f, aimRelativeDepression = 0.1f, aimViewDistance = 15000;
 float azimuth = aimAzimuth, relativeDepression = aimRelativeDepression, viewDistance = aimViewDistance;
 vec3 focus(0);
-char focusMoveDir = 0;
+uint32_t focusMoveDir = 0;
 bool needUpdateView = true;
 clock_t lastFrameTime;
 
@@ -561,30 +561,34 @@ void drawGraphics()
 		}
 		if (focusMoveDir != 0)
 		{
-			float moveSpeed = 0.001f * viewDistance + 1.0f;
-			float moveDistance = moveSpeed * frameTime;
-			switch (focusMoveDir)
+			vec2 dir = vec2(0.0f);
+			if ((focusMoveDir & 0b0011)==0b0001)
 			{
-			case 'a':
-				focus.x -= cos(azimuth) * moveDistance;
-				focus.y -= sin(azimuth) * moveDistance;
-				break;
-			case 'd':
-				focus.x += cos(azimuth) * moveDistance;
-				focus.y += sin(azimuth) * moveDistance;
-				break;
-			case 'w':
-				focus.x -= sin(azimuth) * moveDistance;
-				focus.y += cos(azimuth) * moveDistance;
-				break;
-			case 's':
-				focus.x += sin(azimuth) * moveDistance;
-				focus.y -= cos(azimuth) * moveDistance;
-				break;
+				dir += vec2(-cos(azimuth), -sin(azimuth));
 			}
-			focus.x = clamp(focus.x, -30000.0f, 30000.0f);
-			focus.y = clamp(focus.y, -10000.0f, 20000.0f);
-			needUpdateView = true;
+			if ((focusMoveDir & 0b0011) == 0b0010)
+			{
+				dir += vec2(cos(azimuth), sin(azimuth));
+			}
+			if ((focusMoveDir & 0b1100) == 0b0100)
+			{
+				dir += vec2(-sin(azimuth), cos(azimuth));
+			}
+			if ((focusMoveDir & 0b1100) == 0b1000)
+			{
+				dir += vec2(sin(azimuth), -cos(azimuth));
+			}
+			if (dir != vec2(0.0f))
+			{
+				dir = normalize(dir);
+				float moveSpeed = 0.001f * viewDistance + 1.0f;
+				float moveDistance = moveSpeed * frameTime;
+				focus.x += dir.x * moveDistance;
+				focus.y += dir.y * moveDistance;
+				focus.x = clamp(focus.x, -30000.0f, 30000.0f);
+				focus.y = clamp(focus.y, -10000.0f, 20000.0f);
+				needUpdateView = true;
+			}
 		}
 
 		float depression = PI / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * viewDistance / MAX_VIEW_DISTANCE) * (1 - relativeDepression)));
@@ -1277,7 +1281,7 @@ void lineSegment()
 	glutIdleFunc(drawGraphics);
 }
 
-void winReshapeFunc(GLint width, GLint height)
+void onReshape(GLint width, GLint height)
 {
 	windowWidth = width;
 	windowHeight = height;
@@ -1307,7 +1311,7 @@ void winReshapeFunc(GLint width, GLint height)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, BLOOM_BUFFER_HEIGHT, bloomBufferWidth, 0, GL_RGB, GL_FLOAT, nullptr);
 }
 
-void winKeyboardFunc(GLubyte key, GLint x, GLint y)
+void onKeyDown(GLubyte key, GLint x, GLint y)
 {
 	switch (key)
 	{
@@ -1334,10 +1338,16 @@ void winKeyboardFunc(GLubyte key, GLint x, GLint y)
 		simulateSpeed = key - '0';
 		return;
 	case 'a':
+		focusMoveDir |= 0b0001;
+		break;
 	case 'd':
+		focusMoveDir |= 0b0010;
+		break;
 	case 'w':
+		focusMoveDir |= 0b0100;
+		break;
 	case 's':
-		focusMoveDir = key;
+		focusMoveDir |= 0b1000;
 		break;
 	default:
 		return;
@@ -1345,20 +1355,26 @@ void winKeyboardFunc(GLubyte key, GLint x, GLint y)
 	needUpdateView = true;
 }
 
-void winKeyboardUpFunc(GLubyte key, GLint x, GLint y)
+void onKeyUp(GLubyte key, GLint x, GLint y)
 {
 	switch (key)
 	{
 	case 'a':
+		focusMoveDir &= ~(0b0001);
+		break;
 	case 'd':
+		focusMoveDir &= ~(0b0010);
+		break;
 	case 'w':
+		focusMoveDir &= ~(0b0100);
+		break;
 	case 's':
-		focusMoveDir = 0;
+		focusMoveDir &= ~(0b1000);
 		break;
 	}
 }
 
-void mouseWheel(GLint button, GLint dir, GLint x, GLint y)
+void onMouseWheel(GLint button, GLint dir, GLint x, GLint y)
 {
 	float viewDistance;
 	if (dir > 0)
@@ -1408,7 +1424,7 @@ void rotateView(GLint xMouse, GLint yMouse)
 	}
 }
 
-void winMouseFunc(GLint button, GLint action, GLint xMouse, GLint yMouse)
+void onMouseButton(GLint button, GLint action, GLint xMouse, GLint yMouse)
 {
 	if (button == GLUT_MIDDLE_BUTTON)
 	{
@@ -1439,11 +1455,11 @@ int main(int argc, char** argv)
 	init();
 	std::thread logicalThread(logicalFrame);
 	glutDisplayFunc(lineSegment);
-	glutReshapeFunc(winReshapeFunc);
-	glutKeyboardFunc(winKeyboardFunc);
-	glutKeyboardUpFunc(winKeyboardUpFunc);
-	glutMouseFunc(winMouseFunc);
-	glutMouseWheelFunc(mouseWheel);
+	glutReshapeFunc(onReshape);
+	glutKeyboardFunc(onKeyDown);
+	glutKeyboardUpFunc(onKeyUp);
+	glutMouseFunc(onMouseButton);
+	glutMouseWheelFunc(onMouseWheel);
 	lastFrameTime = clock();
 	glutMainLoop();
 }
