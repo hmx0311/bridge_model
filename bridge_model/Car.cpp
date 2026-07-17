@@ -4,179 +4,180 @@
 
 using namespace glm;
 
-static constexpr float acceleration = 0.0002f;	// cm/ms^2
-static constexpr float breakIntensity = 0.0004f;	// cm/ms^2
+static constexpr float ACCELERATION = 0.0002f;	// cm/ms^2
+static constexpr float BREAK_INTENSITY = 0.0004f;	// cm/ms^2
 static constexpr float BREAK_DISTANCE = 12000;
 
 
-Car::Car(Lane* lane, float sunHeight)
+Car::Car(Lane* lane, float sun_height)
 {
 	std::uniform_real_distribution<float> distb(0.1f, 0.95f);
-	color = vec3(pow(distb(rdEng), 2.2f), pow(distb(rdEng), 2.2f), pow(distb(rdEng), 2.2f));
-	s = 0;
-	speed = lane->speedLimit;
-	aimSpeed = speed;
+	m_color = vec3(pow(distb(rd_eng), 2.2f), pow(distb(rd_eng), 2.2f), pow(distb(rd_eng), 2.2f));
+	m_s = 0;
+	m_speed = lane->speed_limit;
+	m_aim_speed = m_speed;
 	while (lane != nullptr)
 	{
-		path.push_back(lane);
+		m_path.push_back(lane);
 		lane = lane->getNextLane();
 	}
-	distb.param(std::uniform_real_distribution<float>::param_type(-0.2f, 0.0f));
-	if (sunHeight < distb(rdEng))
+
+	distb.param(decltype(distb)::param_type(-0.2f, 0.0f));
+	if (sun_height < distb(rd_eng))
 	{
-		lightOn = true;
-		wasDay = false;
+		m_is_light_on = true;
+		m_was_day = false;
 	}
 	else
 	{
-		lightOn = false;
-		wasDay = true;
+		m_is_light_on = false;
+		m_was_day = true;
 	}
 }
 
-bool Car::update(uint32_t time, float sunHeight)
+bool Car::update(uint32_t time_ms, float sun_height)
 {
-	if (time > 0)
+	if (time_ms > 0)
 	{
-		if (speed > aimSpeed)
+		if (m_speed > m_aim_speed)
 		{
-			if (speed - breakIntensity * time >= aimSpeed)
+			if (m_speed - BREAK_INTENSITY * time_ms >= m_aim_speed)
 			{
-				s += speed * time - breakIntensity * time * time / 2;
-				speed = speed - breakIntensity * time;
+				m_s += m_speed * time_ms - BREAK_INTENSITY * time_ms * time_ms / 2;
+				m_speed = m_speed - BREAK_INTENSITY * time_ms;
 			}
 			else
 			{
-				float breakTime = (speed - aimSpeed) / breakIntensity;
-				s += (speed + aimSpeed) * breakTime / 2 + aimSpeed * (time - breakTime);
-				speed = aimSpeed;
+				float break_time = (m_speed - m_aim_speed) / BREAK_INTENSITY;
+				m_s += (m_speed + m_aim_speed) * break_time / 2 + m_aim_speed * (time_ms - break_time);
+				m_speed = m_aim_speed;
 			}
 		}
-		else if (speed < aimSpeed)
+		else if (m_speed < m_aim_speed)
 		{
-			if (speed + acceleration * time <= aimSpeed)
+			if (m_speed + ACCELERATION * time_ms <= m_aim_speed)
 			{
-				s += speed * time + acceleration * time * time / 2;
-				speed = speed + acceleration * time;
+				m_s += m_speed * time_ms + ACCELERATION * time_ms * time_ms / 2;
+				m_speed = m_speed + ACCELERATION * time_ms;
 			}
 			else
 			{
-				float accelerateTime = (aimSpeed - speed) / acceleration;
-				s += (speed + aimSpeed) * accelerateTime / 2 + aimSpeed * (time - accelerateTime);
-				speed = aimSpeed;
+				float accelerate_time = (m_aim_speed - m_speed) / ACCELERATION;
+				m_s += (m_speed + m_aim_speed) * accelerate_time / 2 + m_aim_speed * (time_ms - accelerate_time);
+				m_speed = m_aim_speed;
 			}
 		}
 		else
 		{
-			s += speed * time;
+			m_s += m_speed * time_ms;
 		}
-		Lane* curLane = path.front();
-		while (s > curLane->length)
+		Lane* cur_lane = m_path.front();
+		while (m_s > cur_lane->length)
 		{
-			s -= curLane->length;
-			path.pop_front();
-			if (path.empty())
+			m_s -= cur_lane->length;
+			m_path.pop_front();
+			if (m_path.empty())
 			{
 				return false;
 			}
-			curLane = path.front();
+			cur_lane = m_path.front();
 		}
-		aimSpeed = curLane->speedLimit;
-		if (path.size() > 1)
+		m_aim_speed = cur_lane->speed_limit;
+		if (m_path.size() > 1)
 		{
-			Lane* nextLane = *std::next(path.begin());
-			if (nextLane->speedLimit < speed && (speed + nextLane->speedLimit) * (speed - nextLane->speedLimit) / (2 * breakIntensity) > curLane->length - s)
+			Lane* next_lane = *std::next(m_path.begin());
+			if (next_lane->speed_limit < m_speed && (m_speed + next_lane->speed_limit) * (m_speed - next_lane->speed_limit) / (2 * BREAK_INTENSITY) > cur_lane->length - m_s)
 			{
-				aimSpeed = nextLane->speedLimit;
+				m_aim_speed = next_lane->speed_limit;
 			}
 		}
-		modelMat = curLane->transform(s);
-		dir = (mat3)modelMat * vec3(0, 1, 0);
+		m_transform = cur_lane->transform(m_s);
+		m_dir = (mat3)m_transform * vec3(0, 1, 0);
 
-		if (sunHeight > 0)
+		if (sun_height > 0)
 		{
-			wasDay = true;
-			lightOn = false;
+			m_was_day = true;
+			m_is_light_on = false;
 		}
-		else if (sunHeight < -0.2f)
+		else if (sun_height < -0.2f)
 		{
-			wasDay = false;
-			lightOn = true;
+			m_was_day = false;
+			m_is_light_on = true;
 		}
-		else if (wasDay && !lightOn)
+		else if (m_was_day && !m_is_light_on)
 		{
 			std::uniform_real_distribution<float> distb(0, 300);
-			if (distb(rdEng) < time * (-sunHeight))
+			if (distb(rd_eng) < time_ms * (-sun_height))
 			{
-				lightOn = true;
+				m_is_light_on = true;
 			}
 		}
-		else if (!wasDay && lightOn)
+		else if (!m_was_day && m_is_light_on)
 		{
 			std::uniform_real_distribution<float> distb(0, 300);
-			if (distb(rdEng) < time * (0.2f + sunHeight))
+			if (distb(rd_eng) < time_ms * (0.2f + sun_height))
 			{
-				lightOn = false;
+				m_is_light_on = false;
 			}
 		}
 	}
 	return true;
 }
 
-void Car::collisionTest(Car* testCar)
+void Car::collisionTest(Car* test_car)
 {
-	if (this == testCar || abs(modelMat[3].z - testCar->modelMat[3].z) > 200)
+	if (this == test_car || abs(m_transform[3].z - test_car->m_transform[3].z) > 200)
 	{
 		return;
 	}
-	auto thisLane = path.begin();
-	float thisDistanceToIntersect = -s;
-	auto testLane = testCar->path.begin();
-	float testDistanceToIntersect = -testCar->s;
+	auto this_lane = m_path.begin();
+	float this_distance_to_intersect = -m_s;
+	auto test_lane = test_car->m_path.begin();
+	float test_distance_to_intersect = -test_car->m_s;
 	while (true)
 	{
-		if (*thisLane == *testLane)
+		if (*this_lane == *test_lane)
 		{
-			float minDistance = REACT_TIME * speed + (speed + testCar->speed) * (speed - testCar->speed) / (2 * breakIntensity) + CAR_LENGTH;
-			if (testDistanceToIntersect < thisDistanceToIntersect && thisDistanceToIntersect - testDistanceToIntersect < minDistance)
+			float min_distance = REACT_TIME_MS * m_speed + (m_speed + test_car->m_speed) * (m_speed - test_car->m_speed) / (2 * BREAK_INTENSITY) + CAR_LENGTH;
+			if (test_distance_to_intersect < this_distance_to_intersect && this_distance_to_intersect - test_distance_to_intersect < min_distance)
 			{
 				float b, c;
-				if (testDistanceToIntersect < 0)
+				if (test_distance_to_intersect < 0)
 				{
-					b = REACT_TIME * (2 * breakIntensity);
-					c = -testCar->speed * testCar->speed + (CAR_LENGTH - thisDistanceToIntersect + testDistanceToIntersect) * (2 * breakIntensity);
+					b = REACT_TIME_MS * (2 * BREAK_INTENSITY);
+					c = -test_car->m_speed * test_car->m_speed + (CAR_LENGTH - this_distance_to_intersect + test_distance_to_intersect) * (2 * BREAK_INTENSITY);
 				}
 				else
 				{
-					b = (REACT_TIME+ testDistanceToIntersect/ testCar->speed) * (2 * breakIntensity);
-					c = -testCar->speed * testCar->speed + (CAR_LENGTH - thisDistanceToIntersect) * (2 * breakIntensity);
+					b = (REACT_TIME_MS + test_distance_to_intersect / test_car->m_speed) * (2 * BREAK_INTENSITY);
+					c = -test_car->m_speed * test_car->m_speed + (CAR_LENGTH - this_distance_to_intersect) * (2 * BREAK_INTENSITY);
 				}
 				float delta = b * b - 4 * c;
 				if (delta < 0)
 				{
-					aimSpeed = 0;
+					m_aim_speed = 0;
 				}
 				else
 				{
-					aimSpeed = fmin(aimSpeed, (-b + sqrt(delta)) / 2);
+					m_aim_speed = fmin(m_aim_speed, (-b + sqrt(delta)) / 2);
 				}
 			}
 			return;
 		}
-		if (thisDistanceToIntersect < testDistanceToIntersect)
+		if (this_distance_to_intersect < test_distance_to_intersect)
 		{
-			thisDistanceToIntersect += (*thisLane)->length;
-			thisLane++;
-			if (thisDistanceToIntersect > BREAK_DISTANCE || thisLane == path.end())
+			this_distance_to_intersect += (*this_lane)->length;
+			this_lane++;
+			if (this_distance_to_intersect > BREAK_DISTANCE || this_lane == m_path.end())
 			{
 				return;
 			}
 		}
 		else
 		{
-			testDistanceToIntersect += (*testLane)->length;
-			testLane++;
-			if (testLane == testCar->path.end())
+			test_distance_to_intersect += (*test_lane)->length;
+			test_lane++;
+			if (test_lane == test_car->m_path.end())
 			{
 				return;
 			}
@@ -186,20 +187,20 @@ void Car::collisionTest(Car* testCar)
 
 bool Car::isLightOn()
 {
-	return lightOn;
+	return m_is_light_on;
 }
 
 const vec3& Car::getColor()
 {
-	return color;
+	return m_color;
 }
 
 const mat4& Car::getModelMat()
 {
-	return modelMat;
+	return m_transform;
 }
 
 const vec3& Car::getDir()
 {
-	return dir;
+	return m_dir;
 }

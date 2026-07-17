@@ -4,7 +4,8 @@
 #include "Car.h"
 #include "scene.h"
 
-#include <chrono>
+#include "gtx/transform.hpp"
+
 #include <vector>
 #include <list>
 
@@ -13,91 +14,419 @@ using namespace glm;
 static constexpr ivec2 CAR_POS_MAP_SIZE = ivec2(54, 50);
 static constexpr float CAR_POS_MAP_GRID_LENGTH = 4000;
 
-static constexpr uint32_t MAX_FRAME_TIME = 50;
-static constexpr uint64_t INITIAL_TIME = 2000;
+static constexpr uint32_t MAX_FRAME_DT_MS = 50;
+static constexpr uint64_t INITIAL_TIME_MS = 2000;
 
 
-static LogicalData logicalData[3];
+static LogicalData logical_data[3];
 static std::atomic<int> latest_data = 0;
 static std::atomic<int> reading_data = 0;
-std::atomic<float> tickRate = 60;
-std::atomic<bool> isPaused = false;
-std::atomic<int> simulateSpeed = 1;
-std::mt19937 rdEng;
+std::atomic<float> tick_rate = 60;
+std::atomic<bool> is_paused = false;
+std::atomic<int> simulate_speed = 1;
+std::mt19937 rd_eng;
 
+static Lane* lanes[6];
 static Sun sun(39.9f);
+
+void initLanes()
+{
+	Lane* iter;
+	Lane* next_lane;
+	Lane* critical_lanes[2];
+	lanes[0] = new Lane(210000, 2.5f, (translate(vec3(-105000, -200, 0)) * rotate(-PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(s, 0, 0));
+			return transform;
+		});
+
+	lanes[1] = new Lane(98920, 2.5f, (translate(vec3(-105000, -520, 0)) * rotate(-PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(s, 0, 0));
+			return transform;
+		});
+	iter = lanes[1];
+	next_lane = new Lane(27160, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(83920, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	critical_lanes[0] = next_lane;
+	iter = lanes[1];
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-6080, -29480, 0));
+			transform *= rotate(-s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(6080, 29480, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, 28120, 0));
+			transform *= rotate(s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(0, -28120, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(3000, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(-5.0f / 13) * 2800, 1.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(3000, -3640, 0));
+			transform *= rotate(-s / 2800, vec3(0, 0, 1));
+			transform *= translate(vec3(-3000, 3640, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(asin(61.0f / 1861) * 37220 * 560 / 600, 1.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(3000, -3640, 37220 - 37220 * cos(s * 600 / (560 * 37220))));
+			transform *= rotate(-7444 * sin(s * 600 / (560 * 37220)) / 600, vec3(0, 0, 1));
+			transform *= rotate(-s * 600 / (560 * 37220), vec3(12, -5, 0));
+			transform *= translate(vec3(-3000, 3640, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(6556.4215f, 1.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(3000, -3640, s / 6556.4215f * 305 * (1 - 456.0f / 1860)));
+			transform *= rotate(-s * (acos(-12.0f / 13) - 244.0f / 600) / 6556.4215f, vec3(0, 0, 1));
+			transform *= translate(vec3(-3000, 3640, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(2280.0f * 1861 / 1860, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, s * 1860 / 1861, s * 61 / 1861));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(2 * asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, -140, -36895));
+			transform *= rotate(-s / 37220, vec3(1, 0, 0));
+			transform *= translate(vec3(0, 140, 36895));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(9305, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, s * 1860 / 1861, -s * 61 / 1861));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, 11600, 37220));
+			transform *= rotate(-s / 37220, vec3(-1, 0, 0));
+			transform *= translate(vec3(0, -11600, -37220));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(83400, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, s, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+
+	lanes[2] = new Lane(210000, 2.5f, (translate(vec3(105000, 200, 0)) * rotate(PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-s, 0, 0));
+			return transform;
+		});
+
+	lanes[3] = new Lane(83440, 2.5f, (translate(vec3(105000, 520, 0)) * rotate(PI / 2, vec3(0, 0, 1))), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-s, 0, 0));
+			return transform;
+		});
+	iter = lanes[3];
+	next_lane = new Lane(43120, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(83440, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	critical_lanes[1] = next_lane;
+	iter = lanes[3];
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(21560, 29480, 0));
+			transform *= rotate(-s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(-21560, -29480, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(15480, -28120, 0));
+			transform *= rotate(s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(-15480, 28120, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(3000, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(11960 * PI / 2, 1.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(12480, 12800, 0));
+			transform *= rotate(-s / 11960, vec3(0, 0, 1));
+			transform *= translate(vec3(-12480, -12800, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(82200, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, s, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+
+	lanes[4] = new Lane(83400, 2.5f, (translate(vec3(-200, 95000, 0)) * rotate(PI, vec3(0, 0, 1))), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, -s, 0));
+			return transform;
+		});
+	iter = lanes[4];
+	next_lane = new Lane(asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, 11600, 37220));
+			transform *= rotate(s / 37220, vec3(-1, 0, 0));
+			transform *= translate(vec3(0, -11600, -37220));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(9305, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, -s * 1860 / 1861, s * 61 / 1861));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(2 * asin(61.0f / 1861) * 37220, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, -140, -36895));
+			transform *= rotate(s / 37220, vec3(1, 0, 0));
+			transform *= translate(vec3(0, 140, 36895));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(2280.0f * 1861 / 1860, 2.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, -s * 1860 / 1861, -s * 61 / 1861));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(7491.97f, 1.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(3000, -3640, -s / 7491.97f * 305 * (1 - 456.0f / 1860)));
+			transform *= rotate(s * (acos(-12.0f / 13) - 244.0f / 600) / 7491.97f, vec3(0, 0, 1));
+			transform *= translate(vec3(-3000, 3640, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(asin(61.0f / 1861) * 37220 * 640 / 600, 1.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(3000, -3640, 37220 - 37220 * cos(asin(61.0f / 1861) - s * 600 / (640 * 37220))));
+			transform *= rotate((1220.0f - 37220 * sin(asin(61.0f / 1861) - s * 600 / (640 * 37220))) / 3000, vec3(0, 0, 1));
+			transform *= rotate(s * 600 / (640 * 37220), vec3(cos(asin(5.0f / 13) + 244.0f / 600), -sin(asin(5.0f / 13) + 244.0f / 600), 0));
+			transform *= translate(vec3(-3000, 3640, -20));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(asin(12.0f / 13) * 6550, 1.0f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(12000, -7390, 0));
+			transform *= rotate(-s / 6550, vec3(0, 0, 1));
+			transform *= translate(vec3(-12000, 7390, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(3000, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(15000, 28120, 0));
+			transform *= rotate(s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(-15000, -28120, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(21080, -29480, 0));
+			transform *= rotate(-s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(-21080, 29480, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	next_lane->setNextLane(critical_lanes[0]);
+
+	lanes[5] = new Lane(82200, 2.5f, (translate(vec3(-520, 95000, 0)) * rotate(PI, vec3(0, 0, 1))), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(0, -s, 0));
+			return transform;
+		});
+	iter = lanes[5];
+	next_lane = new Lane(11960 * PI / 2, 1.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-12480, 12800, 0));
+			transform *= rotate(-s / 11960, vec3(0, 0, 1));
+			transform *= translate(vec3(12480, -12800, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(3000, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-s, 0, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-15480, -28120, 0));
+			transform *= rotate(s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(15480, 28120, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	iter = next_lane;
+	next_lane = new Lane(acos(180.0f / 181) * 28960, 2.5f, iter->transform(iter->length), [](float s)->mat4
+		{
+			mat4 transform = translate(vec3(-21560, 29480, 0));
+			transform *= rotate(-s / 28960, vec3(0, 0, 1));
+			transform *= translate(vec3(21560, -29480, 0));
+			return transform;
+		});
+	iter->setNextLane(next_lane);
+	next_lane->setNextLane(critical_lanes[1]);
+}
 
 void initLogic()
 {
-	sun.updatePosition(INITIAL_TIME);
-	logicalData[latest_data].sunDir = sun.dir;
+	initLanes();
+	sun.updatePosition(INITIAL_TIME_MS);
+	logical_data[latest_data].sun_dir = sun.getDir();
 }
 
 LogicalData& getLatestLogicalData()
 {
 	reading_data = static_cast<int>(latest_data);
-	return logicalData[reading_data];
+	return logical_data[reading_data];
 }
 
 void logicalFrame()
 {
 	std::random_device rd;
-	rdEng.seed(rd());
+	rd_eng.seed(rd());
 	std::uniform_int_distribution<uint64_t> distb(0, 320);
-	uint64_t elapsedTime = INITIAL_TIME;
-	clock_t lastTime = clock();
-	uint64_t nextCarTime[6];
+	uint64_t elapsed_time_ms = INITIAL_TIME_MS;
+	uint64_t last_frame_time_us = getTimestampMicroseconds();
+	uint64_t next_car_time_ms[6];
 	for (int i = 0; i < 6; i++)
 	{
-		nextCarTime[i] = elapsedTime + distb(rdEng);
+		next_car_time_ms[i] = elapsed_time_ms + distb(rd_eng);
 	}
 	std::list<Car> vehicles;
 	while (true)
 	{
 		int writing_data = (latest_data + ((latest_data + 1) % 3 == reading_data ? 2 :1)) % 3;
 
-		clock_t time = clock();
-		uint32_t frameTime = time - lastTime;
-		lastTime = time;
-		tickRate = (0.1f * tickRate + 1) / (frameTime * 0.001f + 0.1f);
-		uint32_t logicalTime = frameTime * simulateSpeed;
-		if (isPaused)
+		uint64_t time_us = getTimestampMicroseconds();
+		uint32_t frame_dt_us = static_cast<uint32_t>(time_us - last_frame_time_us);
+		last_frame_time_us = time_us;
+		tick_rate = (0.1f * tick_rate + 1) / (frame_dt_us * 1e-6f + 0.1f);
+		uint32_t logical_dt_ms = static_cast<uint32_t>(frame_dt_us * simulate_speed / 1000);
+		if (is_paused)
 		{
-			logicalTime = 0;
+			logical_dt_ms = 0;
 		}
-		else if (logicalTime > MAX_FRAME_TIME)
+		else if (logical_dt_ms > MAX_FRAME_DT_MS)
 		{
-			logicalTime = MAX_FRAME_TIME;
+			logical_dt_ms = MAX_FRAME_DT_MS;
 		}
-		elapsedTime += logicalTime;
+		elapsed_time_ms += logical_dt_ms;
 
-		sun.updatePosition(elapsedTime);
-		logicalData[writing_data].sunDir = sun.dir;
+		sun.updatePosition(elapsed_time_ms);
+		logical_data[writing_data].sun_dir = sun.getDir();
 
 		for (int i = 0; i < 6; i++)
 		{
-			if (elapsedTime > nextCarTime[i])
+			if (elapsed_time_ms > next_car_time_ms[i])
 			{
-				vehicles.emplace_back(lanes[i], sun.dir.z);
-				nextCarTime[i] += (i < 4 ? 1 : 8) * distb(rdEng) + REACT_TIME + CAR_LENGTH / lanes[i]->speedLimit;
+				vehicles.emplace_back(lanes[i], sun.getDir().z);
+				next_car_time_ms[i] += (i < 4 ? 1 : 8) * distb(rd_eng) + REACT_TIME_MS + CAR_LENGTH / lanes[i]->speed_limit;
 			}
 		}
-		ivec2 carPosMap[CAR_POS_MAP_SIZE.x][CAR_POS_MAP_SIZE.y]{};
+		ivec2 car_pos_map[CAR_POS_MAP_SIZE.x][CAR_POS_MAP_SIZE.y]{};
 		struct CarPosInfo
 		{
 			Car* car;
-			ivec2* posMapGrids;
+			ivec2* pos_map_grids;
 		};
-		std::vector<CarPosInfo> carPosInfos;
+		std::vector<CarPosInfo> car_pos_infos;
 		for (auto iter = vehicles.begin(); iter != vehicles.end(); )
 		{
-			if (iter->update(logicalTime, sun.dir.z))
+			if (iter->update(logical_dt_ms, sun.getDir().z))
 			{
-				const mat4& modelMat = iter->getModelMat();
-				vec2 carXYPos(modelMat[3]);
-				ivec2 posMapIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * carXYPos + 0.5f * vec2(CAR_POS_MAP_SIZE));
-				carPosInfos.push_back(CarPosInfo{ &*iter, &carPosMap[posMapIdx.x][posMapIdx.y] });
-				carPosMap[posMapIdx.x][posMapIdx.y].x++;
+				const mat4& transform = iter->getModelMat();
+				vec2 car_xy_pos(transform[3]);
+				ivec2 pos_map_idx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * car_xy_pos + 0.5f * vec2(CAR_POS_MAP_SIZE));
+				car_pos_infos.push_back(CarPosInfo{ &*iter, &car_pos_map[pos_map_idx.x][pos_map_idx.y] });
+				car_pos_map[pos_map_idx.x][pos_map_idx.y].x++;
 				iter++;
 			}
 			else
@@ -105,70 +434,70 @@ void logicalFrame()
 				iter = vehicles.erase(iter);
 			}
 		}
-		Car* carPos[MAX_CAR_CNT];
-		int numCarPos = 0;
-		for (CarPosInfo& carPosInfo : carPosInfos)
+		Car* car_pos[MAX_CAR_CNT];
+		int num_car_pos = 0;
+		for (CarPosInfo& car_pos_info : car_pos_infos)
 		{
-			if (carPosInfo.posMapGrids->y == 0)
+			if (car_pos_info.pos_map_grids->y == 0)
 			{
-				carPosInfo.posMapGrids->y = numCarPos;
-				numCarPos += carPosInfo.posMapGrids->x;
-				carPosInfo.posMapGrids->x = carPosInfo.posMapGrids->y;
+				car_pos_info.pos_map_grids->y = num_car_pos;
+				num_car_pos += car_pos_info.pos_map_grids->x;
+				car_pos_info.pos_map_grids->x = car_pos_info.pos_map_grids->y;
 			}
-			carPos[carPosInfo.posMapGrids->y++] = carPosInfo.car;
+			car_pos[car_pos_info.pos_map_grids->y++] = car_pos_info.car;
 		}
 		for (Car& car : vehicles)
 		{
-			constexpr float posOffset = -30.0f / CAR_POS_MAP_GRID_LENGTH + 0.5f;
-			ivec2 posIdx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + posOffset * vec2(car.getDir()) + 0.5f * vec2(CAR_POS_MAP_SIZE) - 0.5f);
-			constexpr ivec2 offset[4] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
+			constexpr float POS_OFFSET = -30.0f / CAR_POS_MAP_GRID_LENGTH + 0.5f;
+			ivec2 pos_idx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + POS_OFFSET * vec2(car.getDir()) + 0.5f * vec2(CAR_POS_MAP_SIZE) - 0.5f);
+			constexpr ivec2 OFFSET[4] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
 			for (int i = 0; i < 4; i++)
 			{
-				ivec2 idx = posIdx + offset[i];
-				for (int k = carPosMap[idx.x][idx.y].x; k < carPosMap[idx.x][idx.y].y; k++)
+				ivec2 idx = pos_idx + OFFSET[i];
+				for (int k = car_pos_map[idx.x][idx.y].x; k < car_pos_map[idx.x][idx.y].y; k++)
 				{
-					car.collisionTest(carPos[k]);
+					car.collisionTest(car_pos[k]);
 				}
 			}
 		}
 
-		logicalData[writing_data].numCars = vehicles.size();
-		if (sun.dir.z > 0)
+		logical_data[writing_data].num_cars = vehicles.size();
+		if (sun.getDir().z > 0)
 		{
-			int numCars = 0;
+			int num_cars = 0;
 			for (Car& car : vehicles)
 			{
-				logicalData[writing_data].carModelMat[numCars] = car.getModelMat();
-				logicalData[writing_data].carColor[numCars] = car.getColor();
-				numCars++;
+				logical_data[writing_data].car_transform[num_cars] = car.getModelMat();
+				logical_data[writing_data].car_color[num_cars] = car.getColor();
+				num_cars++;
 			}
-			logicalData[writing_data].numLightOnCars = 0;
+			logical_data[writing_data].num_light_on_cars = 0;
 		}
 		else
 		{
-			int numLightOnCars = 0;
-			int numLightOffCars = 0;
+			int num_light_on_cars = 0;
+			int num_light_off_cars = 0;
 			for (Car& car : vehicles)
 			{
 				if (car.isLightOn())
 				{
-					const mat4& modelMat = car.getModelMat();
-					logicalData[writing_data].carLightPos[2 * numLightOnCars] = modelMat * CAR_LEFT_LIGHT_POS;
-					logicalData[writing_data].carLightDir[2 * numLightOnCars] = modelMat * CAR_LEFT_LIGHT_DIR;
-					logicalData[writing_data].carLightPos[2 * numLightOnCars + 1] = modelMat * CAR_RIGHT_LIGHT_POS;
-					logicalData[writing_data].carLightDir[2 * numLightOnCars + 1] = modelMat * CAR_RIGHT_LIGHT_DIR;
-					logicalData[writing_data].carModelMat[numLightOnCars] = car.getModelMat();
-					logicalData[writing_data].carColor[numLightOnCars] = car.getColor();
-					numLightOnCars++;
+					const mat4& transform = car.getModelMat();
+					logical_data[writing_data].car_light_pos[2 * num_light_on_cars] = transform * CAR_LEFT_LIGHT_POS;
+					logical_data[writing_data].car_light_dir[2 * num_light_on_cars] = transform * CAR_LEFT_LIGHT_DIR;
+					logical_data[writing_data].car_light_pos[2 * num_light_on_cars + 1] = transform * CAR_RIGHT_LIGHT_POS;
+					logical_data[writing_data].car_light_dir[2 * num_light_on_cars + 1] = transform * CAR_RIGHT_LIGHT_DIR;
+					logical_data[writing_data].car_transform[num_light_on_cars] = car.getModelMat();
+					logical_data[writing_data].car_color[num_light_on_cars] = car.getColor();
+					num_light_on_cars++;
 				}
 				else
 				{
-					logicalData[writing_data].carModelMat[vehicles.size() - numLightOffCars - 1] = car.getModelMat();
-					logicalData[writing_data].carColor[vehicles.size() - numLightOffCars - 1] = car.getColor();
-					numLightOffCars++;
+					logical_data[writing_data].car_transform[vehicles.size() - num_light_off_cars - 1] = car.getModelMat();
+					logical_data[writing_data].car_color[vehicles.size() - num_light_off_cars - 1] = car.getColor();
+					num_light_off_cars++;
 				}
 			}
-			logicalData[writing_data].numLightOnCars = numLightOnCars;
+			logical_data[writing_data].num_light_on_cars = num_light_on_cars;
 		}
 		latest_data = writing_data;
 	}

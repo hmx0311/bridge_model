@@ -5,10 +5,11 @@
 class Sun
 {
 public:
-	glm::vec3 dir = { 0.0f, 0.0f, 0.0f };
 	Sun(float latitude);
 
-	void updatePosition(uint64_t date);
+	const glm::vec3& getDir();
+	void updatePosition(uint64_t time_ms);
 private:
-	float latitude;
+	glm::vec3 m_dir = { 0.0f, 0.0f, 0.0f };
+	float m_latitude;
 };

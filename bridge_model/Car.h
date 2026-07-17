@@ -6,7 +6,7 @@
 
 #include "Lane.h"
 
-#define REACT_TIME 800
+constexpr uint32_t REACT_TIME_MS = 800;
 constexpr float CAR_LENGTH = 400;
 constexpr float CAR_LIGHT_V_COS_ANGLE = 0.994f;
 constexpr float CAR_LIGHT_ASPECT = 2.5f;
@@ -20,19 +20,19 @@ constexpr glm::vec4 CAR_RIGHT_LIGHT_DIR(0.096f, 0.9856f, -0.1392f, 0);
 class Car
 {
 private:
-	float s;	//cm
-	float speed;	// cm/ms
-	float aimSpeed;	// cm/ms
-	bool lightOn;
-	bool wasDay;
-	std::list<Lane*> path;
-	glm::mat4 modelMat = glm::mat4(0);
-	glm::vec3 dir = glm::vec3(0);
-	glm::vec3 color;
+	float m_s;	//cm
+	float m_speed;	// cm/ms
+	float m_aim_speed;	// cm/ms
+	bool m_is_light_on;
+	bool m_was_day;
+	std::list<Lane*> m_path;
+	glm::mat4 m_transform = glm::mat4(0);
+	glm::vec3 m_dir = glm::vec3(0);
+	glm::vec3 m_color;
 
 public:
-	Car(Lane* lane, float sunHeight);
-	bool update(uint32_t time, float sunHeight);
+	Car(Lane* lane, float sun_height);
+	bool update(uint32_t time_ms, float sun_height);
 	void collisionTest(Car* car);
 	bool isLightOn();
 	const glm::vec3& getColor();
