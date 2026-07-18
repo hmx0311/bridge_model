@@ -36,7 +36,7 @@ float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view
 vec3 focus(0);
 uint32_t focus_move_dir = 0;
 bool need_update_view = true;
-uint64_t last_frame_time_us;
+uint64_t last_time_us;
 
 #define MAX_HEIGHT 500
 constexpr int HEIGHT_MAP_SIZE = 256;
@@ -480,14 +480,14 @@ void init()
 
 	initScene();
 	buildHeightMap();
-	last_frame_time_us = getTimestampMicroseconds();
+	last_time_us = getTimestampMicroseconds();
 }
 
 void drawGraphics()
 {
 	uint64_t time_us = getTimestampMicroseconds();
-	uint32_t frame_dt_us = time_us - last_frame_time_us;
-	last_frame_time_us = time_us;
+	uint64_t dt_us = time_us - last_time_us;
+	last_time_us = time_us;
 	LogicalData& logical_data = getLatestLogicalData();
 	bool is_view_updated = need_update_view;
 	if (need_update_view)
@@ -496,7 +496,7 @@ void drawGraphics()
 		if (azimuth != aim_azimuth)
 		{
 			constexpr float ROTATE_SPEED = 10.0f;
-			float max_rotate_angle = ROTATE_SPEED * 1e-6 * frame_dt_us;
+			float max_rotate_angle = ROTATE_SPEED * 1e-6f * dt_us;
 			if (abs(azimuth - aim_azimuth) > max_rotate_angle)
 			{
 				if (azimuth > aim_azimuth)
@@ -518,7 +518,7 @@ void drawGraphics()
 		if (relative_depression != aim_relative_depression)
 		{
 			constexpr float ROTATE_SPEED = 5.0f;
-			float max_rotate_angle = ROTATE_SPEED * 1e-6f * frame_dt_us;
+			float max_rotate_angle = ROTATE_SPEED * 1e-6f * dt_us;
 			if (abs(relative_depression - aim_relative_depression) > max_rotate_angle)
 			{
 				if (relative_depression > aim_relative_depression)
@@ -539,7 +539,7 @@ void drawGraphics()
 		if (view_distance != aim_view_distance)
 		{
 			constexpr float ZOOM_SPEED = 5.0f;
-			float max_zoom_distance = ZOOM_SPEED * 1e-6f * frame_dt_us * view_distance;
+			float max_zoom_distance = ZOOM_SPEED * 1e-6f * dt_us * view_distance;
 			if (abs(view_distance - aim_view_distance) > max_zoom_distance)
 			{
 				if (view_distance > aim_view_distance)
@@ -580,7 +580,7 @@ void drawGraphics()
 			{
 				dir = normalize(dir);
 				float move_speed = 1.0f * view_distance + 1000.0f;
-				float move_distance = move_speed * 1e-6f * frame_dt_us;
+				float move_distance = move_speed * 1e-6f * dt_us;
 				focus.x += dir.x * move_distance;
 				focus.y += dir.y * move_distance;
 				focus.x = clamp(focus.x, -30000.0f, 30000.0f);
@@ -1266,7 +1266,7 @@ void drawGraphics()
 	glUseProgram(0);
 
 	static float fps = 60;
-	fps = (fps + 1) / (frame_dt_us * 1e-6 + 1.0f);
+	fps = (fps + 1) / (dt_us * 1e-6f + 1.0f);
 	glWindowPos2i(10, 10);
 	char str[40];
 	sprintf_s(str, 40, "fps: %d|%d", int(fps), int(tick_rate));
@@ -1287,7 +1287,7 @@ void onReshape(GLint width, GLint height)
 
 	GLint max_tex_size;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
-	bloom_buffer_width = fmin(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
+	bloom_buffer_width = std::min(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
 	view.proj_mat = perspective(FOVY, float(width) / height, VIEW_Z_NEAR, VIEW_Z_FAR);
 	glNamedBufferSubData(scene_UBO, 0, sizeof(view.proj_mat), &view.proj_mat);
 

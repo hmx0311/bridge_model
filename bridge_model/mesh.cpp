@@ -1,4 +1,4 @@
-Ôªø#include "mesh.h"
+#include "mesh.h"
 #include "common.h"
 
 #include "ext/scalar_constants.hpp"
@@ -996,24 +996,24 @@ void buildCarMesh()
 	glProgramUniform3fv(SP_car_night, glGetUniformLocation(SP_car_night, "materials[6].specular"), 1, COLOR_BLACK);
 	glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "materials[6].shininess"), 0);
 
-	vec3 positions[VERTICES_SIZE] = { {	 POINT0},	{POINT1},	{POINT2},	{POINT3},	//Â∑¶ÂâçÁÅØ
-										{POINT4},	{POINT5},	{POINT6},	{POINT7},	//Âè≥ÂâçÁÅØ
-										{POINT8},	{POINT9},	{POINT10},	{POINT11},	//Â∑¶ÂêéÁÅØ
-										{POINT12},	{POINT13},	{POINT14},	{POINT15},	//Âè≥ÂêéÁÅØ
-										{POINT7},	{POINT2},	{POINT16},	{POINT17},	//Ââç‰∏ä
-										{POINT5},	{POINT0},	{POINT3},	{POINT6},	//Ââç‰∏≠
-										{POINT18},	{POINT19},	{POINT1},	{POINT4},	//Ââç‰∏ã
-										{POINT18},	{POINT20},	{POINT21},	{POINT19},	//Â∫ï
-										{POINT9},	{POINT12},	{POINT15},	{POINT10},	//Âêé‰∏ä
-										{POINT21},	{POINT20},	{POINT13},	{POINT8},	//Âêé‰∏ã
-										{POINT19},	{POINT21},	{POINT11},	{POINT16},	//Â∑¶
-										{POINT20},	{POINT18},	{POINT17},	{POINT14},	//Âè≥
-										{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÂºïÊìéÁõñ
-										{POINT24},	{POINT25},	{POINT26},	{POINT27},	//È°∂
-										{POINT23},	{POINT22},	{POINT25},	{POINT24},	//ÂâçÁéªÁíÉ
-										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ÂêéÁéªÁíÉ
-										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//Â∑¶ÁéªÁíÉ
-										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//Âè≥ÁéªÁíÉ
+	vec3 positions[VERTICES_SIZE] = { {	 POINT0},	{POINT1},	{POINT2},	{POINT3},	//◊Û«∞µ∆
+										{POINT4},	{POINT5},	{POINT6},	{POINT7},	//”“«∞µ∆
+										{POINT8},	{POINT9},	{POINT10},	{POINT11},	//◊Û∫Ûµ∆
+										{POINT12},	{POINT13},	{POINT14},	{POINT15},	//”“∫Ûµ∆
+										{POINT7},	{POINT2},	{POINT16},	{POINT17},	//«∞…œ
+										{POINT5},	{POINT0},	{POINT3},	{POINT6},	//«∞÷–
+										{POINT18},	{POINT19},	{POINT1},	{POINT4},	//«∞œ¬
+										{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ◊
+										{POINT9},	{POINT12},	{POINT15},	{POINT10},	//∫Û…œ
+										{POINT21},	{POINT20},	{POINT13},	{POINT8},	//∫Ûœ¬
+										{POINT19},	{POINT21},	{POINT11},	{POINT16},	//◊Û
+										{POINT20},	{POINT18},	{POINT17},	{POINT14},	//”“
+										{POINT17},	{POINT16},	{POINT22},	{POINT23},	//“˝«Ê∏«
+										{POINT24},	{POINT25},	{POINT26},	{POINT27},	//∂•
+										{POINT23},	{POINT22},	{POINT25},	{POINT24},	//«∞≤£¡ß
+										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//∫Û≤£¡ß
+										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//◊Û≤£¡ß
+										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//”“≤£¡ß
 	vec3 normals[VERTICES_SIZE];
 	int material_idxs[VERTICES_SIZE];
 	GLuint indices[CAR_EBO_SIZE]{};
@@ -1200,17 +1200,17 @@ void buildCarShadowMesh()
 {
 	constexpr int VERTICES_SIZE = 560;
 
-	vec3 positions[VERTICES_SIZE] = { {	 POINT16},	{POINT17},	{POINT18},	{POINT19},	//Ââç
-										{POINT18},	{POINT20},	{POINT21},	{POINT19},	//Â∫ï
-										{POINT21},	{POINT20},	{POINT14},	{POINT11},	//Âêé
-										{POINT19},	{POINT21},	{POINT11},	{POINT16},	//Â∑¶
-										{POINT20},	{POINT18},	{POINT17},	{POINT14},	//Âè≥
-										{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÂºïÊìéÁõñ
-										{POINT24},	{POINT25},	{POINT26},	{POINT27},	//È°∂
-										{POINT23},	{POINT22},	{POINT25},	{POINT24},	//ÂâçÁéªÁíÉ
-										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ÂêéÁéªÁíÉ
-										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//Â∑¶ÁéªÁíÉ
-										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//Âè≥ÁéªÁíÉ
+	vec3 positions[VERTICES_SIZE] = { {	 POINT16},	{POINT17},	{POINT18},	{POINT19},	//«∞
+										{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ◊
+										{POINT21},	{POINT20},	{POINT14},	{POINT11},	//∫Û
+										{POINT19},	{POINT21},	{POINT11},	{POINT16},	//◊Û
+										{POINT20},	{POINT18},	{POINT17},	{POINT14},	//”“
+										{POINT17},	{POINT16},	{POINT22},	{POINT23},	//“˝«Ê∏«
+										{POINT24},	{POINT25},	{POINT26},	{POINT27},	//∂•
+										{POINT23},	{POINT22},	{POINT25},	{POINT24},	//«∞≤£¡ß
+										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//∫Û≤£¡ß
+										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//◊Û≤£¡ß
+										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//”“≤£¡ß
 	vec3 normals[VERTICES_SIZE]{};
 	GLuint indices[CAR_SHADOW_EBO_SIZE]{};
 

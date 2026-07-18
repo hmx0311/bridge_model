@@ -16,7 +16,7 @@ using namespace glm;
 static constexpr ivec2 CAR_POS_MAP_SIZE = ivec2(54, 50);
 static constexpr float CAR_POS_MAP_GRID_LENGTH = 4000;
 
-static constexpr uint32_t MAX_FRAME_DT_US = 50'000;
+static constexpr float MAX_LOGICAL_DT = 0.05f;
 static constexpr double INITIAL_TIME = 2;
 
 
@@ -396,12 +396,12 @@ void logicalFrame()
 			std::this_thread::yield();
 			continue;
 		}
-		tick_rate = (0.1f * tick_rate + 1) / (frame_dt_us * 1e-6f + 0.1f);
-		if (frame_dt_us > MAX_FRAME_DT_US)
-		{
-			frame_dt_us = MAX_FRAME_DT_US;
-		}
+		tick_rate = (tick_rate + 1) / (frame_dt_us * 1e-6f + 1.0f);
 		float logical_dt_s = 1e-6 * simulate_speed * frame_dt_us;
+		if (logical_dt_s > MAX_LOGICAL_DT)
+		{
+			logical_dt_s = MAX_LOGICAL_DT;
+		}
 		elapsed_time += logical_dt_s;
 
 		sun.updatePosition(elapsed_time);
