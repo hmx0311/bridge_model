@@ -1,6 +1,8 @@
 ﻿#include "mesh.h"
 #include "common.h"
 
+#include "ext/scalar_constants.hpp"
+
 GLuint ground_VAO, ground_VBO, ground_EBO;
 GLuint bridge_VAO, bridge_VBO, bridge_EBO;
 GLuint car_VAO, car_VBO, car_EBO, car_transform_VBO, car_color_VBO;
@@ -164,7 +166,7 @@ void buildGroundMesh()
 	i_vert += 4 * (2 * n + 1);
 	i_idx += 3 * 4 * (2 * n - 1);
 
-	theta = PI / 2;
+	theta = pi<float>() / 2;
 	n = theta * sqrtf(12160) + 3;
 	dtheta = theta / n;
 	n++;
@@ -842,8 +844,8 @@ void buildBridgeMesh()
 	i_vert += 8;
 	i_idx += 12;
 
-	n = 2 * PI * sqrtf(40) + 3;
-	dtheta = 2 * PI / n;
+	n = 2 * pi<float>() * sqrtf(40) + 3;
+	dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < 4; i++)
 	{
 		vec3 pillar_pos[10] = { {-300 + 200 * i, 8860,  65},
@@ -1065,8 +1067,8 @@ void buildCarMesh()
 	int i_vert = 72;
 	int i_idx = 108;
 
-	int n = 2 * PI * sqrtf(30) + 3;
-	float dtheta = 2 * PI / n;
+	int n = 2 * pi<float>() * sqrtf(30) + 3;
+	float dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < n; i++)
 	{
 		float cos_theta = cos(i * dtheta);
@@ -1238,8 +1240,8 @@ void buildCarShadowMesh()
 	int i_vert = 44;
 	int i_idx = 66;
 
-	int n = 2 * PI * sqrtf(30) + 3;
-	float dtheta = 2 * PI / n;
+	int n = 2 * pi<float>() * sqrtf(30) + 3;
+	float dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < n; i++)
 	{
 		float cos_theta = cos(i * dtheta);
@@ -1340,7 +1342,7 @@ void buildSunMesh()
 {
 	vec3 positions[SUN_VBO_SIZE];
 	int n = SUN_VBO_SIZE;
-	float dtheta = 2 * PI / n;
+	float dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < n; i++)
 	{
 		positions[i] = vec3(400 * cos(i * dtheta), -400 * sin(i * dtheta), 0);

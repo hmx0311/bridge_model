@@ -1,11 +1,12 @@
 #include "Car.h"
 
-#include "common.h"
+#include "Lane.h"
+#include "logical_frame.h"
 
 using namespace glm;
 
-static constexpr float ACCELERATION = 0.0002f;	// cm/ms^2
-static constexpr float BREAK_INTENSITY = 0.0004f;	// cm/ms^2
+static constexpr float ACCELERATION = 200.0f;	// cm/s^2
+static constexpr float BREAK_INTENSITY = 400.f;	// cm/s^2
 static constexpr float BREAK_DISTANCE = 12000;
 
 
@@ -35,41 +36,41 @@ Car::Car(Lane* lane, float sun_height)
 	}
 }
 
-bool Car::update(uint32_t time_ms, float sun_height)
+bool Car::update(float dt, float sun_height)
 {
-	if (time_ms > 0)
+	if (dt > 0)
 	{
 		if (m_speed > m_aim_speed)
 		{
-			if (m_speed - BREAK_INTENSITY * time_ms >= m_aim_speed)
+			if (m_speed - BREAK_INTENSITY * dt >= m_aim_speed)
 			{
-				m_s += m_speed * time_ms - BREAK_INTENSITY * time_ms * time_ms / 2;
-				m_speed = m_speed - BREAK_INTENSITY * time_ms;
+				m_s += m_speed * dt - BREAK_INTENSITY * dt * dt / 2;
+				m_speed = m_speed - BREAK_INTENSITY * dt;
 			}
 			else
 			{
 				float break_time = (m_speed - m_aim_speed) / BREAK_INTENSITY;
-				m_s += (m_speed + m_aim_speed) * break_time / 2 + m_aim_speed * (time_ms - break_time);
+				m_s += (m_speed + m_aim_speed) * break_time / 2 + m_aim_speed * (dt - break_time);
 				m_speed = m_aim_speed;
 			}
 		}
 		else if (m_speed < m_aim_speed)
 		{
-			if (m_speed + ACCELERATION * time_ms <= m_aim_speed)
+			if (m_speed + ACCELERATION * dt <= m_aim_speed)
 			{
-				m_s += m_speed * time_ms + ACCELERATION * time_ms * time_ms / 2;
-				m_speed = m_speed + ACCELERATION * time_ms;
+				m_s += m_speed * dt + ACCELERATION * dt * dt / 2;
+				m_speed = m_speed + ACCELERATION * dt;
 			}
 			else
 			{
 				float accelerate_time = (m_aim_speed - m_speed) / ACCELERATION;
-				m_s += (m_speed + m_aim_speed) * accelerate_time / 2 + m_aim_speed * (time_ms - accelerate_time);
+				m_s += (m_speed + m_aim_speed) * accelerate_time / 2 + m_aim_speed * (dt - accelerate_time);
 				m_speed = m_aim_speed;
 			}
 		}
 		else
 		{
-			m_s += m_speed * time_ms;
+			m_s += m_speed * dt;
 		}
 		Lane* cur_lane = m_path.front();
 		while (m_s > cur_lane->length)
@@ -106,16 +107,16 @@ bool Car::update(uint32_t time_ms, float sun_height)
 		}
 		else if (m_was_day && !m_is_light_on)
 		{
-			std::uniform_real_distribution<float> distb(0, 300);
-			if (distb(rd_eng) < time_ms * (-sun_height))
+			std::uniform_real_distribution<float> distb(0, 0.3f);
+			if (distb(rd_eng) < dt * (-sun_height))
 			{
 				m_is_light_on = true;
 			}
 		}
 		else if (!m_was_day && m_is_light_on)
 		{
-			std::uniform_real_distribution<float> distb(0, 300);
-			if (distb(rd_eng) < time_ms * (0.2f + sun_height))
+			std::uniform_real_distribution<float> distb(0, 0.3f);
+			if (distb(rd_eng) < dt * (0.2f + sun_height))
 			{
 				m_is_light_on = false;
 			}
@@ -138,18 +139,18 @@ void Car::collisionTest(Car* test_car)
 	{
 		if (*this_lane == *test_lane)
 		{
-			float min_distance = REACT_TIME_MS * m_speed + (m_speed + test_car->m_speed) * (m_speed - test_car->m_speed) / (2 * BREAK_INTENSITY) + CAR_LENGTH;
+			float min_distance = REACT_TIME * m_speed + (m_speed + test_car->m_speed) * (m_speed - test_car->m_speed) / (2 * BREAK_INTENSITY) + CAR_LENGTH;
 			if (test_distance_to_intersect < this_distance_to_intersect && this_distance_to_intersect - test_distance_to_intersect < min_distance)
 			{
 				float b, c;
 				if (test_distance_to_intersect < 0)
 				{
-					b = REACT_TIME_MS * (2 * BREAK_INTENSITY);
+					b = REACT_TIME * (2 * BREAK_INTENSITY);
 					c = -test_car->m_speed * test_car->m_speed + (CAR_LENGTH - this_distance_to_intersect + test_distance_to_intersect) * (2 * BREAK_INTENSITY);
 				}
 				else
 				{
-					b = (REACT_TIME_MS + test_distance_to_intersect / test_car->m_speed) * (2 * BREAK_INTENSITY);
+					b = (REACT_TIME + test_distance_to_intersect / test_car->m_speed) * (2 * BREAK_INTENSITY);
 					c = -test_car->m_speed * test_car->m_speed + (CAR_LENGTH - this_distance_to_intersect) * (2 * BREAK_INTENSITY);
 				}
 				float delta = b * b - 4 * c;

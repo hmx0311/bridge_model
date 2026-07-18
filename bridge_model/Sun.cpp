@@ -1,19 +1,22 @@
 #include "Sun.h"
 
-#include "common.h"
+#include "ext/scalar_constants.hpp"
 
 using namespace glm;
 
+constexpr double YEAR_PERIOD = 7200.0;
+constexpr double DAY_PERIOD = 360.0;
+
 Sun::Sun(float latitude)
 {
-	m_latitude = latitude * PI / 180;
+	m_latitude = latitude * pi<float>() / 180;
 	updatePosition(0);
 }
 
-void Sun::updatePosition(uint64_t time_ms)
+void Sun::updatePosition(double time)
 {
-	float season = asin(0.3987490689f * sin(time_ms % 7200000 * 2 * PI / 7200000));
-	float day_angle = time_ms % 360000 * 2 * PI / 360000;
+	float season = asin(0.3987490689f * sin(2 * pi<float>() / YEAR_PERIOD * fmod(time, YEAR_PERIOD)));
+	float day_angle = 2 * pi<float>() / DAY_PERIOD * fmod(time, DAY_PERIOD);
 	m_dir.x = -cos(season) * sin(day_angle);
 	m_dir.y = cos(m_latitude) * sin(season) - sin(m_latitude) * cos(season) * cos(day_angle);
 	m_dir.z = sin(m_latitude) * sin(season) + cos(m_latitude) * cos(season) * cos(day_angle);

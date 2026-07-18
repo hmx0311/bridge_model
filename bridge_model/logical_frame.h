@@ -2,7 +2,10 @@
 #include "common.h"
 #include "glm.hpp"
 
+#include <random>
 #include <atomic>
+
+extern std::mt19937 rd_eng;
 
 extern std::atomic<float> tick_rate;
 extern std::atomic<bool> is_paused;

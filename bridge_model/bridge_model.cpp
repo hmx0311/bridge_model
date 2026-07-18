@@ -1,6 +1,5 @@
 #pragma comment(lib,"imm32.lib")
-
-#include "common.h"
+//#include "common.h"
 #include "resource.h"
 #include "scene.h"
 #include "mesh.h"
@@ -512,14 +511,14 @@ void drawGraphics()
 			}
 			else
 			{
-				aim_azimuth = fmod(aim_azimuth, (2 * PI));
+				aim_azimuth = fmod(aim_azimuth, (2 * pi<float>()));
 				azimuth = aim_azimuth;
 			}
 		}
 		if (relative_depression != aim_relative_depression)
 		{
 			constexpr float ROTATE_SPEED = 5.0f;
-			float max_rotate_angle = ROTATE_SPEED * 1e-6 * frame_dt_us;
+			float max_rotate_angle = ROTATE_SPEED * 1e-6f * frame_dt_us;
 			if (abs(relative_depression - aim_relative_depression) > max_rotate_angle)
 			{
 				if (relative_depression > aim_relative_depression)
@@ -540,7 +539,7 @@ void drawGraphics()
 		if (view_distance != aim_view_distance)
 		{
 			constexpr float ZOOM_SPEED = 5.0f;
-			float max_zoom_distance = ZOOM_SPEED * 1e-6 * frame_dt_us * view_distance;
+			float max_zoom_distance = ZOOM_SPEED * 1e-6f * frame_dt_us * view_distance;
 			if (abs(view_distance - aim_view_distance) > max_zoom_distance)
 			{
 				if (view_distance > aim_view_distance)
@@ -581,7 +580,7 @@ void drawGraphics()
 			{
 				dir = normalize(dir);
 				float move_speed = 1.0f * view_distance + 1000.0f;
-				float move_distance = move_speed * 1e-6 * frame_dt_us;
+				float move_distance = move_speed * 1e-6f * frame_dt_us;
 				focus.x += dir.x * move_distance;
 				focus.y += dir.y * move_distance;
 				focus.x = clamp(focus.x, -30000.0f, 30000.0f);
@@ -590,7 +589,7 @@ void drawGraphics()
 			}
 		}
 
-		float depression = PI / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * view_distance / MAX_VIEW_DISTANCE) * (1 - relative_depression)));
+		float depression = pi<float>() / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * view_distance / MAX_VIEW_DISTANCE) * (1 - relative_depression)));
 		vec3 view_dir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
 		focus.z = FOCUS_HEIGHT;
 		vec3 eye = focus - view_distance * view_dir;

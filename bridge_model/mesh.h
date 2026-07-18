@@ -1,5 +1,4 @@
 #pragma once
-
 #include "glew.h"
 #include "glm.hpp"
 

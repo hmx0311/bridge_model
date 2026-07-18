@@ -1,7 +1,6 @@
 #include "Lane.h"
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
-#include "common.h"
+
+#include "logical_frame.h"
 
 Lane::Lane(float length, float speed_limit, const glm::mat4& start_mat, glm::mat4(*motion)(float)) :
 	length(length), speed_limit(speed_limit), m_start_mat(start_mat), m_motion(motion) {}

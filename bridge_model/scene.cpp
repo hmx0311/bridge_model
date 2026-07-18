@@ -1,12 +1,8 @@
 #include "scene.h"
-#include "Car.h"
-#include "common.h"
+
 #include "mesh.h"
 
-#include <cmath>
-
 #include "gtx\transform.hpp"
-#include "matrix.hpp"
 
 using namespace glm;
 
