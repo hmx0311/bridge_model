@@ -1,7 +1,6 @@
 #pragma once
-#include "glm.hpp"
-
 #include <list>
+#include "glm.hpp"
 
 constexpr float REACT_TIME = 0.8f;
 constexpr float CAR_LENGTH = 400;

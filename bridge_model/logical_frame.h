@@ -1,14 +1,16 @@
 #pragma once
-#include "common.h"
-#include "glm.hpp"
-
 #include <random>
 #include <atomic>
+
+#include "glm.hpp"
+
+#include "common.h"
 
 extern std::mt19937 rd_eng;
 
 extern std::atomic<float> tick_rate;
 extern std::atomic<bool> is_paused;
+extern std::atomic<int> simulate_speed;
 extern std::atomic<int> simulate_speed;
 
 struct LogicalData
@@ -23,6 +25,7 @@ struct LogicalData
 };
 
 void initLogic();
+void stopLogic();
 
 LogicalData& getLatestLogicalData();
 

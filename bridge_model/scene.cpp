@@ -1,8 +1,8 @@
 #include "scene.h"
 
-#include "mesh.h"
-
 #include "gtx\transform.hpp"
+
+#include "mesh.h"
 
 using namespace glm;
 

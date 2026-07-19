@@ -1,16 +1,17 @@
 #pragma comment(lib,"imm32.lib")
-//#include "common.h"
+#include <Windows.h>
+
+#include <thread>
+
+#include "glew.h"
+#include "glfw3.h"
+#include "gtx/transform.hpp"
+
 #include "resource.h"
 #include "scene.h"
 #include "mesh.h"
 #include "Car.h"
 #include "logical_frame.h"
-
-#include "glew.h"
-#include "freeglut.h"
-#include "gtx/transform.hpp"
-
-#include <thread>
 
 using namespace glm;
 
@@ -129,7 +130,7 @@ GLuint SP_tex_blit;
 GLuint SP_gaussian_blur;
 GLuint SP_buffer_to_screen;
 
-GLuint loadShader(GLuint shader_id, GLenum type)
+static GLuint loadShader(GLuint shader_id, GLenum type)
 {
 	HRSRC rc = FindResource(nullptr, MAKEINTRESOURCE(shader_id), L"SHADER");
 	if (rc == nullptr)
@@ -160,7 +161,7 @@ GLuint loadShader(GLuint shader_id, GLenum type)
 	return shader;
 }
 
-GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
+static GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
 {
 	GLint status;
 	GLuint sp = glCreateProgram();
@@ -189,7 +190,7 @@ GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
 	return sp;
 }
 
-void initShader()
+static void initShader()
 {
 	GLuint VS_highway = loadShader(IDR_VS_HIGHWAY, GL_VERTEX_SHADER);
 	GLuint FS_highway_day = loadShader(IDR_FS_HIGHWAY_DAY, GL_FRAGMENT_SHADER);
@@ -253,7 +254,7 @@ void initShader()
 	glDeleteShader(FS_buffer_to_screen);
 }
 
-void buildHeightMap()
+static void buildHeightMap()
 {
 	glEnable(GL_DEPTH_TEST);
 	constexpr int HEIGHT_BORDER = 3;
@@ -363,7 +364,7 @@ void buildHeightMap()
 	delete[] height_map_buffer;
 }
 
-void init()
+static void init()
 {
 	glewInit();
 	printf("%s\n", (char*)glGetString(GL_VERSION));
@@ -483,7 +484,7 @@ void init()
 	last_time_us = getTimestampMicroseconds();
 }
 
-void drawGraphics()
+static void drawGraphics()
 {
 	uint64_t time_us = getTimestampMicroseconds();
 	uint64_t dt_us = time_us - last_time_us;
@@ -1270,16 +1271,9 @@ void drawGraphics()
 	glWindowPos2i(10, 10);
 	char str[40];
 	sprintf_s(str, 40, "fps: %d|%d", int(fps), int(tick_rate));
-	glutBitmapString(GLUT_BITMAP_8_BY_13, (unsigned char*)str);
-	glutSwapBuffers();
 }
 
-void lineSegment()
-{
-	glutIdleFunc(drawGraphics);
-}
-
-void onReshape(GLint width, GLint height)
+static void onResize(GLFWwindow*, int width, int height)
 {
 	window_width = width;
 	window_height = height;
@@ -1309,75 +1303,77 @@ void onReshape(GLint width, GLint height)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, BLOOM_BUFFER_HEIGHT, bloom_buffer_width, 0, GL_RGB, GL_FLOAT, nullptr);
 }
 
-void onKeyDown(GLubyte key, GLint x, GLint y)
+static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 {
-	switch (key)
+	if (action == GLFW_PRESS)
 	{
-	case ' ':
-		is_paused = !is_paused;
-		return;
-	case '=':
-		if (simulate_speed < 5)
+		switch (key)
 		{
-			simulate_speed++;
+		case ' ':
+			is_paused = !is_paused;
+			return;
+		case '=':
+			if (simulate_speed < 5)
+			{
+				simulate_speed++;
+			}
+			return;
+		case '-':
+			if (simulate_speed > 1)
+			{
+				simulate_speed--;
+			}
+			return;
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+			simulate_speed = key - '0';
+			return;
+		case 'A':
+			focus_move_dir |= 0b0001;
+			break;
+		case 'D':
+			focus_move_dir |= 0b0010;
+			break;
+		case 'W':
+			focus_move_dir |= 0b0100;
+			break;
+		case 'S':
+			focus_move_dir |= 0b1000;
+			break;
+		default:
+			return;
 		}
-		return;
-	case '-':
-		if (simulate_speed > 1)
-		{
-			simulate_speed--;
-		}
-		return;
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-		simulate_speed = key - '0';
-		return;
-	case 'a':
-		focus_move_dir |= 0b0001;
-		break;
-	case 'd':
-		focus_move_dir |= 0b0010;
-		break;
-	case 'w':
-		focus_move_dir |= 0b0100;
-		break;
-	case 's':
-		focus_move_dir |= 0b1000;
-		break;
-	default:
-		return;
+		need_update_view = true;
 	}
-	need_update_view = true;
+	else if (action == GLFW_RELEASE)
+	{
+		switch (key)
+		{
+		case 'A':
+			focus_move_dir &= ~(0b0001);
+			break;
+		case 'D':
+			focus_move_dir &= ~(0b0010);
+			break;
+		case 'W':
+			focus_move_dir &= ~(0b0100);
+			break;
+		case 'S':
+			focus_move_dir &= ~(0b1000);
+			break;
+		}
+	}
 }
 
-void onKeyUp(GLubyte key, GLint x, GLint y)
-{
-	switch (key)
-	{
-	case 'a':
-		focus_move_dir &= ~(0b0001);
-		break;
-	case 'd':
-		focus_move_dir &= ~(0b0010);
-		break;
-	case 'w':
-		focus_move_dir &= ~(0b0100);
-		break;
-	case 's':
-		focus_move_dir &= ~(0b1000);
-		break;
-	}
-}
-
-void onMouseWheel(GLint button, GLint dir, GLint x, GLint y)
+static void onMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 {
 	float view_distance;
-	if (dir > 0)
+	if (yoffset > 0)
 	{
-		view_distance = aim_view_distance * 0.91f;
+		view_distance = aim_view_distance * 0.90909091f;
 		if (view_distance < MIN_VIEW_DISTANCE)
 		{
 			view_distance = MIN_VIEW_DISTANCE;
@@ -1398,7 +1394,7 @@ void onMouseWheel(GLint button, GLint dir, GLint x, GLint y)
 	}
 }
 
-void rotateView(GLint x_mouse, GLint y_mouse)
+static void onMouseMiddleMove(GLFWwindow* window, double x_mouse, double y_mouse)
 {
 	if (x_mouse != window_width / 2 || y_mouse != window_height / 2)
 	{
@@ -1418,46 +1414,77 @@ void rotateView(GLint x_mouse, GLint y_mouse)
 			aim_relative_depression = relative_depression;
 			need_update_view = true;
 		}
-		SetCursorPos(glutGet(GLUT_WINDOW_X) + window_width / 2, glutGet(GLUT_WINDOW_Y) + window_height / 2);
+		int x, y;
+		glfwGetWindowPos(window, &x, &y);
+		SetCursorPos(x + window_width / 2, y + window_height / 2);
 	}
 }
 
-void onMouseButton(GLint button, GLint action, GLint x_mouse, GLint y_mouse)
+static void onMouseButton(GLFWwindow* window, int button, int action, int mods)
 {
-	if (button == GLUT_MIDDLE_BUTTON)
+	if (button == GLFW_MOUSE_BUTTON_MIDDLE)
 	{
-		if (action == GLUT_DOWN)
+		if (action == GLFW_PRESS)
 		{
-			SetCursorPos(glutGet(GLUT_WINDOW_X) + window_width / 2, glutGet(GLUT_WINDOW_Y) + window_height / 2);
-			glutSetCursor(GLUT_CURSOR_NONE);
-			glutMotionFunc(rotateView);
+			int x, y;
+			glfwGetWindowPos(window, &x, &y);
+			SetCursorPos(x + window_width / 2, y + window_height / 2);
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+			glfwSetCursorPosCallback(window, onMouseMiddleMove);
 		}
-		else if (action == GLUT_UP)
+		else if (action == GLFW_RELEASE)
 		{
-			glutMotionFunc(0);
-			glutSetCursor(0);
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			glfwSetCursorPosCallback(window, nullptr);
 		}
 	}
 }
 
 int main(int argc, char** argv)
 {
+	ImmDisableIME(GetCurrentThreadId());
+
+	window_width = 1920;
+	window_height = 1080;
+
+	if (!glfwInit())
+		return -1;
+
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+
+	GLFWwindow* window = glfwCreateWindow(window_width, window_height, "", nullptr, nullptr);
+	if (!window)
+	{
+		glfwTerminate();
+		return -1;
+	}
+	glfwSetWindowPos(window, 10, 40);
+	glfwMakeContextCurrent(window);
+
+	glfwSetWindowSizeCallback(window, onResize);
+	glfwSetKeyCallback(window, onKey);
+	glfwSetMouseButtonCallback(window, onMouseButton);
+	glfwSetScrollCallback(window, onMouseWheel);
+
 	initLogic();
 	std::thread logicalThread(logicalFrame);
-	ImmDisableIME(GetCurrentThreadId());
-	glutInit(&argc, argv);
-	//glutInitContextVersion(4, 6);
-	glutInitContextProfile(GLUT_CORE_PROFILE);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-	glutInitWindowPosition(0, 0);
-	glutInitWindowSize(2520, 1350);
-	glutCreateWindow("");
-	glutDisplayFunc(lineSegment);
-	glutReshapeFunc(onReshape);
-	glutKeyboardFunc(onKeyDown);
-	glutKeyboardUpFunc(onKeyUp);
-	glutMouseFunc(onMouseButton);
-	glutMouseWheelFunc(onMouseWheel);
+
 	init();
-	glutMainLoop();
+	onResize(window, window_width, window_height);
+
+	while (!glfwWindowShouldClose(window))
+	{
+		drawGraphics();
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+	stopLogic();
+
+	glfwTerminate();
+
+	
+	logicalThread.join();
+	return 0;
 }

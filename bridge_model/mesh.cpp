@@ -1,7 +1,8 @@
 #include "mesh.h"
-#include "common.h"
 
 #include "ext/scalar_constants.hpp"
+
+#include "common.h"
 
 GLuint ground_VAO, ground_VBO, ground_EBO;
 GLuint bridge_VAO, bridge_VBO, bridge_EBO;

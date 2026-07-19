@@ -1,15 +1,15 @@
 #include "logical_frame.h"
 
+#include <vector>
+#include <list>
+#include <thread>
+
+#include "gtx/transform.hpp"
+
 #include "Sun.h"
 #include "Car.h"
 #include "Lane.h"
 #include "scene.h"
-
-#include "gtx/transform.hpp"
-
-#include <vector>
-#include <list>
-#include <thread>
 
 using namespace glm;
 
@@ -28,6 +28,7 @@ std::mt19937 rd_eng;
 static LogicalData logical_data[3];
 static std::atomic<int> latest_data = 0;
 static std::atomic<int> reading_data = 0;
+static std::atomic<bool> is_running;
 
 static Lane* lanes[6];
 static Sun sun(39.9f);
@@ -365,6 +366,12 @@ void initLogic()
 	initLanes();
 	sun.updatePosition(INITIAL_TIME);
 	logical_data[latest_data].sun_dir = sun.getDir();
+	is_running = true;
+}
+
+void stopLogic()
+{
+	is_running = false;
 }
 
 LogicalData& getLatestLogicalData()
@@ -384,7 +391,7 @@ void logicalFrame()
 		next_car_time[i] = elapsed_time + spawn_distb(rd_eng);
 	}
 	std::list<Car> vehicles;
-	while (true)
+	while (is_running)
 	{
 		int writing_data = (latest_data + ((latest_data + 1) % 3 == reading_data ? 2 :1)) % 3;
 
