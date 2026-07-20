@@ -151,4 +151,12 @@
       <Filter>资源文件\shaders\draw</Filter>
     </Text>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="textures\font_atlas_r8.raw">
+      <Filter>资源文件</Filter>
+    </None>
+    <None Include="shaders\fs_text.txt">
+      <Filter>资源文件\shaders</Filter>
+    </None>
+  </ItemGroup>
 </Project>

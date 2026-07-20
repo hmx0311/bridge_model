@@ -133,6 +133,10 @@
     <Text Include="shaders\vs_shadow_highway_day.txt" />
     <Text Include="shaders\vs_sun.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="textures\font_atlas_r8.raw" />
+    <None Include="shaders\fs_text.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

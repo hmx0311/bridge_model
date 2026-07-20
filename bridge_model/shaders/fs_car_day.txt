@@ -2,8 +2,6 @@
 
 const int CSMLevels = 4;
 
-out vec3 fragColor;
-
 layout(std140, binding = 1) uniform Sun
 {
 	vec3 sunDir;
@@ -17,14 +15,8 @@ layout(std140, binding = 2) uniform Shadow
 	mat4 shadowTexMat[CSMLevels];
 };
 
-in vec3 modelPos;
-in vec3 modelPosView;
-in vec3 viewRay;
-in vec3 aNormal;
-in flat int aMaterialIdx;
-in flat vec3 carColor;
-
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
+
 struct Material
 {
 	vec3 ambientAndDiffuse;
@@ -33,6 +25,15 @@ struct Material
 };
 uniform Material materials[5];
 uniform float fogDensity;
+
+in vec3 modelPos;
+in vec3 modelPosView;
+in vec3 viewRay;
+in vec3 aNormal;
+in flat int aMaterialIdx;
+in flat vec3 carColor;
+
+out vec3 fragColor;
 
 void main()
 {

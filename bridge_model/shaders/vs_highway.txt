@@ -1,15 +1,15 @@
 #version 430 core
 
-layout(location = 0) in vec3 vertex;
-layout(location = 1) in vec3 normal;
-layout(location = 2) in vec2 texCoord;
-
 layout(std140, binding = 0) uniform View
 {
 	mat4 projectionMat;
 	mat4 viewMat;
 	mat4 invViewMat;
 };
+
+layout(location = 0) in vec3 vertex;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 texCoord;
 
 out vec3 modelPos;
 out vec3 modelPosView;

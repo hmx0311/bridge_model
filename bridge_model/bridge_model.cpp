@@ -36,6 +36,7 @@ float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 15
 float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
 vec3 focus(0);
 uint32_t focus_move_dir = 0;
+bool show_fps = false;
 bool need_update_view = true;
 uint64_t last_time_us;
 
@@ -58,6 +59,12 @@ GLuint bloom_texs[2];
 
 GLuint tex_blit_VAO, tex_mapping_VBO;
 
+constexpr GLsizei TEXT_WIDTH = 16;
+constexpr GLsizei TEXT_HEIGHT = 24;
+constexpr GLsizei TEXT_ALTAS_CNT_X = 16;
+constexpr GLsizei TEXT_ALTAS_CNT_Y = 6;
+constexpr int TEXT_ALTAS_ASCII_OFFSET = 32;
+GLuint text_atlas_tex;
 
 /*
 * binding = 0
@@ -129,17 +136,24 @@ GLuint SP_shadow_car_night;
 GLuint SP_tex_blit;
 GLuint SP_gaussian_blur;
 GLuint SP_buffer_to_screen;
+GLuint SP_text;
 
 static GLuint loadShader(GLuint shader_id, GLenum type)
 {
-	HRSRC rc = FindResource(nullptr, MAKEINTRESOURCE(shader_id), L"SHADER");
-	if (rc == nullptr)
+	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(shader_id), L"SHADER");
+	if (rc_info == nullptr)
+	{
+		printf("ERROR: Can't Find Resource %d\n", shader_id);
+		return 0;
+	}
+	int size = SizeofResource(nullptr, rc_info);
+	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
+	if (rc_data == nullptr)
 	{
 		printf("ERROR: Can't Load Resource %d\n", shader_id);
 		return 0;
 	}
-	int size = SizeofResource(nullptr, rc);
-	const char* data = (const char*)(LockResource(LoadResource(nullptr, rc)));
+	const char* data = (const char*)(LockResource(rc_data));
 
 	GLint status;
 	GLuint shader = glCreateShader(type);
@@ -157,7 +171,6 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 		glGetShaderInfoLog(shader, 1024, &len, log);
 		printf("%s", log);
 	}
-
 	return shader;
 }
 
@@ -245,13 +258,16 @@ static void initShader()
 	GLuint FS_tex_blit = loadShader(IDR_FS_TEX_BLIT, GL_FRAGMENT_SHADER);
 	GLuint FS_gaussian_blur = loadShader(IDR_FS_GAUSSIAN_BLUR, GL_FRAGMENT_SHADER);
 	GLuint FS_buffer_to_screen = loadShader(IDR_FS_BUFFER_TO_SCREEN, GL_FRAGMENT_SHADER);
+	GLuint FS_text = loadShader(IDR_FS_TEXT, GL_FRAGMENT_SHADER);
 	SP_tex_blit = linkShaderProgram(VS_tex_blit, FS_tex_blit);
 	SP_gaussian_blur = linkShaderProgram(VS_tex_blit, FS_gaussian_blur);
 	SP_buffer_to_screen = linkShaderProgram(VS_tex_blit, FS_buffer_to_screen);
+	SP_text = linkShaderProgram(VS_tex_blit, FS_text);
 	glDeleteShader(VS_tex_blit);
 	glDeleteShader(FS_tex_blit);
 	glDeleteShader(FS_gaussian_blur);
 	glDeleteShader(FS_buffer_to_screen);
+	glDeleteShader(FS_text);
 }
 
 static void buildHeightMap()
@@ -477,7 +493,31 @@ static void init()
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE, CSM_LEVELS, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_tex, 0);
-	glBindTextureUnit(1, shadow_tex);
+
+	glGenTextures(1, &text_atlas_tex);
+	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TEXT_ATLAS), L"TEXTURE");
+	if (rc_info != nullptr)
+	{
+		HGLOBAL rc_data = LoadResource(nullptr, rc_info);
+		if (rc_data != nullptr)
+		{
+			glBindTexture(GL_TEXTURE_2D, text_atlas_tex);
+			const char* data = (const char*)(LockResource(rc_data));
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y, 0, GL_RED, GL_UNSIGNED_BYTE, data);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+		else
+		{
+			printf("ERROR: Can't Load Resource Text Altas\n");
+		}
+	}
+	else
+	{
+		printf("ERROR: Can't Find Resource Text Altas\n");
+	}
 
 	initScene();
 	buildHeightMap();
@@ -1263,14 +1303,33 @@ static void drawGraphics()
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	glDisable(GL_FRAMEBUFFER_SRGB);
 
-	glBindVertexArray(0);
-	glUseProgram(0);
-
 	static float fps = 60;
 	fps = (fps + 1) / (dt_us * 1e-6f + 1.0f);
-	glWindowPos2i(10, 10);
-	char str[40];
-	sprintf_s(str, 40, "fps: %d|%d", int(fps), int(tick_rate));
+
+	if (show_fps)
+	{
+		char str[40];
+		sprintf_s(str, 40, "fps: %d|%d", int(fps), int(tick_rate));
+		glBindTextureUnit(0, text_atlas_tex);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glUseProgram(SP_text);
+		for (int i = 0; str[i] != '\0'; i++)
+		{
+			constexpr int x = 10;
+			constexpr int y = 10;
+			float offset_x = static_cast<float>((str[i] - TEXT_ALTAS_ASCII_OFFSET) % TEXT_ALTAS_CNT_X) / TEXT_ALTAS_CNT_X;
+			float offset_y = static_cast<float>((str[i] - TEXT_ALTAS_ASCII_OFFSET) / TEXT_ALTAS_CNT_X) / TEXT_ALTAS_CNT_Y;
+			glProgramUniform2f(SP_text, glGetUniformLocation(SP_text, "tex_offset"), offset_x, offset_y);
+			glViewport(x + i * (TEXT_WIDTH - 5), y, TEXT_WIDTH, TEXT_HEIGHT);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		}
+		glBlendFunc(GL_ONE, GL_ZERO);
+		glDisable(GL_BLEND);
+	}
+
+	glBindVertexArray(0);
+	glUseProgram(0);
 }
 
 static void onResize(GLFWwindow*, int width, int height)
@@ -1323,6 +1382,9 @@ static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 			{
 				simulate_speed--;
 			}
+			return;
+		case 'F':
+			show_fps = !show_fps;
 			return;
 		case '1':
 		case '2':
@@ -1484,7 +1546,7 @@ int main(int argc, char** argv)
 
 	glfwTerminate();
 
-	
+
 	logicalThread.join();
 	return 0;
 }
