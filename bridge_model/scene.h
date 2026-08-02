@@ -1,5 +1,5 @@
 #pragma once
-#include"glew.h"
+#include"glad/glad.h"
 
 extern GLuint highway_tex;
 

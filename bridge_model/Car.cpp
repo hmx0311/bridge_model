@@ -160,7 +160,7 @@ void Car::collisionTest(Car* test_car)
 				}
 				else
 				{
-					m_aim_speed = fmin(m_aim_speed, (-b + sqrt(delta)) / 2);
+					m_aim_speed = std::min(m_aim_speed, (-b + sqrt(delta)) / 2);
 				}
 			}
 			return;

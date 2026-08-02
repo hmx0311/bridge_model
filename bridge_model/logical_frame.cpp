@@ -16,9 +16,7 @@ using namespace glm;
 static constexpr ivec2 CAR_POS_MAP_SIZE = ivec2(54, 50);
 static constexpr float CAR_POS_MAP_GRID_LENGTH = 4000;
 
-static constexpr float MAX_LOGICAL_DT = 0.05f;
-static constexpr double INITIAL_TIME = 2;
-
+static constexpr float MAX_LOGICAL_DT = 0.01f;
 
 std::atomic<float> tick_rate = 60;
 std::atomic<bool> is_paused = false;
@@ -364,7 +362,7 @@ void initLogic()
 	std::random_device rd;
 	rd_eng.seed(rd());
 	initLanes();
-	sun.updatePosition(INITIAL_TIME);
+	sun.updatePosition(0);
 	logical_data[latest_data].sun_dir = sun.getDir();
 	is_running = true;
 }
@@ -383,7 +381,7 @@ LogicalData& getLatestLogicalData()
 void logicalFrame()
 {
 	std::uniform_real_distribution<float> spawn_distb(0, 0.32f);
-	double elapsed_time = INITIAL_TIME;
+	double elapsed_time = 0;
 	uint64_t last_frame_time_us = getTimestampMicroseconds();
 	double next_car_time[6];
 	for (int i = 0; i < 6; i++)

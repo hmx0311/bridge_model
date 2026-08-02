@@ -3,7 +3,7 @@
 
 #include <thread>
 
-#include "glew.h"
+#include "glad/glad.h"
 #include "glfw3.h"
 #include "gtx/transform.hpp"
 
@@ -20,6 +20,8 @@ using namespace glm;
 #define CSM_LEVELS 4
 GLuint shadow_FBO;
 GLuint shadow_tex;
+GLuint shadow_PCF_sampler;
+GLuint shadow_depth_sampler;
 
 constexpr float FOVY = pi<float>() / 4;
 constexpr float VIEW_Z_NEAR = 90.0f;
@@ -382,7 +384,6 @@ static void buildHeightMap()
 
 static void init()
 {
-	glewInit();
 	printf("%s\n", (char*)glGetString(GL_VERSION));
 	printf("%s\n", (char*)glGetString(GL_SHADING_LANGUAGE_VERSION));
 	initShader();
@@ -493,6 +494,19 @@ static void init()
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE, CSM_LEVELS, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_tex, 0);
+
+	glGenSamplers(1, &shadow_PCF_sampler);
+	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glGenSamplers(1, &shadow_depth_sampler);
+	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glGenTextures(1, &text_atlas_tex);
 	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TEXT_ATLAS), L"TEXTURE");
@@ -661,17 +675,17 @@ static void drawGraphics()
 
 		if (eye.z > MAX_HEIGHT)
 		{
-			float shadow_near = fmax(-(eye.z - MAX_HEIGHT) / bottom_view.z, VIEW_Z_NEAR);
-			float shadow_far = fmax(shadow_near, MIN_SHADOW_FAR);
+			float shadow_near = std::max(-(eye.z - MAX_HEIGHT) / bottom_view.z, VIEW_Z_NEAR);
+			float shadow_far = std::max(shadow_near, MIN_SHADOW_FAR);
 			float bottom_far = -eye.z / bottom_view.z;
 			float top_near = VIEW_Z_FAR;
 			float top_far = VIEW_Z_FAR;
 			if (top_view.z < 0)
 			{
-				top_near = fmin(-(eye.z - MAX_HEIGHT) / top_view.z, VIEW_Z_FAR);
-				top_far = fmin(-eye.z / top_view.z, VIEW_Z_FAR);
+				top_near = std::min(-(eye.z - MAX_HEIGHT) / top_view.z, VIEW_Z_FAR);
+				top_far = std::min(-eye.z / top_view.z, VIEW_Z_FAR);
 			}
-			float CSM_ratio = fmin(pow(top_far / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
+			float CSM_ratio = std::min(pow(top_far / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 			vec3 shadow_hexa[6];
 			shadow_hexa[4] = shadow_near * bottom_view;
 			shadow_hexa[5] = shadow_hexa[4];
@@ -705,7 +719,7 @@ static void drawGraphics()
 				{
 					if (bottom_far < shadow_far)
 					{
-						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
+						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z * (1 + FLT_EPSILON)) * (view_dir - bottom_view);
 					}
 					else
 					{
@@ -736,8 +750,8 @@ static void drawGraphics()
 			float shadow_far = MIN_SHADOW_FAR;
 			if (top_view.z > 0)
 			{
-				float top = fmin((MAX_HEIGHT - eye.z) / top_view.z, VIEW_Z_FAR);
-				float CSM_ratio = fmin(pow(VIEW_Z_FAR / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
+				float top = std::min((MAX_HEIGHT - eye.z) / top_view.z, VIEW_Z_FAR);
+				float CSM_ratio = std::min(pow(VIEW_Z_FAR / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 				vec3 shadow_hexa[6];
 				shadow_hexa[4] = shadow_near * bottom_view;
 				if (top < shadow_near)
@@ -799,9 +813,9 @@ static void drawGraphics()
 				float top = VIEW_Z_FAR;
 				if (top_view.z < 0)
 				{
-					top = fmin(-eye.z / top_view.z, VIEW_Z_FAR);
+					top = std::min(-eye.z / top_view.z, VIEW_Z_FAR);
 				}
-				float CSM_ratio = fmin(pow(top / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
+				float CSM_ratio = std::min(pow(top / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 				vec3 shadow_hexa[6];
 				shadow_hexa[4] = shadow_near * bottom_view;
 				shadow_hexa[5] = shadow_near * top_view;
@@ -828,7 +842,7 @@ static void drawGraphics()
 					{
 						if (bottom < shadow_far)
 						{
-							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
+							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z * (1 + FLT_EPSILON)) * (view_dir - bottom_view);
 						}
 						else
 						{
@@ -929,10 +943,10 @@ static void drawGraphics()
 		mat4 sun_mat = lookAt(vec3(0.0f), -vec3(sun.dir), vec3(-sun.dir.x, -sun.dir.y, sun.dir.z));
 		float z_far = FLT_MAX;
 		float slope = sqrt(1.0f / (sun.dir.z * sun.dir.z) - 1.0f);
-		float max_x[CSM_LEVELS], min_x[CSM_LEVELS], max_y[CSM_LEVELS], min_y[CSM_LEVELS], z_fars[CSM_LEVELS];
+		float x_max[CSM_LEVELS], x_min[CSM_LEVELS], y_max[CSM_LEVELS], y_min[CSM_LEVELS], z_fars[CSM_LEVELS];
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
-			min_x[i] = FLT_MAX, max_x[i] = -FLT_MAX, min_y[i] = FLT_MAX, max_y[i] = -FLT_MAX;
+			x_min[i] = FLT_MAX, x_max[i] = -FLT_MAX, y_min[i] = FLT_MAX, y_max[i] = -FLT_MAX;
 			for (int j = 0; j < 12; j++)
 			{
 				vec3 point = vec3(sun_mat * vec4(CSM_areas[i][j], 1.0f));
@@ -940,82 +954,82 @@ static void drawGraphics()
 				{
 					z_far = point.z;
 				}
-				if (point.x < min_x[i])
+				if (point.x < x_min[i])
 				{
-					min_x[i] = point.x;
+					x_min[i] = point.x;
 				}
-				if (point.x > max_x[i])
+				if (point.x > x_max[i])
 				{
-					max_x[i] = point.x;
+					x_max[i] = point.x;
 				}
-				if (point.y < min_y[i])
+				if (point.y < y_min[i])
 				{
-					min_y[i] = point.y;
+					y_min[i] = point.y;
 				}
-				if (point.y > max_y[i])
+				if (point.y > y_max[i])
 				{
-					max_y[i] = point.y;
+					y_max[i] = point.y;
 				}
 			}
-			z_far = fmax(-max_y[i] * slope, z_far);
+			z_far = std::max(-y_max[i] * slope, z_far);
 			z_fars[i] = z_far;
 		}
 		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
 		{
-			float x_min = FLT_MAX, x_max = -FLT_MAX, y_min = FLT_MAX, y_max = -FLT_MAX, furthest_z_far = FLT_MAX;
+			float x_group_min = FLT_MAX, x_group_max = -FLT_MAX, y_group_min = FLT_MAX, y_group_max = -FLT_MAX, furthest_z_far = FLT_MAX;
 			for (int j = 0; j < 4; j++)
 			{
 				if (z_fars[4 * i + j] < furthest_z_far)
 				{
 					furthest_z_far = z_fars[4 * i + j];
 				}
-				if (min_x[4 * i + j] < x_min)
+				if (x_min[4 * i + j] < x_group_min)
 				{
-					x_min = min_x[4 * i + j];
+					x_group_min = x_min[4 * i + j];
 				}
-				if (max_x[4 * i + j] > x_max)
+				if (x_max[4 * i + j] > x_group_max)
 				{
-					x_max = max_x[4 * i + j];
+					x_group_max = x_max[4 * i + j];
 				}
-				if (min_y[4 * i + j] < y_min)
+				if (y_min[4 * i + j] < y_group_min)
 				{
-					y_min = min_y[4 * i + j];
+					y_group_min = y_min[4 * i + j];
 				}
-				if (max_y[4 * i + j] > y_max)
+				if (y_max[4 * i + j] > y_group_max)
 				{
-					y_max = max_y[4 * i + j];
+					y_group_max = y_max[4 * i + j];
 				}
 			}
-			if (4 * (max_x[4 * i] - min_x[4 * i]) * (max_y[4 * i] - min_y[4 * i]) > (x_max - x_min) * (y_max - y_min))
+			if (4 * (x_max[4 * i] - x_min[4 * i]) * (y_max[4 * i] - y_min[4 * i]) > (x_group_max - x_group_min) * (y_group_max - y_group_min))
 			{
-				min_x[4 * i] = x_min;
-				max_x[4 * i] = (x_min + x_max) / 2;
-				min_y[4 * i] = y_min;
-				max_y[4 * i] = (x_min + y_max) / 2;
+				x_min[4 * i] = x_group_min;
+				x_max[4 * i] = (x_group_min + x_group_max) / 2;
+				y_min[4 * i] = y_group_min;
+				y_max[4 * i] = (y_group_min + y_group_max) / 2;
 				z_fars[4 * i] = furthest_z_far;
-				min_x[4 * i + 1] = (x_min + x_max) / 2;
-				max_x[4 * i + 1] = x_max;
-				min_y[4 * i + 1] = y_min;
-				max_y[4 * i + 1] = (x_min + y_max) / 2;
+				x_min[4 * i + 1] = (x_group_min + x_group_max) / 2;
+				x_max[4 * i + 1] = x_group_max;
+				y_min[4 * i + 1] = y_group_min;
+				y_max[4 * i + 1] = (y_group_min + y_group_max) / 2;
 				z_fars[4 * i + 1] = furthest_z_far;
-				min_x[4 * i + 2] = x_min;
-				max_x[4 * i + 2] = (x_min + x_max) / 2;
-				min_y[4 * i + 2] = (x_min + y_max) / 2;
-				max_y[4 * i + 2] = y_max;
+				x_min[4 * i + 2] = x_group_min;
+				x_max[4 * i + 2] = (x_group_min + x_group_max) / 2;
+				y_min[4 * i + 2] = (y_group_min + y_group_max) / 2;
+				y_max[4 * i + 2] = y_group_max;
 				z_fars[4 * i + 2] = furthest_z_far;
-				min_x[4 * i + 3] = (x_min + x_max) / 2;
-				max_x[4 * i + 3] = x_max;
-				min_y[4 * i + 3] = (x_min + y_max) / 2;
-				max_y[4 * i + 3] = y_max;
+				x_min[4 * i + 3] = (x_group_min + x_group_max) / 2;
+				x_max[4 * i + 3] = x_group_max;
+				y_min[4 * i + 3] = (y_group_min + y_group_max) / 2;
+				y_max[4 * i + 3] = y_group_max;
 				z_fars[4 * i + 3] = furthest_z_far;
 			}
 		}
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
-			float z_near = fmin(MAX_HEIGHT / sun.dir.z - min_y[i] * slope, 5 * VIEW_Z_FAR + z_fars[i]);
+			float z_near = std::min(MAX_HEIGHT / sun.dir.z - y_min[i] * slope, 5 * VIEW_Z_FAR + z_fars[i]);
 			constexpr float TEX_PADDING = (1 / (1 - 2 * 0.02f) - 1) / 2;
-			mat4 shadow_mat = ortho(min_x[i] - TEX_PADDING * (max_x[i] - min_x[i]), max_x[i] + TEX_PADDING * (max_x[i] - min_x[i]),
-				min_y[i] - TEX_PADDING * (max_y[i] - min_y[i]), max_y[i] + TEX_PADDING * (max_y[i] - min_y[i]),
+			mat4 shadow_mat = ortho(x_min[i] - TEX_PADDING * (x_max[i] - x_min[i]), x_max[i] + TEX_PADDING * (x_max[i] - x_min[i]),
+				y_min[i] - TEX_PADDING * (y_max[i] - y_min[i]), y_max[i] + TEX_PADDING * (y_max[i] - y_min[i]),
 				-z_near, -z_fars[i]);
 			shadow_mat = shadow_mat * sun_mat;
 			sun_shadow.mat[i] = shadow_mat;
@@ -1179,9 +1193,12 @@ static void drawGraphics()
 
 	glBindTextureUnit(0, highway_tex);
 	glBindTextureUnit(1, shadow_tex);
+	glBindTextureUnit(2, shadow_tex);
 	glEnable(GL_DEPTH_TEST);
 	if (sun.dir.z > 0)
 	{
+		glBindSampler(1, shadow_PCF_sampler);
+		glBindSampler(2, shadow_depth_sampler);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glDisable(GL_CULL_FACE);
@@ -1210,6 +1227,8 @@ static void drawGraphics()
 		glUseProgram(SP_car_day);
 		glBindVertexArray(car_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+		glBindSampler(1, 0);
+		glBindSampler(2, 0);
 	}
 	else
 	{
@@ -1506,15 +1525,17 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 
-	window_width = 1920;
-	window_height = 1080;
+	window_width = 2400;
+	window_height = 1350;
 
 	if (!glfwInit())
+	{
 		return -1;
+	}
 
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
 
 	GLFWwindow* window = glfwCreateWindow(window_width, window_height, "", nullptr, nullptr);
 	if (!window)
@@ -1522,8 +1543,16 @@ int main(int argc, char** argv)
 		glfwTerminate();
 		return -1;
 	}
-	glfwSetWindowPos(window, 10, 40);
 	glfwMakeContextCurrent(window);
+
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		glfwTerminate();
+		return -1;
+	}
+
+	glfwSetWindowPos(window, 70, 35);
+	glfwSwapInterval(0);
 
 	glfwSetWindowSizeCallback(window, onResize);
 	glfwSetKeyCallback(window, onKey);
@@ -1531,10 +1560,12 @@ int main(int argc, char** argv)
 	glfwSetScrollCallback(window, onMouseWheel);
 
 	initLogic();
-	std::thread logicalThread(logicalFrame);
+	std::thread logical_thread(logicalFrame);
 
+	simulate_speed = 500;
 	init();
 	onResize(window, window_width, window_height);
+	simulate_speed = 1;
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -1546,7 +1577,6 @@ int main(int argc, char** argv)
 
 	glfwTerminate();
 
-
-	logicalThread.join();
+	logical_thread.join();
 	return 0;
 }

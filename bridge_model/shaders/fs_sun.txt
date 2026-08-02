@@ -26,9 +26,11 @@ void main()
 			discard;
 		}
 		sunColor *= sunPercentage;
-		brightColor = sunColor;
 		fragColor = sunColor + (1 - sunPercentage) * skyColor;
 	}
-	fragColor = sunColor;
+	else
+	{
+		fragColor = sunColor;
+	}
 	brightColor = sunColor;
 }

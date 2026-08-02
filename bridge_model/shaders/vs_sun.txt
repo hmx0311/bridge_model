@@ -19,5 +19,5 @@ layout(location = 0) in vec3 vertex;
 
 void main()
 {
-	gl_Position = projectionMat * vec4(mat3(viewMat) * (sunMat * vertex + 80000.0 * sunDir), 1.0);
+	gl_Position = projectionMat * vec4(mat3(viewMat) * (sunMat * vertex + 85600.0 * sunDir), 1.0);
 }

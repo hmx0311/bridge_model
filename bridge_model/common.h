@@ -1,6 +1,6 @@
 #pragma once
 #include <chrono>
-#include "glew.h"
+#include "glad/glad.h"
 
 constexpr float EARTH_RADIUS = 6.371e8f;
 

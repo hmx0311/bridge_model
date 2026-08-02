@@ -1,5 +1,5 @@
 #pragma once
-#include "glew.h"
+#include "glad/glad.h"
 #include "glm.hpp"
 
 constexpr int GROUND_EBO_SIZE = 3906;
