@@ -1,6 +1,6 @@
 #version 430 core
 
-uniform float horizionY;
+uniform float horizonY;
 
 layout(pixel_center_integer) in vec4 gl_FragCoord;
 
@@ -18,9 +18,9 @@ layout(std140, binding = 1) uniform Sun
 void main()
 {
 	vec3 sunColor = 50.0 * sunDiffuseAndSpecular;
-	if(gl_FragCoord.y < horizionY)
+	if(gl_FragCoord.y < horizonY)
 	{
-		float sunPercentage = gl_FragCoord.y + 1 - horizionY;
+		float sunPercentage = gl_FragCoord.y + 1 - horizonY;
 		if(sunPercentage < 0)
 		{
 			discard;

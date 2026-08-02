@@ -717,9 +717,9 @@ static void drawGraphics()
 				}
 				else
 				{
-					if (bottom_far < shadow_far)
+					if (bottom_far * (1 + FLT_EPSILON) < shadow_far)
 					{
-						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z * (1 + FLT_EPSILON)) * (view_dir - bottom_view);
+						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
 					}
 					else
 					{
@@ -840,9 +840,9 @@ static void drawGraphics()
 					}
 					else
 					{
-						if (bottom < shadow_far)
+						if (bottom * (1 + FLT_EPSILON) < shadow_far)
 						{
-							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z * (1 + FLT_EPSILON)) * (view_dir - bottom_view);
+							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
 						}
 						else
 						{
@@ -950,26 +950,11 @@ static void drawGraphics()
 			for (int j = 0; j < 12; j++)
 			{
 				vec3 point = vec3(sun_mat * vec4(CSM_areas[i][j], 1.0f));
-				if (point.z < z_far)
-				{
-					z_far = point.z;
-				}
-				if (point.x < x_min[i])
-				{
-					x_min[i] = point.x;
-				}
-				if (point.x > x_max[i])
-				{
-					x_max[i] = point.x;
-				}
-				if (point.y < y_min[i])
-				{
-					y_min[i] = point.y;
-				}
-				if (point.y > y_max[i])
-				{
-					y_max[i] = point.y;
-				}
+				z_far = min(z_far, point.z);
+				x_min[i] = min(x_min[i], point.x);
+				x_max[i] = max(x_max[i], point.x);
+				y_min[i] = min(y_min[i], point.y);
+				y_max[i] = max(y_max[i], point.y);
 			}
 			z_far = std::max(-y_max[i] * slope, z_far);
 			z_fars[i] = z_far;
@@ -979,26 +964,11 @@ static void drawGraphics()
 			float x_group_min = FLT_MAX, x_group_max = -FLT_MAX, y_group_min = FLT_MAX, y_group_max = -FLT_MAX, furthest_z_far = FLT_MAX;
 			for (int j = 0; j < 4; j++)
 			{
-				if (z_fars[4 * i + j] < furthest_z_far)
-				{
-					furthest_z_far = z_fars[4 * i + j];
-				}
-				if (x_min[4 * i + j] < x_group_min)
-				{
-					x_group_min = x_min[4 * i + j];
-				}
-				if (x_max[4 * i + j] > x_group_max)
-				{
-					x_group_max = x_max[4 * i + j];
-				}
-				if (y_min[4 * i + j] < y_group_min)
-				{
-					y_group_min = y_min[4 * i + j];
-				}
-				if (y_max[4 * i + j] > y_group_max)
-				{
-					y_group_max = y_max[4 * i + j];
-				}
+				furthest_z_far = min(furthest_z_far, z_fars[4 * i + j]);
+				x_group_min = min(x_group_min, x_min[4 * i + j]);
+				x_group_max = max(x_group_max, x_max[4 * i + j]);
+				y_group_min = min(y_group_min, y_min[4 * i + j]);
+				y_group_max = max(y_group_max, y_max[4 * i + j]);
 			}
 			if (4 * (x_max[4 * i] - x_min[4 * i]) * (y_max[4 * i] - y_min[4 * i]) > (x_group_max - x_group_min) * (y_group_max - y_group_min))
 			{
@@ -1163,7 +1133,7 @@ static void drawGraphics()
 	if (is_view_updated)
 	{
 		glNamedBufferSubData(scene_UBO, offsetof(decltype(view), view_mat), sizeof(view.view_mat) + sizeof(view.inv_view_mat), &view.view_mat);
-		glProgramUniform1f(SP_sun, glGetUniformLocation(SP_sun, "horizionY"), horizon_y);
+		glProgramUniform1f(SP_sun, glGetUniformLocation(SP_sun, "horizonY"), horizon_y);
 	}
 
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, 4 * sizeof(vec4), &sun);
@@ -1402,15 +1372,15 @@ static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 				simulate_speed--;
 			}
 			return;
-		case 'F':
-			show_fps = !show_fps;
-			return;
 		case '1':
 		case '2':
 		case '3':
 		case '4':
 		case '5':
 			simulate_speed = key - '0';
+			return;
+		case 'F':
+			show_fps = !show_fps;
 			return;
 		case 'A':
 			focus_move_dir |= 0b0001;
@@ -1552,7 +1522,7 @@ int main(int argc, char** argv)
 	}
 
 	glfwSetWindowPos(window, 70, 35);
-	glfwSwapInterval(0);
+	//glfwSwapInterval(0);
 
 	glfwSetWindowSizeCallback(window, onResize);
 	glfwSetKeyCallback(window, onKey);
