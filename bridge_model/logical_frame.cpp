@@ -391,7 +391,7 @@ void logicalFrame()
 	std::list<Car> vehicles;
 	while (is_running)
 	{
-		int writing_data = (latest_data + ((latest_data + 1) % 3 == reading_data ? 2 :1)) % 3;
+		int writing_data = (latest_data + ((latest_data + 1) % 3 == reading_data ? 2 : 1)) % 3;
 
 		uint64_t time_us = getTimestampMicroseconds();
 		uint64_t frame_dt_us = time_us - last_frame_time_us;
@@ -401,7 +401,7 @@ void logicalFrame()
 			std::this_thread::yield();
 			continue;
 		}
-		tick_rate = (tick_rate + 1) / (frame_dt_us * 1e-6f + 1.0f);
+		tick_rate = (tick_rate + 1) / (1.0f + frame_dt_us * 1e-6f);
 		float logical_dt_s = 1e-6 * simulate_speed * frame_dt_us;
 		if (logical_dt_s > MAX_LOGICAL_DT)
 		{

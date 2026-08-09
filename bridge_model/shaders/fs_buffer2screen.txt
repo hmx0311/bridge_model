@@ -11,5 +11,5 @@ void main()
 {
     ivec2 iTexCoord = ivec2(gl_FragCoord);
     vec3 color = texelFetch(colorBuffer, iTexCoord, 0).rgb + texture(bloomBuffer, texCoord).rgb;
-    fragColor = 1 - 1 / (1 + color + color * color);
+    fragColor = pow(1 - 1 / (1 + color + color * color), vec3(1 / 2.2));
 }

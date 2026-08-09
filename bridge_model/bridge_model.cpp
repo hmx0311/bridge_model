@@ -384,8 +384,6 @@ static void buildHeightMap()
 
 static void init()
 {
-	printf("%s\n", (char*)glGetString(GL_VERSION));
-	printf("%s\n", (char*)glGetString(GL_SHADING_LANGUAGE_VERSION));
 	initShader();
 
 	for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
@@ -1285,20 +1283,18 @@ static void drawGraphics()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, window_width, window_height);
-	glEnable(GL_FRAMEBUFFER_SRGB);
 	glBindTextureUnit(0, render_tex);
 	glBindTextureUnit(1, bloom_texs[0]);
 	glUseProgram(SP_buffer_to_screen);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-	glDisable(GL_FRAMEBUFFER_SRGB);
 
 	static float fps = 60;
-	fps = (fps + 1) / (dt_us * 1e-6f + 1.0f);
+	fps = (fps + 1) / (1.0f + dt_us * 1e-6f);
 
 	if (show_fps)
 	{
 		char str[40];
-		sprintf_s(str, 40, "fps: %d|%d", int(fps), int(tick_rate));
+		sprintf_s(str, 40, "fps: %d|%d", int(round(fps)), int(round(tick_rate)));
 		glBindTextureUnit(0, text_atlas_tex);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1506,6 +1502,10 @@ int main(int argc, char** argv)
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+	glfwWindowHint(GLFW_RED_BITS, 10);
+	glfwWindowHint(GLFW_GREEN_BITS, 10);
+	glfwWindowHint(GLFW_BLUE_BITS, 10);
+	glfwWindowHint(GLFW_ALPHA_BITS, 2);
 
 	GLFWwindow* window = glfwCreateWindow(window_width, window_height, "", nullptr, nullptr);
 	if (!window)
@@ -1521,8 +1521,17 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	glfwSetWindowPos(window, 70, 35);
-	//glfwSwapInterval(0);
+	printf("%s\n", (char*)glGetString(GL_VERSION));
+	printf("%s\n", (char*)glGetString(GL_SHADING_LANGUAGE_VERSION));
+	GLint redBits, greenBits, blueBits;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &redBits);
+	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, &greenBits);
+	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, &blueBits);
+	printf("pixel format: R%dG%dB%d\n", redBits, greenBits, blueBits);
+
+	glfwSetWindowPos(window, 70, 40);
+	glfwSwapInterval(0);
 
 	glfwSetWindowSizeCallback(window, onResize);
 	glfwSetKeyCallback(window, onKey);

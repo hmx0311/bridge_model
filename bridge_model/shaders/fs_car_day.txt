@@ -16,6 +16,7 @@ layout(std140, binding = 2) uniform Shadow
 };
 
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
+layout(binding = 2) uniform sampler2DArray shadow_tex_depth;
 
 struct Material
 {
@@ -50,8 +51,12 @@ void main()
 	}
 	vec3 ambientAndDiffuseLighting = sunAmbient;
 	vec3 specularLighting = vec3(0.0);
+	float view_dist = length(modelPosView);
 	float LdotN = dot(sunDir, aNormal);
-	if(LdotN > 0)
+	vec3 dpdx = dFdx(modelPos);
+	vec3 dpdy = dFdy(modelPos);
+	vec3 surface_normal = normalize(cross(dpdx, dpdy));
+	if(LdotN > 1e-5 && dot(surface_normal, sunDir) > 1e-5)
 	{
 		const float texPadding = 0.02;
 		float shadow;
@@ -68,28 +73,92 @@ void main()
 		}
 		if(level < CSMLevels)
 		{
-			shadow = 0;
-			vec3 offsetX = mat3(shadowTexMat[level]) * dFdx(modelPos);
-			vec3 offsetY = mat3(shadowTexMat[level]) * dFdy(modelPos);
-			float maxOffsetX = abs(offsetX.x) + abs(offsetY.x);
-			if(maxOffsetX > texPadding)
+			shadow = 1;
+			vec3 u_dir = vec3(shadowTexMat[level][0].x,shadowTexMat[level][1].x,shadowTexMat[level][2].x);
+			vec3 v_dir = vec3(shadowTexMat[level][0].y,shadowTexMat[level][1].y,shadowTexMat[level][2].y);
+			vec3 shadow_mat_z = vec3(shadowTexMat[level][0].z,shadowTexMat[level][1].z,shadowTexMat[level][2].z);
+			float shadow_scale_u = length(u_dir);
+			float shadow_scale_v = length(v_dir);
+			u_dir /= shadow_scale_u;
+			v_dir /= shadow_scale_v;
+			float dzdu, dzdv;
 			{
-				offsetX *= texPadding / maxOffsetX;
-				offsetY *= texPadding / maxOffsetX;
+				vec3 temp = cross(v_dir, surface_normal);
+				dzdu = dot(temp, shadow_mat_z) / (dot(u_dir, temp) * shadow_scale_u);
 			}
-			float maxOffsetY = abs(offsetX.y) + abs(offsetY.y);
-			if(maxOffsetY > texPadding)
 			{
-				offsetX *= texPadding / maxOffsetY;
-				offsetY *= texPadding / maxOffsetY;
+				vec3 temp = cross(u_dir, surface_normal);
+				dzdv = dot(temp, shadow_mat_z) / (dot(v_dir, temp) * shadow_scale_v);
 			}
-			const vec2 offsets[8] = { { -0.37, 0.37 }, { 0, 0.25 }, { 0.37, 0.37 }, { -0.25, 0 }, { 0.25, 0 }, { -0.37, -0.37 }, { 0, -0.25 }, { 0.37, -0.37 } };
-			for(int i = 0; i < 8; i++)
+			const float blocker_sample_per_side = 5.0;
+			const float blocker_search_radius = 100;
+			int cnt = 0;
+			float block_dist = 0;
+			for(float i = -blocker_search_radius + blocker_search_radius / blocker_sample_per_side; i < blocker_search_radius; i += 2 * blocker_search_radius / blocker_sample_per_side)
 			{
-				vec3 coord = shadowCoord + offsets[i].x * offsetX + offsets[i].y * offsetY;
-				shadow += texture(shadowTex, vec4(coord.xy, level, coord.z)).x;
+				for (float j = -blocker_search_radius + blocker_search_radius / blocker_sample_per_side; j < blocker_search_radius; j += 2 * blocker_search_radius / blocker_sample_per_side)
+				{
+					if(i * i + j * j > blocker_search_radius * blocker_search_radius)
+					{
+						continue;
+					}
+					vec2 coord_offset =  vec2(i * shadow_scale_u, j * shadow_scale_v);
+					float offset_z = min(0, coord_offset.x * dzdu + coord_offset.y * dzdv);
+					vec2 coord = shadowCoord.xy + coord_offset;
+					float dist = shadowCoord.z -  texture(shadow_tex_depth, vec3(coord.xy, level)).x;
+					if(dist > -offset_z)
+					{
+						block_dist += dist;
+						cnt++;
+					}
+				}
 			}
-			shadow /= 8;
+			if(cnt > 0)
+			{
+				block_dist /= length(shadow_mat_z) * cnt;
+				shadow = 0;
+				const float sun_radius_dist_ratio = 1.0 / 214;
+				float penumbra_radius = sun_radius_dist_ratio * block_dist;
+				vec2 duvdx = 0.5 * vec2(dot(u_dir, dpdx), dot(v_dir, dpdx));
+				vec2 duvdy = 0.5 * vec2(dot(u_dir, dpdy), dot(v_dir, dpdy));
+				float duvdx_len = length(duvdx);
+				float duvdy_len = length(duvdy);
+				float A = dot(duvdx, duvdx);
+				float C = dot(duvdy, duvdy);
+				float B = dot(duvdx, duvdy);
+				vec2 offset_i = vec2(penumbra_radius, 0);
+				vec2 offset_j = vec2(0, penumbra_radius);
+				if(duvdx_len > penumbra_radius && duvdx_len > penumbra_radius)
+				{
+					offset_i = duvdx;
+					offset_j = duvdy;
+				}
+				else if(duvdx_len > penumbra_radius)
+				{
+					offset_i = duvdx;
+					offset_j = penumbra_radius / duvdx_len * vec2(-offset_i.y, offset_i.x);
+				}
+				else if(duvdy_len > penumbra_radius)
+				{
+					offset_i = duvdy;
+					offset_j = penumbra_radius / duvdy_len * vec2(-offset_i.y, offset_i.x);
+				}
+				uint pixelSeed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
+				pixelSeed = (pixelSeed ^ 0x9e3779b9u) * 0x85ebca6bu;
+				int sample_cnt = max(8, int(20 * LdotN * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
+				for (int idx = 0; idx < sample_cnt; idx++)
+				{
+					uint scrambledIdx = uint(idx) ^ pixelSeed;
+					float u = float(scrambledIdx % uint(sample_cnt)) / float(sample_cnt);
+					float v = bitfieldReverse(uint(scrambledIdx)) * 2.3283064365e-10; // 将索引位反转作为随机性    
+					vec2 offset = (vec2(u, v) - 0.5) * 2.0;
+					vec2 coord_offset =  (offset.x * offset_i + offset.y * offset_j) * vec2(shadow_scale_u, shadow_scale_v);
+					vec2 coord = shadowCoord.xy + coord_offset;
+					float offset_z = coord_offset.x * dzdu + coord_offset.y * dzdv;
+					shadow += texture(shadowTex, vec4(coord.xy, level, shadowCoord.z + offset_z)).x;
+				}
+				shadow /= sample_cnt;
+			}
 		}
 		else
 		{
