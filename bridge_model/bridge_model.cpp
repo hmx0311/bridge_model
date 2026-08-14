@@ -13,11 +13,12 @@
 #include "Car.h"
 #include "logical_frame.h"
 
+#include "shader_headers/shadow_day_defines.h"
+
 using namespace glm;
 
 #define SHADOW_TEX_SIZE 4096
 #define MAX_CSM_RATIO 3.6f
-#define CSM_LEVELS 4
 GLuint shadow_FBO;
 GLuint shadow_tex;
 GLuint shadow_PCF_sampler;
@@ -107,11 +108,7 @@ struct
 }view;
 float horizon_y;
 vec3 CSM_areas[CSM_LEVELS][12];
-struct
-{
-	mat4 mat[CSM_LEVELS];
-	mat4 tex_mat[CSM_LEVELS];
-}sun_shadow;
+ShadowTransform sun_shadow;
 constexpr ivec2 LIGHT_MAP_SIZE = ivec2(134, 122);
 constexpr float LIGHT_MAP_GRID_LENGTH = (CAR_LIGHT_RANGE / 2);
 constexpr int MAX_LIGHT_PER_CAR = 24;
@@ -148,18 +145,152 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 		printf("ERROR: Can't Find Resource %d\n", shader_id);
 		return 0;
 	}
-	int size = SizeofResource(nullptr, rc_info);
+	std::vector<int> sizes;
+	std::vector<const char*> sources;
+	struct ShaderName
+	{
+		const char* name;
+		int len;
+	};
+	std::vector<ShaderName> source_names;
+	sizes.push_back(SizeofResource(nullptr, rc_info));
 	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
 	if (rc_data == nullptr)
 	{
 		printf("ERROR: Can't Load Resource %d\n", shader_id);
 		return 0;
 	}
-	const char* data = (const char*)(LockResource(rc_data));
+	sources.push_back(static_cast<const char*>(LockResource(rc_data)));
+	char shader_name[64];
+	source_names.push_back({ shader_name, snprintf(shader_name, sizeof(shader_name), "shader_%d", shader_id) });
+	for (int i = 0; i < sources.size(); i++)
+	{
+		const char* source = sources[i];
+		int len = sizes[i];
+		int j = 0;
+		int comment_type = 0;
+		int line_cnt = 0;
+		while (j < len)
+		{
+			if (source[j] == '\n')
+			{
+				line_cnt++;
+			}
+			if (comment_type > 0)
+			{
+				if (comment_type == 1 && source[j] == '\n')
+				{
+					comment_type = 0;
+				}
+				else if (comment_type == 2 && source[j] == '*' && j + 1 < len && source[j + 1] == '/')
+				{
+					comment_type = 0;
+					j++;
+				}
+			}
+			else
+			{
+				if (source[j] == '#' && j + sizeof("#include") - 2 < len && strncmp(source + j, "#include", sizeof("#include") - 1) == 0)
+				{
+					j += sizeof("#include") - 2;
+					while (true)
+					{
+						j++;
+						if (j == len)
+						{
+							printf("ERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							return 0;
+						}
+						if (source[j] == '\"')
+						{
+							break;
+						}
+						if (!isspace(source[j]) || source[j] == '\n')
+						{
+							printf("ERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							return 0;
+						}
+					}
+					int name_begin = j + 1;
+					do
+					{
+						j++;
+						if (j == len || source[j] == '\n')
+						{
+							printf("ERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							return 0;
+						}
+					} while (source[j] != '\"');
+					int name_len = j - name_begin;
+					bool included = false;
+					for(int k = i; k < sources.size(); k++)
+					{
+						if (name_len == source_names[k].len && strncmp(source + name_begin, source_names[k].name, name_len) == 0)
+						{
+							included = true;
+							break;
+						}
+					}
+					//if (!included)
+					{
+						HRSRC rc_info = FindResourceA(nullptr, std::string(source + name_begin, name_len).c_str(), "SHADER_HEADER");
+						if (rc_info == nullptr)
+						{
+							printf("ERROR: Can't find include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
+							return 0;
+						}
+						sizes.insert(sizes.begin() + i + 1, SizeofResource(nullptr, rc_info));
+						HGLOBAL rc_data = LoadResource(nullptr, rc_info);
+						if (rc_data == nullptr)
+						{
+							printf("ERROR: Can't load include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
+							return 0;
+						}
+						sources.insert(sources.begin() + i + 1, static_cast<const char*>(LockResource(rc_data)));
+						source_names.insert(source_names.begin() + i + 1, { source + name_begin, name_len });
+					}
+					j++;
+					len -= j;
+					source = &source[j];
+					sizes[i] = len;
+					sources[i] = source;
+					j = 0;
+					continue;
+				}
+				else if (source[j] == '/' && j + 1 < len)
+				{
+					if (source[j + 1] == '/')
+					{
+						comment_type = 1;
+						j++;
+					}
+					else if (source[j + 1] == '*')
+					{
+						comment_type = 2;
+						j++;
+					}
+					else
+					{
+						break;
+					}
+				}
+				else if (!isspace(source[j]))
+				{
+					break;
+				}
+			}
+			j++;
+		}
+	}
+	const char* version_str = "#version 430 core\n";
+	sources.push_back(version_str);
+	sizes.push_back(-1);
+	std::reverse(sources.begin(), sources.end());
+	std::reverse(sizes.begin(), sizes.end());
 
 	GLint status;
 	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &data, &size);
+	glShaderSource(shader, sources.size(), sources.data(), sizes.data());
 	glCompileShader(shader);
 
 	// check for errors
@@ -167,11 +298,16 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	if (status == GL_FALSE)
 	{
 		printf("ERROR: Shader %d Compilation Error\n", shader_id);
-		printf("%s\n", data);
-		char log[1024];
+		for (const char* source : sources)
+		{
+			printf("%s", source);
+		}
 		int len;
-		glGetShaderInfoLog(shader, 1024, &len, log);
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+		char* log = new char[len];
+		glGetShaderInfoLog(shader, len, nullptr, log);
 		printf("%s", log);
+		delete[] log;
 	}
 	return shader;
 }
@@ -1000,8 +1136,8 @@ static void drawGraphics()
 				y_min[i] - TEX_PADDING * (y_max[i] - y_min[i]), y_max[i] + TEX_PADDING * (y_max[i] - y_min[i]),
 				-z_near, -z_fars[i]);
 			shadow_mat = shadow_mat * sun_mat;
-			sun_shadow.mat[i] = shadow_mat;
-			sun_shadow.tex_mat[i] = mat4(
+			sun_shadow.shadow_mat[i] = shadow_mat;
+			sun_shadow.shadow_tex_mat[i] = mat4(
 				0.5f, 0.0f, 0.0f, 0.0f,
 				0.0f, 0.5f, 0.0f, 0.0f,
 				0.0f, 0.0f, 0.5f, 0.0f,
@@ -1491,8 +1627,8 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 
-	window_width = 2400;
-	window_height = 1350;
+	window_width = 240;
+	window_height = 135;
 
 	if (!glfwInit())
 	{

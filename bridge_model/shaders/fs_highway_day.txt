@@ -1,6 +1,4 @@
-#version 430 core
-
-const int CSM_LEVELS = 4;
+#include "shadow_day.glslh"
 
 layout(std140, binding = 1) uniform Sun
 {
@@ -9,17 +7,10 @@ layout(std140, binding = 1) uniform Sun
 	vec3 sunDiffuseAndSpecular;
 	vec3 skyColor;
 };
-layout(std140, binding = 2) uniform Shadow
-{
-	mat4 shadowMat[CSM_LEVELS];
-	mat4 shadowTexMat[CSM_LEVELS];
-};
 
 uniform float fogDensity;
 
 layout(binding = 0) uniform sampler2D texture0;
-layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
-layout(binding = 2) uniform sampler2DArray shadow_tex_depth;
 
 in vec3 modelPos;
 in vec3 modelPosView;
@@ -40,118 +31,7 @@ void main()
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
 	if(LdotN > 1e-5 && dot(surface_normal, sunDir) > 1e-5)
 	{
-		const float texPadding = 0.02;
-		float shadow = 1.0;
-		int level;
-		vec3 shadowCoord;
-		for(level = 0; level < CSM_LEVELS; level++)
-		{
-			shadowCoord = (shadowTexMat[level] * vec4(modelPos, 1.0)).xyz;
-			if(shadowCoord.x > texPadding && shadowCoord.x < 1 - texPadding &&
-				shadowCoord.y > texPadding && shadowCoord.y < 1 - texPadding)
-			{
-				break;
-			}
-		}
-		if(level < CSM_LEVELS)
-		{
-			const float sun_radius_dist_ratio = 1.0 / 214;
-			vec3 u_dir = vec3(shadowTexMat[level][0].x,shadowTexMat[level][1].x,shadowTexMat[level][2].x);
-			vec3 v_dir = vec3(shadowTexMat[level][0].y,shadowTexMat[level][1].y,shadowTexMat[level][2].y);
-			vec3 shadow_mat_z = vec3(shadowTexMat[level][0].z,shadowTexMat[level][1].z,shadowTexMat[level][2].z);
-			float shadow_scale_u = length(u_dir);
-			float shadow_scale_v = length(v_dir);
-			float shadow_inv_scale_z = 1.0 / length(shadow_mat_z);
-			u_dir /= shadow_scale_u;
-			v_dir /= shadow_scale_v;
-			float dzdu, dzdv;
-			{
-				vec3 temp = cross(v_dir, surface_normal);
-				dzdu = dot(temp, shadow_mat_z) / (dot(u_dir, temp) * shadow_scale_u);
-			}
-			{
-				vec3 temp = cross(u_dir, surface_normal);
-				dzdv = dot(temp, shadow_mat_z) / (dot(v_dir, temp) * shadow_scale_v);
-			}
-			const int NUM_BLOCKER_SAMPLE = 16;
-			float blocker_search_r = 100;
-			int blocker_cnt = 0;
-			float block_dist = 0;
-			bool has_valid = false;
-			vec2 duvdx = 0.5 * vec2(dot(u_dir, dpdx), dot(v_dir, dpdx));
-			vec2 duvdy = 0.5 * vec2(dot(u_dir, dpdy), dot(v_dir, dpdy));
-			float duvdx_len = length(duvdx);
-			float duvdy_len = length(duvdy);
-			for(int i = 0, reverse_cnt = 0; i < NUM_BLOCKER_SAMPLE; i++)
-			{
-				float r = blocker_search_r * sqrt(reverse_cnt == 0 ? max(0.0, (i - 0.25) / (NUM_BLOCKER_SAMPLE - 1)) : (NUM_BLOCKER_SAMPLE - i - 0.5) / reverse_cnt);
-				float angle = 2 * 3.1415927 * 2.3283064365e-10 * bitfieldReverse(uint(i));
-				vec2 coord_offset =  vec2(r * cos(angle) * shadow_scale_u, r * sin(angle) * shadow_scale_v);
-				float offset_z = min(0, coord_offset.x * dzdu + coord_offset.y * dzdv);
-				vec2 coord = shadowCoord.xy + coord_offset;
-				float dist = shadowCoord.z -  texture(shadow_tex_depth, vec3(coord.xy, level)).x;
-				if(dist > -offset_z)
-				{
-					dist *= shadow_inv_scale_z;
-					block_dist += dist;
-					blocker_cnt++;
-					if(1.5 * sun_radius_dist_ratio * dist > r)
-					{
-						has_valid = true;
-					}
-					if(reverse_cnt == 0)
-					{
-						float r_range = max(1.5 * sun_radius_dist_ratio * block_dist / blocker_cnt, max(duvdx_len, duvdy_len));
-						if(r > r_range)
-						{
-							reverse_cnt = NUM_BLOCKER_SAMPLE - i - 1;
-							blocker_search_r = r_range;
-						}
-					}
-				}
-			}
-			if(blocker_cnt > 0)
-			{
-				shadow = 0;
-				if(blocker_cnt < NUM_BLOCKER_SAMPLE)
-				{
-					block_dist /= blocker_cnt;
-					float penumbra_radius = sun_radius_dist_ratio * block_dist;
-					vec2 offset_i = vec2(penumbra_radius, 0);
-					vec2 offset_j = vec2(0, penumbra_radius);
-					if(duvdx_len > penumbra_radius && duvdx_len > penumbra_radius)
-					{
-						offset_i = duvdx;
-						offset_j = duvdy;
-					}
-					else if(duvdx_len > penumbra_radius)
-					{
-						offset_i = duvdx;
-						offset_j = penumbra_radius / duvdx_len * vec2(-offset_i.y, offset_i.x);
-					}
-					else if(duvdy_len > penumbra_radius)
-					{
-						offset_i = duvdy;
-						offset_j = penumbra_radius / duvdy_len * vec2(-offset_i.y, offset_i.x);
-					}
-					uint pixelSeed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
-					pixelSeed = (pixelSeed ^ 0x9e3779b9u) * 0x85ebca6bu;
-					int sample_cnt = max(8, int(20 * LdotN * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
-					for (int idx = 0; idx < sample_cnt; idx++)
-					{
-						uint scrambledIdx = uint(idx) ^ pixelSeed;
-						float u = float(scrambledIdx % uint(sample_cnt)) / float(sample_cnt);
-						float v = bitfieldReverse(uint(scrambledIdx)) * 2.3283064365e-10; // 将索引位反转作为随机性    
-						vec2 offset = (vec2(u, v) - 0.5) * 2.0;
-						vec2 coord_offset =  (offset.x * offset_i + offset.y * offset_j) * vec2(shadow_scale_u, shadow_scale_v);
-						vec2 coord = shadowCoord.xy + coord_offset;
-						float offset_z = coord_offset.x * dzdu + coord_offset.y * dzdv;
-						shadow += texture(shadowTex, vec4(coord.xy, level, shadowCoord.z + offset_z)).x;
-					}
-					shadow /= sample_cnt;
-				}
-			}
-		}
+		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
 		lighting += shadow * LdotN * sunDiffuseAndSpecular;
 	}
 	color *= lighting;

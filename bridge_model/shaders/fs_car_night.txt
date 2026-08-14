@@ -1,5 +1,3 @@
-#version 430 core
-
 #define MAX_CAR_CNT 512
 #define MAX_LIGHT_PER_CAR 24
 

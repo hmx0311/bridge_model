@@ -34,6 +34,9 @@
     <Filter Include="资源文件\shaders\draw\night">
       <UniqueIdentifier>{25cb70f5-f06b-474f-ba11-effa18e6b298}</UniqueIdentifier>
     </Filter>
+    <Filter Include="资源文件\shader_headers">
+      <UniqueIdentifier>{0c56730f-f61e-449f-b9be-ebeafa266ec9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bridge_model.cpp">
@@ -85,6 +88,15 @@
     </ClInclude>
     <ClInclude Include="logical_frame.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_headers\shadow_day.glslh">
+      <Filter>资源文件\shader_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_headers\shadow_day_defines.h">
+      <Filter>资源文件\shader_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_headers\common_defines.h">
+      <Filter>资源文件\shader_headers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

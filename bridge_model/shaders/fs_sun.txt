@@ -1,5 +1,3 @@
-#version 430 core
-
 uniform float horizonY;
 
 layout(pixel_center_integer) in vec4 gl_FragCoord;

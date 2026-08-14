@@ -47,7 +47,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;GLFW_INCLUDE_NONE;GLEW_STATIC;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;GLFW_INCLUDE_NONE;GLEW_STATIC;_1DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <OpenMPSupport>true</OpenMPSupport>
       <FloatingPointModel>Fast</FloatingPointModel>
@@ -107,6 +107,9 @@
     <ClInclude Include="mesh.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scene.h" />
+    <ClInclude Include="shader_headers\common_defines.h" />
+    <ClInclude Include="shader_headers\shadow_day.glslh" />
+    <ClInclude Include="shader_headers\shadow_day_defines.h" />
     <ClInclude Include="Sun.h" />
   </ItemGroup>
   <ItemGroup>
