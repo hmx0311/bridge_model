@@ -13,7 +13,9 @@
 #include "Car.h"
 #include "logical_frame.h"
 
-#include "shader_headers/shadow_day_defines.h"
+#include "shader_headers/scene_constances.h"
+#include "shader_headers/camera_defines.h"
+#include "shader_headers/lighting_day_defines.h"
 
 using namespace glm;
 
@@ -72,7 +74,7 @@ GLuint text_atlas_tex;
 /*
 * binding = 0
 *	mat4 projection_mat
-*	mat4 view_mat
+*	mat4 view
 *	mat4 inv_view_mat
 *
 * binding = 1
@@ -86,8 +88,8 @@ GLintptr scene_UBO_offset1;
 
 /*
 * binding = 2
-*	mat4 shadow_mat[CSM_LEVELS];
-*	mat4 shadow_tex_mat[CSM_LEVELS];
+*	mat4 view_proj[CSM_LEVELS];
+*	mat4 tex[CSM_LEVELS];
 */
 GLuint shadow_UBO;
 
@@ -100,25 +102,18 @@ GLuint car_light_shadow_mat_UBO;
 // binding = 6
 GLuint car_lighting_SSBO;
 
-struct
-{
-	mat4 proj_mat;
-	mat4 view_mat;
-	mat4 inv_view_mat;
-}view;
+
+CameraData camera;
 float horizon_y;
 vec3 CSM_areas[CSM_LEVELS][12];
-ShadowTransform sun_shadow;
-constexpr ivec2 LIGHT_MAP_SIZE = ivec2(134, 122);
-constexpr float LIGHT_MAP_GRID_LENGTH = (CAR_LIGHT_RANGE / 2);
-constexpr int MAX_LIGHT_PER_CAR = 24;
+ShadowTransformData sun_shadow;
 const mat4 CAR_LIGHT_SHADOW_PROJ_MAT = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 50.0f, 50.0f + 2 * LIGHT_MAP_GRID_LENGTH);
 
 int num_active_car_light_map_grids = 0;
-float car_light_map_grid_distance2_to_view[LIGHT_MAP_SIZE.x][LIGHT_MAP_SIZE.y];
-ivec2 car_light_map_grid_distance_order[LIGHT_MAP_SIZE.x * LIGHT_MAP_SIZE.y];
+float car_light_map_grid_distance2_to_view[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
+ivec2 car_light_map_grid_distance_order[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
 
-int car_light_map[LIGHT_MAP_SIZE.x][LIGHT_MAP_SIZE.y][2];
+int car_light_map[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y][2];
 vec4 car_light_pos[2 * MAX_CAR_CNT];
 mat4 car_light_mats[2 * MAX_CAR_CNT];
 int car_lightings[MAX_CAR_CNT][MAX_LIGHT_PER_CAR];
@@ -142,7 +137,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(shader_id), L"SHADER");
 	if (rc_info == nullptr)
 	{
-		printf("ERROR: Can't Find Resource %d\n", shader_id);
+		printf("\nERROR: Can't Find Resource %d\n", shader_id);
 		return 0;
 	}
 	std::vector<int> sizes;
@@ -157,7 +152,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
 	if (rc_data == nullptr)
 	{
-		printf("ERROR: Can't Load Resource %d\n", shader_id);
+		printf("\nERROR: Can't Load Resource %d\n", shader_id);
 		return 0;
 	}
 	sources.push_back(static_cast<const char*>(LockResource(rc_data)));
@@ -198,7 +193,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 						j++;
 						if (j == len)
 						{
-							printf("ERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
 							return 0;
 						}
 						if (source[j] == '\"')
@@ -207,7 +202,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 						}
 						if (!isspace(source[j]) || source[j] == '\n')
 						{
-							printf("ERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
 							return 0;
 						}
 					}
@@ -217,7 +212,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 						j++;
 						if (j == len || source[j] == '\n')
 						{
-							printf("ERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
 							return 0;
 						}
 					} while (source[j] != '\"');
@@ -231,19 +226,19 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 							break;
 						}
 					}
-					//if (!included)
+					if (!included)
 					{
 						HRSRC rc_info = FindResourceA(nullptr, std::string(source + name_begin, name_len).c_str(), "SHADER_HEADER");
 						if (rc_info == nullptr)
 						{
-							printf("ERROR: Can't find include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
+							printf("\nERROR: Can't find include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
 							return 0;
 						}
 						sizes.insert(sizes.begin() + i + 1, SizeofResource(nullptr, rc_info));
 						HGLOBAL rc_data = LoadResource(nullptr, rc_info);
 						if (rc_data == nullptr)
 						{
-							printf("ERROR: Can't load include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
+							printf("\nERROR: Can't load include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
 							return 0;
 						}
 						sources.insert(sources.begin() + i + 1, static_cast<const char*>(LockResource(rc_data)));
@@ -287,6 +282,24 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	sizes.push_back(-1);
 	std::reverse(sources.begin(), sources.end());
 	std::reverse(sizes.begin(), sizes.end());
+#if 1
+	std::string cource_str;
+	for (int i = 0; i < sources.size(); i++)
+	{
+		if(sizes[i]<0)
+		{
+			cource_str.append(sources[i]);
+		}
+		else
+		{
+			cource_str.append(sources[i], sizes[i]);
+		}
+	}
+	sources.clear();
+	sources.push_back(cource_str.c_str());
+	sizes.clear();
+	sizes.push_back(-1);
+#endif
 
 	GLint status;
 	GLuint shader = glCreateShader(type);
@@ -297,7 +310,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
 	if (status == GL_FALSE)
 	{
-		printf("ERROR: Shader %d Compilation Error\n", shader_id);
+		printf("\nERROR: Shader %d Compilation Error\n", shader_id);
 		for (const char* source : sources)
 		{
 			printf("%s", source);
@@ -326,11 +339,13 @@ static GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
 	glGetProgramiv(sp, GL_LINK_STATUS, &status);
 	if (status == GL_FALSE)
 	{
-		printf("ERROR: Shader Program %d Link Error\n", sp);
-		char data[1024];
+		printf("\nERROR: Shader Program %d Link Error\n", sp);
 		int len;
-		glGetProgramInfoLog(sp, 1024, &len, data);
-		printf("\n%s", data);
+		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &len);
+		char* log = new char[len];
+		glGetProgramInfoLog(sp, len, nullptr, log);
+		printf("%s", log);
+		delete[] log;
 	}
 	glDetachShader(sp, vs);
 	glDetachShader(sp, fs);
@@ -522,28 +537,28 @@ static void init()
 {
 	initShader();
 
-	for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
+	for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 	{
-		for (int j = 0; j < LIGHT_MAP_SIZE.y; j++)
+		for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 		{
-			car_light_map_grid_distance_order[i * LIGHT_MAP_SIZE.y + j] = ivec2(i, j);
+			car_light_map_grid_distance_order[i * LIGHT_MAP_SIZE_Y + j] = ivec2(i, j);
 		}
 	}
 
 	int UBO_offset_alignment;
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &UBO_offset_alignment);
 
-	scene_UBO_offset1 = ((sizeof(view) - 1) / UBO_offset_alignment + 1) * UBO_offset_alignment;
+	scene_UBO_offset1 = ((sizeof(camera) - 1) / UBO_offset_alignment + 1) * UBO_offset_alignment;
 	glGenBuffers(1, &scene_UBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, scene_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, scene_UBO_offset1 + 4 * sizeof(vec4), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, scene_UBO, 0, sizeof(view));
-	glBindBufferRange(GL_UNIFORM_BUFFER, 1, scene_UBO, scene_UBO_offset1, 4 * sizeof(vec4));
+	glBufferData(GL_UNIFORM_BUFFER, scene_UBO_offset1 + sizeof(SunData), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, camera_binding, scene_UBO, 0, sizeof(CameraData));
+	glBindBufferRange(GL_UNIFORM_BUFFER, sun_binding, scene_UBO, scene_UBO_offset1, sizeof(SunData));
 
 	glGenBuffers(1, &shadow_UBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, shadow_UBO);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(sun_shadow), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, 2, shadow_UBO, 0, sizeof(sun_shadow));
+	glBindBufferRange(GL_UNIFORM_BUFFER, sun_shadow_binding, shadow_UBO, 0, sizeof(sun_shadow));
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 	glGenBuffers(1, &car_light_map_SSBO);
@@ -678,6 +693,40 @@ static void drawGraphics()
 	uint64_t dt_us = time_us - last_time_us;
 	last_time_us = time_us;
 	LogicalData& logical_data = getLatestLogicalData();
+	if (focus_move_dir != 0)
+	{
+		vec2 dir = vec2(0.0f);
+		if ((focus_move_dir & 0b0011) == 0b0001)
+		{
+			dir += vec2(-cos(azimuth), -sin(azimuth));
+		}
+		if ((focus_move_dir & 0b0011) == 0b0010)
+		{
+			dir += vec2(cos(azimuth), sin(azimuth));
+		}
+		if ((focus_move_dir & 0b1100) == 0b0100)
+		{
+			dir += vec2(-sin(azimuth), cos(azimuth));
+		}
+		if ((focus_move_dir & 0b1100) == 0b1000)
+		{
+			dir += vec2(sin(azimuth), -cos(azimuth));
+		}
+		if (dir != vec2(0.0f))
+		{
+			dir = normalize(dir);
+			float move_speed = 1.0f * view_distance + 1000.0f;
+			float move_distance = move_speed * 1e-6f * dt_us;
+			vec3 new_focus = focus + vec3(dir.x * move_distance, dir.y * move_distance, 0);
+			new_focus.x = clamp(new_focus.x, -30000.0f, 30000.0f);
+			new_focus.y = clamp(new_focus.y, -10000.0f, 20000.0f);
+			if (focus != new_focus)
+			{
+				need_update_view = true;
+				focus = new_focus;
+			}
+		}
+	}
 	bool is_view_updated = need_update_view;
 	if (need_update_view)
 	{
@@ -746,37 +795,6 @@ static void drawGraphics()
 				view_distance = aim_view_distance;
 			}
 		}
-		if (focus_move_dir != 0)
-		{
-			vec2 dir = vec2(0.0f);
-			if ((focus_move_dir & 0b0011) == 0b0001)
-			{
-				dir += vec2(-cos(azimuth), -sin(azimuth));
-			}
-			if ((focus_move_dir & 0b0011) == 0b0010)
-			{
-				dir += vec2(cos(azimuth), sin(azimuth));
-			}
-			if ((focus_move_dir & 0b1100) == 0b0100)
-			{
-				dir += vec2(-sin(azimuth), cos(azimuth));
-			}
-			if ((focus_move_dir & 0b1100) == 0b1000)
-			{
-				dir += vec2(sin(azimuth), -cos(azimuth));
-			}
-			if (dir != vec2(0.0f))
-			{
-				dir = normalize(dir);
-				float move_speed = 1.0f * view_distance + 1000.0f;
-				float move_distance = move_speed * 1e-6f * dt_us;
-				focus.x += dir.x * move_distance;
-				focus.y += dir.y * move_distance;
-				focus.x = clamp(focus.x, -30000.0f, 30000.0f);
-				focus.y = clamp(focus.y, -10000.0f, 20000.0f);
-				need_update_view = true;
-			}
-		}
 
 		float depression = pi<float>() / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * view_distance / MAX_VIEW_DISTANCE) * (1 - relative_depression)));
 		vec3 view_dir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
@@ -797,14 +815,14 @@ static void drawGraphics()
 				focus.z += height_offset;
 			}
 		}
-		view.view_mat = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
-		view.inv_view_mat = inverse(view.view_mat);
+		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
+		camera.inv_view = inverse(camera.view);
 		vec3 top_view(0, tanf(FOVY / 2), -1);
 		vec3 bottom_view(0, -top_view.y, -1);
 		vec3 view_x = vec3(top_view.y / window_height * window_width, 0, 0);
-		top_view = mat3(view.inv_view_mat) * top_view;
-		bottom_view = mat3(view.inv_view_mat) * bottom_view;
-		view_x = mat3(view.inv_view_mat) * view_x;
+		top_view = mat3(camera.inv_view) * top_view;
+		bottom_view = mat3(camera.inv_view) * bottom_view;
+		view_x = mat3(camera.inv_view) * view_x;
 		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * window_height / 2;
 
 		if (eye.z > MAX_HEIGHT)
@@ -995,14 +1013,14 @@ static void drawGraphics()
 			}
 		}
 
-		mat4 proj_and_view_mat = view.proj_mat * view.view_mat;
-		bool is_light_grid_visible[LIGHT_MAP_SIZE.x][LIGHT_MAP_SIZE.y];
-		for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
+		mat4 proj_and_view_mat = camera.projection * camera.view;
+		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
+		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 		{
-			float offset_x = (-LIGHT_MAP_SIZE.x / 2 + i) * LIGHT_MAP_GRID_LENGTH;
-			for (int j = 0; j < LIGHT_MAP_SIZE.y; j++)
+			float offset_x = (-LIGHT_MAP_SIZE_X / 2 + i) * LIGHT_MAP_GRID_LENGTH;
+			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 			{
-				float offset_y = (-LIGHT_MAP_SIZE.y / 2 + j) * LIGHT_MAP_GRID_LENGTH;
+				float offset_y = (-LIGHT_MAP_SIZE_Y / 2 + j) * LIGHT_MAP_GRID_LENGTH;
 				constexpr vec4 GRID_AABB[8] = { vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1),
 					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1),
 					vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1),
@@ -1024,12 +1042,12 @@ static void drawGraphics()
 			}
 		}
 		num_active_car_light_map_grids = 0;
-		for (int i = 0; i < LIGHT_MAP_SIZE.x; i++)
+		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 		{
-			float offset_x = (-LIGHT_MAP_SIZE.x / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
-			for (int j = 0; j < LIGHT_MAP_SIZE.y; j++)
+			float offset_x = (-LIGHT_MAP_SIZE_X / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
+			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 			{
-				float offset_y = (-LIGHT_MAP_SIZE.y / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
+				float offset_y = (-LIGHT_MAP_SIZE_Y / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
 				if (is_light_grid_visible[i][j])
 				{
 					vec2 distance = vec2(eye) - vec2(offset_x, offset_y);
@@ -1042,29 +1060,23 @@ static void drawGraphics()
 				}
 			}
 		}
-		std::sort(car_light_map_grid_distance_order, &car_light_map_grid_distance_order[LIGHT_MAP_SIZE.x * LIGHT_MAP_SIZE.y], [](ivec2 a, ivec2 b)->bool
+		std::sort(car_light_map_grid_distance_order, &car_light_map_grid_distance_order[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y], [](ivec2 a, ivec2 b)->bool
 			{
 				return car_light_map_grid_distance2_to_view[a.x][a.y] < car_light_map_grid_distance2_to_view[b.x][b.y];
 			});
 	}
 
-	struct
-	{
-		vec4 dir;
-		vec4 ambient;
-		vec4 diffuse_and_specular;
-		vec4 sky_color;
-	}sun;
-	sun.dir = vec4(logical_data.sun_dir, 0);
-	sun.ambient = vec4(vec3(0.01f), 0);
+	SunData sun;
+	sun.dir = logical_data.sun_dir;
+	sun.ambient = vec3(0.01f);
 	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e6f;
 	float absorb_factor = -1e-7f * (-EARTH_RADIUS * sun.dir.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.dir.z * sun.dir.z)));
-	sun.diffuse_and_specular = vec4(0.5f * vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor)), 0);
-	sun.sky_color = vec4(0.01f, 0.015f, 0.055f, 0);
+	sun.diffuse_specular = 0.5f * vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
+	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
 	if (sun.dir.z > -0.2f)
 	{
-		sun.ambient += vec4(vec3((sun.dir.z + 0.2f) * 0.1f), 0);
-		sun.sky_color += vec4((sun.dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f), 0);
+		sun.ambient += vec3((sun.dir.z + 0.2f) * 0.1f);
+		sun.sky_color += (sun.dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
 	}
 
 	int num_visible_cars;
@@ -1130,14 +1142,15 @@ static void drawGraphics()
 		}
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
-			float z_near = std::min(MAX_HEIGHT / sun.dir.z - y_min[i] * slope, 5 * VIEW_Z_FAR + z_fars[i]);
-			constexpr float TEX_PADDING = (1 / (1 - 2 * 0.02f) - 1) / 2;
-			mat4 shadow_mat = ortho(x_min[i] - TEX_PADDING * (x_max[i] - x_min[i]), x_max[i] + TEX_PADDING * (x_max[i] - x_min[i]),
-				y_min[i] - TEX_PADDING * (y_max[i] - y_min[i]), y_max[i] + TEX_PADDING * (y_max[i] - y_min[i]),
-				-z_near, -z_fars[i]);
+			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
+			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_max[i] - x_min[i]));
+			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_max[i] - y_min[i]));
+			float z_near = std::min(MAX_HEIGHT / sun.dir.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
+			float z_padding = std::max(x_padding / (x_max[i] - x_min[i]), y_padding / (y_max[i] - y_min[i])) * (z_near - z_fars[i]);
+			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding,	y_min[i] - y_padding, y_max[i] + y_padding,	-z_near, -z_fars[i] + z_padding);
 			shadow_mat = shadow_mat * sun_mat;
-			sun_shadow.shadow_mat[i] = shadow_mat;
-			sun_shadow.shadow_tex_mat[i] = mat4(
+			sun_shadow.view_proj[i] = shadow_mat;
+			sun_shadow.tex[i] = mat4(
 				0.5f, 0.0f, 0.0f, 0.0f,
 				0.0f, 0.5f, 0.0f, 0.0f,
 				0.0f, 0.0f, 0.5f, 0.0f,
@@ -1160,13 +1173,13 @@ static void drawGraphics()
 		for (int i = 0, j = logical_data.num_light_on_cars; i < j; i++)
 		{
 			mat4& transform = logical_data.car_transform[i];
-			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
 			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] == FLT_MAX)
 			{
 				for (j--; i < j; j--)
 				{
 					mat4& back_transform = logical_data.car_transform[j];
-					ivec2 back_light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(back_transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+					ivec2 back_light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(back_transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
 					if (car_light_map_grid_distance2_to_view[back_light_map_idx.x][back_light_map_idx.y] < FLT_MAX)
 					{
 						std::swap(transform, back_transform);
@@ -1185,13 +1198,13 @@ static void drawGraphics()
 		for (int i = logical_data.num_light_on_cars, j = logical_data.num_cars; i < j; i++)
 		{
 			mat4& transform = logical_data.car_transform[i];
-			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
 			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] == FLT_MAX)
 			{
 				for (j--; i < j; j--)
 				{
 					mat4& back_transform = logical_data.car_transform[j];
-					ivec2 back_light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(back_transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+					ivec2 back_light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(back_transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
 					if (car_light_map_grid_distance2_to_view[back_light_map_idx.x][back_light_map_idx.y] < FLT_MAX)
 					{
 						std::swap(transform, back_transform);
@@ -1212,10 +1225,10 @@ static void drawGraphics()
 			constexpr float POS_OFFSET = 50.0f / LIGHT_MAP_GRID_LENGTH + 1.0f;
 			vec4 light_pos = logical_data.car_light_pos[i];
 			vec4 light_dir = logical_data.car_light_dir[i];
-			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(light_pos) + POS_OFFSET * vec2(light_dir) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(light_pos) + POS_OFFSET * vec2(light_dir) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
 			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] < FLT_MAX)
 			{
-				car_light_infos.emplace_back(CarLightInfo{ light_pos, light_dir, car_light_map[light_map_idx.x][light_map_idx.y] });
+				car_light_infos.push_back({ light_pos, light_dir, car_light_map[light_map_idx.x][light_map_idx.y] });
 				car_light_map[light_map_idx.x][light_map_idx.y][0]++;
 			}
 		}
@@ -1235,7 +1248,7 @@ static void drawGraphics()
 		for (int i = 0; i < num_visible_cars; i++)
 		{
 			mat4& transform = logical_data.car_transform[i < num_visible_light_on_cars ? i : i + logical_data.num_light_on_cars - num_visible_light_on_cars];
-			ivec2 pos_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE));
+			ivec2 pos_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
 			int num_lighting = 0;
 			for (int j = -1; j < 2; j++)
 			{
@@ -1266,11 +1279,11 @@ static void drawGraphics()
 
 	if (is_view_updated)
 	{
-		glNamedBufferSubData(scene_UBO, offsetof(decltype(view), view_mat), sizeof(view.view_mat) + sizeof(view.inv_view_mat), &view.view_mat);
+		glNamedBufferSubData(scene_UBO, offsetof(CameraData, view), sizeof(camera.view) + sizeof(camera.inv_view), &camera.view);
 		glProgramUniform1f(SP_sun, glGetUniformLocation(SP_sun, "horizonY"), horizon_y);
 	}
 
-	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, 4 * sizeof(vec4), &sun);
+	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(SunData), &sun);
 	if (sun.dir.z > 0)
 	{
 		glNamedBufferSubData(shadow_UBO, 0, sizeof(sun_shadow), &sun_shadow);
@@ -1462,8 +1475,8 @@ static void onResize(GLFWwindow*, int width, int height)
 	GLint max_tex_size;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
 	bloom_buffer_width = std::min(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
-	view.proj_mat = perspective(FOVY, float(width) / height, VIEW_Z_NEAR, VIEW_Z_FAR);
-	glNamedBufferSubData(scene_UBO, 0, sizeof(view.proj_mat), &view.proj_mat);
+	camera.projection = perspective(FOVY, float(width) / height, VIEW_Z_NEAR, VIEW_Z_FAR);
+	glNamedBufferSubData(scene_UBO, 0, sizeof(camera.projection), &camera.projection);
 
 	int MSAA_level = 8;
 	for (int i = 0; i < 2; i++)
@@ -1516,20 +1529,22 @@ static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 			return;
 		case 'A':
 			focus_move_dir |= 0b0001;
-			break;
+			return;
 		case 'D':
 			focus_move_dir |= 0b0010;
-			break;
+			return;
 		case 'W':
 			focus_move_dir |= 0b0100;
-			break;
+			return;
 		case 'S':
 			focus_move_dir |= 0b1000;
-			break;
-		default:
 			return;
+
+		case 'P':
+			printf("%f,%f,%f,%f,%f\n", focus.x, focus.y, aim_azimuth, aim_relative_depression, aim_view_distance);
+			focus.x = 4479.475098, focus.y = -1698.803833,aim_azimuth = -0.474000, aim_relative_depression = 0.099000, aim_view_distance = 200;
+			need_update_view = true;
 		}
-		need_update_view = true;
 	}
 	else if (action == GLFW_RELEASE)
 	{
@@ -1537,16 +1552,16 @@ static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 		{
 		case 'A':
 			focus_move_dir &= ~(0b0001);
-			break;
+			return;
 		case 'D':
 			focus_move_dir &= ~(0b0010);
-			break;
+			return;
 		case 'W':
 			focus_move_dir &= ~(0b0100);
-			break;
+			return;
 		case 'S':
 			focus_move_dir &= ~(0b1000);
-			break;
+			return;
 		}
 	}
 }
@@ -1627,8 +1642,8 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 
-	window_width = 240;
-	window_height = 135;
+	window_width = 2400;
+	window_height = 1350;
 
 	if (!glfwInit())
 	{
@@ -1657,14 +1672,21 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	printf("%s\n", (char*)glGetString(GL_VERSION));
-	printf("%s\n", (char*)glGetString(GL_SHADING_LANGUAGE_VERSION));
+	printf("%s\n", glGetString(GL_VERSION));
+	printf("%s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	GLint redBits, greenBits, blueBits;
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &redBits);
 	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, &greenBits);
 	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, &blueBits);
-	printf("pixel format: R%dG%dB%d\n", redBits, greenBits, blueBits);
+	if (redBits == greenBits && redBits == blueBits)
+	{
+		printf("pixel format: RGB%d\n", redBits);
+	}
+	else
+	{
+		printf("pixel format: R%dG%dB%d\n", redBits, greenBits, blueBits);
+	}
 
 	glfwSetWindowPos(window, 70, 40);
 	glfwSwapInterval(0);

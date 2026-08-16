@@ -1,12 +1,4 @@
-#include "shadow_day.glslh"
-
-layout(std140, binding = 1) uniform Sun
-{
-	vec3 sunDir;
-	vec3 sunAmbient;
-	vec3 sunDiffuseAndSpecular;
-	vec3 skyColor;
-};
+#include "lighting_day.glslh"
 
 uniform float fogDensity;
 
@@ -22,23 +14,23 @@ out vec3 fragColor;
 void main()
 {
 	vec3 color = texture(texture0, aTexCoord).rgb;
-	vec3 lighting = sunAmbient;
+	vec3 lighting = sun.ambient;
 	vec3 normal = normalize(aNormal);
 	float view_dist = length(modelPosView);
-	float LdotN = dot(sunDir, normal);
+	float LdotN = dot(sun.dir, normal);
 	vec3 dpdx = dFdx(modelPos);
 	vec3 dpdy = dFdy(modelPos);
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
-	if(LdotN > 1e-5 && dot(surface_normal, sunDir) > 1e-5)
+	if(LdotN > 1e-5 && dot(surface_normal, sun.dir) > 1e-5)
 	{
 		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
-		lighting += shadow * LdotN * sunDiffuseAndSpecular;
+		lighting += shadow * LdotN * sun.diffuse_specular;
 	}
 	color *= lighting;
 	float fogFactor;
 	{
-		float temp = fogDensity * max(0, view_dist - 30000);
+		float temp = fogDensity * max(0.0, view_dist - 30000.0);
 		fogFactor = exp(-temp * temp);
 	}
-	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
+	fragColor = fogFactor * color + (1.0 - fogFactor) * sun.sky_color;
 }

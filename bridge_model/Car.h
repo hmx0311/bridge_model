@@ -2,11 +2,13 @@
 #include <list>
 #include "glm.hpp"
 
+#include "shader_headers/scene_constances.h"
+
 constexpr float REACT_TIME = 0.8f;
 constexpr float CAR_LENGTH = 400;
 constexpr float CAR_LIGHT_V_COS_ANGLE = 0.994f;
 constexpr float CAR_LIGHT_ASPECT = 2.5f;
-constexpr float CAR_LIGHT_RANGE = 3200;
+constexpr float CAR_LIGHT_RANGE = 2 * LIGHT_MAP_GRID_LENGTH;
 
 constexpr glm::vec4 CAR_LEFT_LIGHT_POS(-45, 150, 72, 1);
 constexpr glm::vec4 CAR_RIGHT_LIGHT_POS(45, 150, 72, 1);

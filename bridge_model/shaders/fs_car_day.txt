@@ -1,12 +1,4 @@
-#include "shadow_day.glslh"
-
-layout(std140, binding = 1) uniform Sun
-{
-	vec3 sunDir;
-	vec3 sunAmbient;
-	vec3 sunDiffuseAndSpecular;
-	vec3 skyColor;
-};
+#include "lighting_day.glslh"
 
 struct Material
 {
@@ -39,30 +31,30 @@ void main()
 	{
 		material = materials[aMaterialIdx];
 	}
-	vec3 ambientAndDiffuseLighting = sunAmbient;
+	vec3 ambientAndDiffuseLighting = sun.ambient;
 	vec3 specularLighting = vec3(0.0);
 	float view_dist = length(modelPosView);
-	float LdotN = dot(sunDir, aNormal);
+	float LdotN = dot(sun.dir, aNormal);
 	vec3 dpdx = dFdx(modelPos);
 	vec3 dpdy = dFdy(modelPos);
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
-	if(LdotN > 1e-5 && dot(surface_normal, sunDir) > 1e-5)
+	if(LdotN > 1e-5 && dot(surface_normal, sun.dir) > 1e-5)
 	{
 		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
-		ambientAndDiffuseLighting += shadow * LdotN * sunDiffuseAndSpecular;
+		ambientAndDiffuseLighting += shadow * LdotN * sun.diffuse_specular;
 		if(material.shininess > 0)
 		{
-			vec3 halfway = normalize(sunDir + normalize(viewRay));
+			vec3 halfway = normalize(sun.dir + normalize(viewRay));
 			float HdotN = dot(halfway, aNormal);
 			if(HdotN > 0)
 			{
-				specularLighting = shadow * pow(HdotN, material.shininess) * sunDiffuseAndSpecular;
+				specularLighting = shadow * pow(HdotN, material.shininess) * sun.diffuse_specular;
 			}
 		}
 	}
 	vec3 color = ambientAndDiffuseLighting * material.ambientAndDiffuse + specularLighting * material.specular;
 	
-	float temp = fogDensity * max(0, length(viewRay) - 30000);
+	float temp = fogDensity * max(0.0, length(viewRay) - 30000.0);
 	float fogFactor = exp(-temp * temp);
-	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
+	fragColor = fogFactor * color + (1.0 - fogFactor) * sun.sky_color;
 }

@@ -107,9 +107,11 @@
     <ClInclude Include="mesh.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scene.h" />
+    <ClInclude Include="shader_headers\camera_defines.h" />
     <ClInclude Include="shader_headers\common_defines.h" />
-    <ClInclude Include="shader_headers\shadow_day.glslh" />
-    <ClInclude Include="shader_headers\shadow_day_defines.h" />
+    <ClInclude Include="shader_headers\scene_constances.h" />
+    <ClInclude Include="shader_headers\lighting_day.glslh" />
+    <ClInclude Include="shader_headers\lighting_day_defines.h" />
     <ClInclude Include="Sun.h" />
   </ItemGroup>
   <ItemGroup>
@@ -138,6 +140,7 @@
     <Text Include="shaders\vs_sun.txt" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shader_headers\lighting_night.glslh" />
     <None Include="textures\font_atlas_r8.raw" />
     <None Include="shaders\fs_text.txt" />
   </ItemGroup>

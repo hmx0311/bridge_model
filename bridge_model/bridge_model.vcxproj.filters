@@ -37,6 +37,9 @@
     <Filter Include="资源文件\shader_headers">
       <UniqueIdentifier>{0c56730f-f61e-449f-b9be-ebeafa266ec9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="资源文件\shader_headers\common_headers">
+      <UniqueIdentifier>{e04ed47e-6077-41cb-8012-43bfa4465dab}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bridge_model.cpp">
@@ -89,14 +92,20 @@
     <ClInclude Include="logical_frame.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="shader_headers\shadow_day.glslh">
+    <ClInclude Include="shader_headers\lighting_day.glslh">
       <Filter>资源文件\shader_headers</Filter>
     </ClInclude>
-    <ClInclude Include="shader_headers\shadow_day_defines.h">
-      <Filter>资源文件\shader_headers</Filter>
+    <ClInclude Include="shader_headers\camera_defines.h">
+      <Filter>资源文件\shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\common_defines.h">
-      <Filter>资源文件\shader_headers</Filter>
+      <Filter>资源文件\shader_headers\common_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_headers\lighting_day_defines.h">
+      <Filter>资源文件\shader_headers\common_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_headers\scene_constances.h">
+      <Filter>资源文件\shader_headers\common_headers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -172,6 +181,9 @@
     </None>
     <None Include="shaders\fs_text.txt">
       <Filter>资源文件\shaders</Filter>
+    </None>
+    <None Include="shader_headers\lighting_night.glslh">
+      <Filter>资源文件\shader_headers</Filter>
     </None>
   </ItemGroup>
 </Project>

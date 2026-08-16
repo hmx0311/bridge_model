@@ -1,15 +1,7 @@
-#define MAX_CAR_CNT 512
-#define LIGHT_MAP_SIZE_X 134
-#define LIGHT_MAP_SIZE_Y 122
-#define LIGHT_MAP_GRID_LENGTH 1600
+#include "scene_constances.h"
+#include "lighting_day_defines.h"
+#include "lighting_night.glslh"
 
-layout(std140, binding = 1) uniform Sun
-{
-	vec3 sunDir;
-	vec3 sunAmbient;
-	vec3 sunDiffuseAndSpecular;
-	vec3 skyColor;
-};
 layout(std430, binding = 3) buffer CarLightMap
 {
 	ivec2 lightIdx[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
@@ -39,7 +31,7 @@ void main()
 {
 	vec3 color = texture(texture0, aTexCoord).rgb;
 	
-	vec3 lighting = sunAmbient;
+	vec3 lighting = sun.ambient;
 	const int idxOffsets[9] = { -LIGHT_MAP_SIZE_Y - 1, -LIGHT_MAP_SIZE_Y, -LIGHT_MAP_SIZE_Y + 1, -1, 0, 1, LIGHT_MAP_SIZE_Y - 1, LIGHT_MAP_SIZE_Y, LIGHT_MAP_SIZE_Y + 1 };
 	vec3 offsetX = dFdx(modelPos);
 	vec3 offsetY = dFdy(modelPos);
@@ -86,15 +78,7 @@ void main()
 				coord.w = 0.5 * (coord.z / coord.w + 1.0);
 				coord.z = layer;
 				float shadow = texture(shadowTex, coord).x;
-				if(r2 > 0.84)
-				{
-					float t = (0.99 - r2) / 0.15;
-					intensity *= shadow * (3 - 2 * t) * t * t;
-				}
-				else
-				{
-					intensity *= shadow;
-				}
+				intensity *= shadow * lightSmooth(r2);
 				aveIntensity += intensity;
 			}
 		}
@@ -104,8 +88,8 @@ void main()
 	}
 	color *= lighting;
 	
-	float temp = fogDensity * max(0, length(modelPosView) - 30000);
+	float temp = fogDensity * max(0.0, length(modelPosView) - 30000.0);
 	float fogFactor = exp(-temp * temp);
-	fragColor = fogFactor * color + (1.0 - fogFactor) * skyColor;
+	fragColor = fogFactor * color + (1.0 - fogFactor) * sun.sky_color;
 	return;
 }

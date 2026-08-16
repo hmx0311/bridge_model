@@ -1,0 +1,12 @@
+float lightSmooth(float radius2)
+{
+	if(radius2 > 0.84)
+	{
+		float t = (0.99 - radius2) / 0.15;
+		return (3 - 2 * t) * t * t;
+	}
+	else
+	{
+		return 1;
+	}
+}

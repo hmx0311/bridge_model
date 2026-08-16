@@ -1,3 +1,5 @@
+#include "lighting_day_defines.h"
+
 uniform float horizonY;
 
 layout(pixel_center_integer) in vec4 gl_FragCoord;
@@ -5,17 +7,10 @@ layout(pixel_center_integer) in vec4 gl_FragCoord;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 brightColor;
 
-layout(std140, binding = 1) uniform Sun
-{
-	vec3 sunDir;
-	vec3 sunAmbient;
-	vec3 sunDiffuseAndSpecular;
-	vec3 skyColor;
-};
 
 void main()
 {
-	vec3 sunColor = 50.0 * sunDiffuseAndSpecular;
+	vec3 sun_color = 50.0 * sun.diffuse_specular;
 	if(gl_FragCoord.y < horizonY)
 	{
 		float sunPercentage = gl_FragCoord.y + 1 - horizonY;
@@ -23,12 +18,12 @@ void main()
 		{
 			discard;
 		}
-		sunColor *= sunPercentage;
-		fragColor = sunColor + (1 - sunPercentage) * skyColor;
+		sun_color *= sunPercentage;
+		fragColor = sun_color + (1 - sunPercentage) * sun.sky_color;
 	}
 	else
 	{
-		fragColor = sunColor;
+		fragColor = sun_color;
 	}
-	brightColor = sunColor;
+	brightColor = sun_color;
 }

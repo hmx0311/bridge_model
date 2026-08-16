@@ -1,10 +1,15 @@
+#ifndef COMMON_DEFINES_H
+#define COMMON_DEFINES_H
+
 #ifdef __cplusplus
 using glm::vec3;
 using glm::mat4;
-#endif
 
-#ifdef __cplusplus
-#define DECLARE_UNIFORM(name, position) struct name
+#define DECLARE_UNIFORM(type, name, position) \
+	constexpr int name##_binding = position;
 #else
-#define DECLARE_UNIFORM(name, position) layout(std140, binding = position) uniform name
-#endif
+#define alignas(x)
+#define DECLARE_UNIFORM(type, name, position) layout(std140, binding = position) uniform name##_block { type name; }
+#endif // __cplusplus
+
+#endif // !COMMON_DEFINES_H

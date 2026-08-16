@@ -4,6 +4,8 @@
 
 #include "common.h"
 
+#include "shader_headers/scene_constances.h"
+
 GLuint ground_VAO, ground_VBO, ground_EBO;
 GLuint bridge_VAO, bridge_VBO, bridge_EBO;
 GLuint car_VAO, car_VBO, car_EBO, car_transform_VBO, car_color_VBO;

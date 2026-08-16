@@ -1,9 +1,4 @@
-layout(std140, binding = 0) uniform View
-{
-	mat4 projection;
-	mat4 view;
-	mat4 inv_view;
-};
+#include "camera_defines.h"
 
 uniform int numLightOnCars;
 
@@ -24,8 +19,8 @@ out flat int instanceId;
 void main()
 {
 	modelPos = mat4x3(modelMat) * vec4(vertex, 1.0);
-	modelPosView = mat4x3(view) * vec4(modelPos, 1.0);
-	viewRay = inv_view[3].xyz - modelPos;
+	modelPosView = mat4x3(camera.view) * vec4(modelPos, 1.0);
+	viewRay = camera.inv_view[3].xyz - modelPos;
 	aNormal = mat3(modelMat) * normal;
 	aMaterialIdx = materialIdx;
 	instanceId = gl_InstanceID;
@@ -34,5 +29,5 @@ void main()
 		aMaterialIdx += 2;
 	}
 	carColor = color;
-	gl_Position = projection * vec4(modelPosView, 1.0);
+	gl_Position = camera.projection * vec4(modelPosView, 1.0);
 }

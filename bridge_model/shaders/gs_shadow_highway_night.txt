@@ -1,7 +1,4 @@
-#define MAX_CAR_CNT 512
-#define LIGHT_MAP_SIZE_X 134
-#define LIGHT_MAP_SIZE_Y 122
-#define LIGHT_MAP_GRID_LENGTH 1600
+#include "scene_constances.h"
 
 layout(triangles) in;
 

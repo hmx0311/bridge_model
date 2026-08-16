@@ -1,8 +1,5 @@
-layout(std140, binding = 0) uniform Matices
-{
-	mat4 projectionMat;
-	mat4 viewMat;
-};
+#include "camera_defines.h"
+
 layout(std140, binding = 1) uniform Sun
 {
 	vec3 sunDir;
@@ -17,5 +14,5 @@ layout(location = 0) in vec3 vertex;
 
 void main()
 {
-	gl_Position = projectionMat * vec4(mat3(viewMat) * (sunMat * vertex + 85600.0 * sunDir), 1.0);
+	gl_Position = camera.projection * vec4(mat3(camera.view) * (sunMat * vertex + 85600.0 * sunDir), 1.0);
 }

@@ -1,5 +1,4 @@
-#define MAX_CAR_CNT 512
-#define MAX_LIGHT_PER_CAR 24
+#include "scene_constances.h"
 
 layout(triangles) in;
 

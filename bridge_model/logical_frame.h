@@ -6,6 +6,8 @@
 
 #include "common.h"
 
+#include "shader_headers/scene_constances.h"
+
 extern std::mt19937 rd_eng;
 
 extern std::atomic<float> tick_rate;
