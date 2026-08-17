@@ -1,5 +1,4 @@
-#define TEXT_ALTAS_CNT_X 16
-#define TEXT_ALTAS_CNT_Y 6
+#include "text_altas_constances.h"
 
 uniform vec2 tex_offset;
 

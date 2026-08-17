@@ -1,4 +1,4 @@
-#include "scene_constances.h"
+#include "lighting_night_defines.h"
 
 layout(triangles) in;
 
@@ -8,22 +8,13 @@ out float gl_ClipDistance[4];
 in vec3 aNormal[];
 in int instanceId[];
 
-layout(std140, binding = 5) uniform CarLightShadow
-{
-	mat4 carLightShadowMat[2 * MAX_CAR_CNT];
-};
-layout(std430, binding = 6) buffer CarLighting
-{
-	int lightIdx[MAX_CAR_CNT * MAX_LIGHT_PER_CAR];
-};
-
 void main()
 {
 	int lightingOffset = instanceId[0] * MAX_LIGHT_PER_CAR;
-	int end = lightingOffset + 1 + lightIdx[lightingOffset];
+	int end = lightingOffset + 1 + car_lighting.light_indices[lightingOffset];
 	for(int i = lightingOffset + 1; i < end; i++)
 	{
-		int idx = lightIdx[i];
+		int idx = car_lighting.light_indices[i];
 		int layer = findMSB((idx >> 3) * 3 + 1) >> 1;
 		if(layer >= 4)
 		{
@@ -33,7 +24,7 @@ void main()
 		vec3 test[3];
 		for(int j = 0; j < 3; j++)
 		{
-			pos[j] = carLightShadowMat[idx] * gl_in[j].gl_Position;
+			pos[j] = car_light_shadow.view_proj[idx] * gl_in[j].gl_Position;
 			test[j]= pos[j].xyz / pos[j].w;
 		}
 		vec3 projNoraml = cross(test[1] - test[0], test[2] - test[0]);

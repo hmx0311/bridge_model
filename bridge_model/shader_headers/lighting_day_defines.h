@@ -1,6 +1,6 @@
 #include "common_defines.h"
-#ifndef SHADOW_DAY_DEFINES_H
-#define SHADOW_DAY_DEFINES_H
+#ifndef LIGHTING_DAY_DEFINES_H
+#define LIGHTING_DAY_DEFINES_H
 
 #define CSM_LEVELS 4
 #define MAX_PENUMBRA_RADIUS 100.0f
@@ -24,4 +24,4 @@ struct ShadowTransformData
 
 DECLARE_UNIFORM(ShadowTransformData, sun_shadow, 2);
 
-#endif // !SHADOW_DAY_DEFINES_H
+#endif // !LIGHTING_DAY_DEFINES_H

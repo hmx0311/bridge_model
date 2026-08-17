@@ -2,19 +2,6 @@
 #include "lighting_day_defines.h"
 #include "lighting_night.glslh"
 
-layout(std140, binding = 4) uniform carLights
-{
-	vec3 carLightPos[2 * MAX_CAR_CNT];
-};
-layout(std140, binding = 5) uniform CarLightShadow
-{
-	mat4 carLightShadowMat[2 * MAX_CAR_CNT];
-};
-layout(std430, binding = 6) buffer CarLighting
-{
-	int lightIdx[MAX_CAR_CNT * MAX_LIGHT_PER_CAR];
-};
-
 struct Material
 {
 	vec3 ambientAndDiffuse;
@@ -55,15 +42,15 @@ void main()
 	{
 		vec3 lighting = sun.ambient;
 		int lightingOffset = instanceId * MAX_LIGHT_PER_CAR;
-		int end = lightingOffset + 1 + lightIdx[lightingOffset];
+		int end = lightingOffset + 1 + car_lighting.light_indices[lightingOffset];
 		for(int i = lightingOffset + 1; i < end; i++)
 		{
-			int idx = lightIdx[i];
-			vec3 modelToLight = modelPos - carLightPos[idx];
+			int idx = car_lighting.light_indices[i];
+			vec3 modelToLight = modelPos - vec3(car_light.positions[idx]);
 			float lightDistance = length(modelToLight);
 			modelToLight /= lightDistance;
 			float intensity = -dot(modelToLight, aNormal) / (lightDistance * lightDistance);
-			vec4 modelPosLight = carLightShadowMat[idx] * vec4(modelPos, 1.0);
+			vec4 modelPosLight = car_light_shadow.view_proj[idx] * vec4(modelPos, 1.0);
 			modelPosLight.xy /= modelPosLight.w;
 			float r2 = dot(modelPosLight.xy, modelPosLight.xy);
 			if(lightDistance > 45 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r2 < 0.99)

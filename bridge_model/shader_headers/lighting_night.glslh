@@ -1,3 +1,5 @@
+#include "lighting_night_defines.h"
+
 float lightSmooth(float radius2)
 {
 	if(radius2 > 0.84)

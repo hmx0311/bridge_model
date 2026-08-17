@@ -109,9 +109,11 @@
     <ClInclude Include="scene.h" />
     <ClInclude Include="shader_headers\camera_defines.h" />
     <ClInclude Include="shader_headers\common_defines.h" />
+    <ClInclude Include="shader_headers\lighting_night_defines.h" />
     <ClInclude Include="shader_headers\scene_constances.h" />
     <ClInclude Include="shader_headers\lighting_day.glslh" />
     <ClInclude Include="shader_headers\lighting_day_defines.h" />
+    <ClInclude Include="shader_headers\text_altas_constances.h" />
     <ClInclude Include="Sun.h" />
   </ItemGroup>
   <ItemGroup>
