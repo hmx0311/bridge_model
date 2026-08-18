@@ -3,6 +3,8 @@
 #include "Lane.h"
 #include "logical_frame.h"
 
+#include "shader_headers/scene_constances.h"
+
 using namespace glm;
 
 static constexpr float ACCELERATION = 2.0f;
@@ -95,7 +97,7 @@ bool Car::update(float dt, float sun_height)
 		m_transform = cur_lane->transform(m_s);
 		m_dir = (mat3)m_transform * vec3(0, 1, 0);
 
-		if (sun_height > 0)
+		if (sun_height > -SUN_RADIUS_DIST_RATIO)
 		{
 			m_was_day = true;
 			m_is_light_on = false;
@@ -108,7 +110,7 @@ bool Car::update(float dt, float sun_height)
 		else if (m_was_day && !m_is_light_on)
 		{
 			std::uniform_real_distribution<float> distb(0, 0.3f);
-			if (distb(rd_eng) < dt * (-sun_height))
+			if (distb(rd_eng) < dt * (-sun_height - SUN_RADIUS_DIST_RATIO))
 			{
 				m_is_light_on = true;
 			}

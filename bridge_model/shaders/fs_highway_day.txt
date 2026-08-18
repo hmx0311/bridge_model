@@ -15,11 +15,11 @@ void main()
 	vec3 color = texture(texture0, aTexCoord).rgb;
 	vec3 lighting = sun.ambient;
 	vec3 normal = normalize(aNormal);
-	float LdotN = dot(sun.dir, normal);
+	float LdotN = dot(sun.light_dir, normal);
 	vec3 dpdx = dFdx(modelPos);
 	vec3 dpdy = dFdy(modelPos);
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
-	if(LdotN > 1e-5 && dot(surface_normal, sun.dir) > 1e-5)
+	if(LdotN > 1e-5 && dot(surface_normal, sun.light_dir) > 1e-5)
 	{
 		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
 		lighting += shadow * LdotN * sun.diffuse_specular;

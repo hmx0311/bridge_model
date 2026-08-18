@@ -8,7 +8,7 @@
 
 struct SunData
 {
-	alignas(16) vec3 dir;
+	alignas(16) vec3 light_dir;
 	alignas(16) vec3 ambient;
 	alignas(16) vec3 diffuse_specular;
 	alignas(16) vec3 sky_color;

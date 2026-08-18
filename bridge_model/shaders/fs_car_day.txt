@@ -34,17 +34,17 @@ void main()
 	vec3 ambientAndDiffuseLighting = sun.ambient;
 	vec3 specularLighting = vec3(0.0);
 	float view_dist = length(modelPosView);
-	float LdotN = dot(sun.dir, aNormal);
+	float LdotN = dot(sun.light_dir, aNormal);
 	vec3 dpdx = dFdx(modelPos);
 	vec3 dpdy = dFdy(modelPos);
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
-	if(LdotN > 1e-5 && dot(surface_normal, sun.dir) > 1e-5)
+	if(LdotN > 1e-5 && dot(surface_normal, sun.light_dir) > 1e-5)
 	{
 		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
 		ambientAndDiffuseLighting += shadow * LdotN * sun.diffuse_specular;
 		if(material.shininess > 0)
 		{
-			vec3 halfway = normalize(sun.dir + normalize(viewRay));
+			vec3 halfway = normalize(sun.light_dir + normalize(viewRay));
 			float HdotN = dot(halfway, aNormal);
 			if(HdotN > 0)
 			{

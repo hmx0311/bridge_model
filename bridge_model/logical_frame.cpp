@@ -11,6 +11,8 @@
 #include "Lane.h"
 #include "scene.h"
 
+#include "shader_headers/lighting_day_defines.h"
+
 using namespace glm;
 
 static constexpr ivec2 CAR_POS_MAP_SIZE = ivec2(54, 50);
@@ -457,7 +459,7 @@ void logicalFrame()
 		}
 		for (Car& car : vehicles)
 		{
-			constexpr float POS_OFFSET = -0.30f / CAR_POS_MAP_GRID_LENGTH + 0.005f;
+			constexpr float POS_OFFSET = -0.30f / CAR_POS_MAP_GRID_LENGTH + 0.5f;
 			ivec2 pos_idx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + POS_OFFSET * vec2(car.getDir()) + 0.5f * vec2(CAR_POS_MAP_SIZE) - 0.5f);
 			constexpr ivec2 OFFSET[4] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
 			for (int i = 0; i < 4; i++)
@@ -471,7 +473,7 @@ void logicalFrame()
 		}
 
 		logical_data[writing_data].num_cars = vehicles.size();
-		if (sun.getDir().z > 0)
+		if (sun.getDir().z > -SUN_RADIUS_DIST_RATIO)
 		{
 			int num_cars = 0;
 			for (Car& car : vehicles)

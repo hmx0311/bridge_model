@@ -48,7 +48,7 @@ uint64_t last_time_us;
 
 #define MAX_HEIGHT 5.0f
 constexpr int HEIGHT_MAP_SIZE = 256;
-constexpr vec4 HEIGHT_MAP_AREA = { -102.4, 128.0, 102.4, -76.8 };
+constexpr vec4 HEIGHT_MAP_AREA = { -102.4f, -76.8f, 102.4f, 128.0f };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
 
 GLuint multisample_render_FBO;
@@ -102,7 +102,7 @@ CameraData camera;
 float horizon_y;
 vec3 CSM_areas[CSM_LEVELS][12];
 ShadowTransformData sun_shadow;
-const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 0.5f, 0.f + 2 * LIGHT_MAP_GRID_LENGTH);
+const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 0.5f, 0.5f + 2 * LIGHT_MAP_GRID_LENGTH);
 
 int num_active_car_light_map_grids = 0;
 float car_light_map_grid_distance2_to_view[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
@@ -433,7 +433,7 @@ static void buildHeightMap()
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
 	glViewport(0, 0, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.w, 0.0f, MAX_HEIGHT) *
+	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.w, 0.0f, MAX_HEIGHT) *
 		lookAt(vec3(0, 0, MAX_HEIGHT), vec3(0, 0, 0), vec3(0, 1, 0));
 	vec4 v(FLT_MAX);
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(vec4), &v);
@@ -803,8 +803,8 @@ static void drawGraphics()
 		vec3 eye = focus - view_distance * view_dir;
 		if (eye.z < FOCUS_HEIGHT + MAX_HEIGHT)
 		{
-			vec2 height_map_coord((eye.x - HEIGHT_MAP_AREA.x) / (HEIGHT_MAP_AREA.y - HEIGHT_MAP_AREA.x) * HEIGHT_MAP_SIZE - 0.5f,
-				(eye.y - HEIGHT_MAP_AREA.w) / (HEIGHT_MAP_AREA.z - HEIGHT_MAP_AREA.w) * HEIGHT_MAP_SIZE - 0.5f);
+			vec2 height_map_coord((eye.x - HEIGHT_MAP_AREA.x) / (HEIGHT_MAP_AREA.z - HEIGHT_MAP_AREA.x) * HEIGHT_MAP_SIZE - 0.5f,
+				(eye.y - HEIGHT_MAP_AREA.y) / (HEIGHT_MAP_AREA.w - HEIGHT_MAP_AREA.y) * HEIGHT_MAP_SIZE - 0.5f);
 			if (0 < height_map_coord.x && height_map_coord.x < HEIGHT_MAP_SIZE - 1 && 0 < height_map_coord.y && height_map_coord.y < HEIGHT_MAP_SIZE - 1)
 			{
 				float height_offset = height_map[int(height_map_coord.y)][int(height_map_coord.x)] * (int(height_map_coord.x) + 1 - height_map_coord.x) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
@@ -1068,28 +1068,47 @@ static void drawGraphics()
 	}
 
 	SunData sun;
-	sun.dir = logical_data.sun_dir;
-	sun.ambient = vec3(0.01f);
-	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e4f;
-	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.dir.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.dir.z * sun.dir.z)));
-	sun.diffuse_specular = 0.5f * vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
-	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
-	if (sun.dir.z > -0.2f)
+	sun.light_dir = logical_data.sun_dir;
+	sun.diffuse_specular = vec3(0.5);
+	if (-SUN_RADIUS_DIST_RATIO < logical_data.sun_dir.z && logical_data.sun_dir.z < SUN_RADIUS_DIST_RATIO)
 	{
-		sun.ambient += vec3((sun.dir.z + 0.2f) * 0.1f);
-		sun.sky_color += (sun.dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
+		float x = -logical_data.sun_dir.z / SUN_RADIUS_DIST_RATIO;
+		float sqrt_one_minus_x2 = sqrt(1 - x * x);
+		float area_unit = 0.5 * pi<float>() - (sqrt_one_minus_x2 * x + asin(x));
+		if (area_unit < sqrt_one_minus_x2 * (1 - x))
+		{
+			area_unit = sqrt_one_minus_x2 * (1 - x);
+		}
+		else if (area_unit > pi<float>() - sqrt_one_minus_x2 * (x + 1))
+		{
+			area_unit = pi<float>() - sqrt_one_minus_x2 * (x + 1);
+		}
+		float area_percent = area_unit / pi<float>();
+		sun.diffuse_specular *= area_percent;
+		sun.light_dir.z += (2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 / (3 * area_unit)) * SUN_RADIUS_DIST_RATIO;
+		sun.light_dir = normalize(sun.light_dir);
+	}
+	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e4f;
+	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.light_dir.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.light_dir.z * sun.light_dir.z)));
+	sun.diffuse_specular *= vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
+	sun.ambient = vec3(0.01f);
+	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
+	if (sun.light_dir.z > -0.2f)
+	{
+		sun.ambient += vec3((sun.light_dir.z + 0.2f) * 0.1f);
+		sun.sky_color += (sun.light_dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
 	}
 
 	int num_visible_cars;
 	int num_visible_light_on_cars;
 	int num_visible_car_lights;
 
-	if (sun.dir.z > 0)
+	if (sun.light_dir.z > 0)
 	{
 		num_visible_cars = logical_data.num_cars;
-		mat4 sun_mat = lookAt(vec3(0.0f), -vec3(sun.dir), vec3(-sun.dir.x, -sun.dir.y, sun.dir.z));
+		mat4 sun_mat = lookAt(vec3(0.0f), -vec3(sun.light_dir), vec3(-sun.light_dir.x, -sun.light_dir.y, sun.light_dir.z));
 		float z_far = FLT_MAX;
-		float slope = sqrt(1.0f / (sun.dir.z * sun.dir.z) - 1.0f);
+		float slope = sqrt(1.0f / (sun.light_dir.z * sun.light_dir.z) - 1.0f);
 		float x_max[CSM_LEVELS], x_min[CSM_LEVELS], y_max[CSM_LEVELS], y_min[CSM_LEVELS], z_fars[CSM_LEVELS];
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
@@ -1146,7 +1165,7 @@ static void drawGraphics()
 			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
 			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_max[i] - x_min[i]));
 			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_max[i] - y_min[i]));
-			float z_near = std::min(MAX_HEIGHT / sun.dir.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
+			float z_near = std::min(MAX_HEIGHT / sun.light_dir.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
 			float z_padding = std::max(x_padding / (x_max[i] - x_min[i]), y_padding / (y_max[i] - y_min[i])) * (z_near - z_fars[i]);
 			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding,	y_min[i] - y_padding, y_max[i] + y_padding,	-z_near, -z_fars[i] + z_padding);
 			shadow_mat = shadow_mat * sun_mat;
@@ -1223,7 +1242,7 @@ static void drawGraphics()
 		int num_car_lights = 2 * logical_data.num_light_on_cars;
 		for (int i = 0; i < num_car_lights; i++)
 		{
-			constexpr float POS_OFFSET = 0.5f / LIGHT_MAP_GRID_LENGTH + 0.01f;
+			constexpr float POS_OFFSET = 0.5f / LIGHT_MAP_GRID_LENGTH + 1.0f;
 			vec4 light_pos = logical_data.car_light_pos[i];
 			vec4 light_dir = logical_data.car_light_dir[i];
 			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(light_pos) + POS_OFFSET * vec2(light_dir) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
@@ -1285,7 +1304,7 @@ static void drawGraphics()
 	}
 
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(SunData), &sun);
-	if (sun.dir.z > 0)
+	if (sun.light_dir.z > 0)
 	{
 		glNamedBufferSubData(shadow_UBO, 0, sizeof(sun_shadow), &sun_shadow);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_cars * sizeof(mat4), logical_data.car_transform);
@@ -1303,17 +1322,18 @@ static void drawGraphics()
 		glNamedBufferSubData(car_color_VBO, num_visible_light_on_cars * sizeof(vec3), (num_visible_cars - num_visible_light_on_cars) * sizeof(vec3), &logical_data.car_color[logical_data.num_light_on_cars]);
 		glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "numLightOnCars"), num_visible_light_on_cars);
 	}
-	if (sun.dir.z > -0.2f)
+	if (sun.light_dir.z > -0.2f)
 	{
-		mat3 sun_mat = rotate(acos(sun.dir.z), vec3(-sun.dir.y, sun.dir.x, 0));
-		glProgramUniformMatrix3fv(SP_sun, glGetUniformLocation(SP_sun, "rotation"), 1, GL_FALSE, (GLfloat*)&sun_mat);
+		mat4x3 transform = rotate(acos(sun.light_dir.z), vec3(-sun.light_dir.y, sun.light_dir.x, 0));
+		transform[3] = 4.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir;
+		glProgramUniformMatrix4x3fv(SP_sun, glGetUniformLocation(SP_sun, "transform"), 1, GL_FALSE, (GLfloat*)&transform);
 	}
 
 	glBindTextureUnit(0, highway_tex);
 	glBindTextureUnit(1, shadow_tex);
 	glBindTextureUnit(2, shadow_tex);
 	glEnable(GL_DEPTH_TEST);
-	if (sun.dir.z > 0)
+	if (sun.light_dir.z > 0)
 	{
 		glBindSampler(1, shadow_PCF_sampler);
 		glBindSampler(2, shadow_depth_sampler);
@@ -1389,7 +1409,7 @@ static void drawGraphics()
 		glBindVertexArray(car_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 	}
-	if (sun.dir.z > -0.2f)
+	if (sun.light_dir.z > -0.2f)
 	{
 		glUseProgram(SP_sun);
 		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };

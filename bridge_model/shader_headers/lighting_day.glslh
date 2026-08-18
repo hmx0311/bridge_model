@@ -1,6 +1,6 @@
+#include "scene_constances.h"
 #include "lighting_day_defines.h"
 
-#define SUN_RADIUS_DIST_RATIO (1.0f / 214)
 #define NUM_BLOCKER_SAMPLE 32
 
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
