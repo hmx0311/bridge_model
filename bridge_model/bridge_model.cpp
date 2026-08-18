@@ -29,17 +29,16 @@ GLuint shadow_PCF_sampler;
 GLuint shadow_depth_sampler;
 
 constexpr float FOVY = pi<float>() / 4;
-constexpr float VIEW_Z_NEAR = 90.0f;
-constexpr float VIEW_Z_FAR = 90000.0f;
-constexpr float FOCUS_HEIGHT = 200;
-constexpr float MIN_VIEW_DISTANCE = 200;
-constexpr float MAX_VIEW_DISTANCE = 25000;
-constexpr float MIN_SHADOW_FAR = 369.5f;
-constexpr float FOG_DENSITY = 0.00003f;
+constexpr float VIEW_Z_NEAR = 0.9f;
+constexpr float VIEW_Z_FAR = 900.0f;
+constexpr float FOCUS_HEIGHT = 2.0f;
+constexpr float MIN_VIEW_DISTANCE = 2.0f;
+constexpr float MAX_VIEW_DISTANCE = 250.0f;
+constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
 
-float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 15000;
+float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 150.0f;
 float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
 vec3 focus(0);
 uint32_t focus_move_dir = 0;
@@ -47,9 +46,9 @@ bool show_fps = false;
 bool need_update_view = true;
 uint64_t last_time_us;
 
-#define MAX_HEIGHT 500
+#define MAX_HEIGHT 5.0f
 constexpr int HEIGHT_MAP_SIZE = 256;
-constexpr RECT HEIGHT_MAP_AREA = { -10240, 12800, 10240, -7680 };
+constexpr vec4 HEIGHT_MAP_AREA = { -102.4, 128.0, 102.4, -76.8 };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
 
 GLuint multisample_render_FBO;
@@ -73,21 +72,17 @@ GLuint text_atlas_tex;
 
 /*
 * binding = 0
-*	mat4 projection_mat
-*	mat4 view
-*	mat4 inv_view_mat
+*	CameraData camera
 *
 * binding = 1
-*	vec4 sun_direction
-*	vec4 sun_ambient
-*	vec4 sun_diffuse_and_specular
-*	vec4 sky_color
+*	SunData sun;
 */
 GLuint scene_UBO;
 GLintptr scene_UBO_offset1;
 
 /*
 * binding = 2
+*	ShadowTransformData sun_shadow;
 *	mat4 view_proj[CSM_LEVELS];
 *	mat4 tex[CSM_LEVELS];
 */
@@ -107,7 +102,7 @@ CameraData camera;
 float horizon_y;
 vec3 CSM_areas[CSM_LEVELS][12];
 ShadowTransformData sun_shadow;
-const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 50.0f, 50.0f + 2 * LIGHT_MAP_GRID_LENGTH);
+const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 0.5f, 0.f + 2 * LIGHT_MAP_GRID_LENGTH);
 
 int num_active_car_light_map_grids = 0;
 float car_light_map_grid_distance2_to_view[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
@@ -164,7 +159,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 		int len = sizes[i];
 		int j = 0;
 		int comment_type = 0;
-		int line_cnt = 0;
+		int line_cnt = 1;
 		while (j < len)
 		{
 			if (source[j] == '\n')
@@ -217,6 +212,18 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 						}
 					} while (source[j] != '\"');
 					int name_len = j - name_begin;
+					for(j++; j < len; j++)
+					{
+						if (source[j] == '\n')
+						{
+							break;
+						}
+						if (!isspace(source[j]))
+						{
+							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
+							return 0;
+						}
+					}
 					bool included = false;
 					for(int k = i; k < sources.size(); k++)
 					{
@@ -244,7 +251,6 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 						sources.insert(sources.begin() + i + 1, static_cast<const char*>(LockResource(rc_data)));
 						source_names.insert(source_names.begin() + i + 1, { source + name_begin, name_len });
 					}
-					j++;
 					len -= j;
 					source = &source[j];
 					sizes[i] = len;
@@ -366,8 +372,6 @@ static void initShader()
 	glDeleteShader(VS_highway);
 	glDeleteShader(FS_highway_day);
 	glDeleteShader(FS_highway_night);
-	glProgramUniform1f(SP_highway_day, glGetUniformLocation(SP_highway_day, "fogDensity"), FOG_DENSITY);
-	glProgramUniform1f(SP_highway_night, glGetUniformLocation(SP_highway_night, "fogDensity"), FOG_DENSITY);
 
 	GLuint VS_car = loadShader(IDR_VS_CAR, GL_VERTEX_SHADER);
 	GLuint FS_car_day = loadShader(IDR_FS_CAR_DAY, GL_FRAGMENT_SHADER);
@@ -377,8 +381,6 @@ static void initShader()
 	glDeleteShader(VS_car);
 	glDeleteShader(FS_car_day);
 	glDeleteShader(FS_car_night);
-	glProgramUniform1f(SP_car_day, glGetUniformLocation(SP_car_day, "fogDensity"), FOG_DENSITY);
-	glProgramUniform1f(SP_car_night, glGetUniformLocation(SP_car_night, "fogDensity"), FOG_DENSITY);
 
 	GLuint VS_sun = loadShader(IDR_VS_SUN, GL_VERTEX_SHADER);
 	GLuint FS_sun = loadShader(IDR_FS_SUN, GL_FRAGMENT_SHADER);
@@ -431,7 +433,7 @@ static void buildHeightMap()
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
 	glViewport(0, 0, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	mat4 height_mat = ortho(float(HEIGHT_MAP_AREA.left), float(HEIGHT_MAP_AREA.right), float(HEIGHT_MAP_AREA.bottom), float(HEIGHT_MAP_AREA.top), 0.0f, float(MAX_HEIGHT)) *
+	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.w, 0.0f, MAX_HEIGHT) *
 		lookAt(vec3(0, 0, MAX_HEIGHT), vec3(0, 0, 0), vec3(0, 1, 0));
 	vec4 v(FLT_MAX);
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(vec4), &v);
@@ -563,19 +565,19 @@ static void init()
 
 	glGenBuffers(1, &car_light_map_SSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_light_map_SSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_light_map), nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_light_map), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, car_light_map_binding, car_light_map_SSBO, 0, sizeof(car_light_map));
 	glGenBuffers(1, &car_light_pos_UBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, car_light_pos_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(car_light_pos), nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(car_light_pos), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, car_light_binding, car_light_pos_UBO, 0, sizeof(car_light_pos));
 	glGenBuffers(1, &car_light_shadow_mat_UBO);
 	glBindBuffer(GL_UNIFORM_BUFFER, car_light_shadow_mat_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_UNIFORM_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, car_light_shadow_binding, car_light_shadow_mat_UBO, 0, sizeof(CarLightShadowTransformData));
 	glGenBuffers(1, &car_lighting_SSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_lighting_SSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_lightings), nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, car_lighting_binding, car_lighting_SSBO, 0, sizeof(car_lightings));
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
@@ -714,11 +716,11 @@ static void drawGraphics()
 		if (dir != vec2(0.0f))
 		{
 			dir = normalize(dir);
-			float move_speed = 1.0f * view_distance + 1000.0f;
+			float move_speed = 1.0f * view_distance + 10.0f;
 			float move_distance = move_speed * 1e-6f * dt_us;
 			vec3 new_focus = focus + vec3(dir.x * move_distance, dir.y * move_distance, 0);
-			new_focus.x = clamp(new_focus.x, -30000.0f, 30000.0f);
-			new_focus.y = clamp(new_focus.y, -10000.0f, 20000.0f);
+			new_focus.x = clamp(new_focus.x, -300.0f, 300.0f);
+			new_focus.y = clamp(new_focus.y, -100.0f, 200.0f);
 			if (focus != new_focus)
 			{
 				need_update_view = true;
@@ -801,8 +803,8 @@ static void drawGraphics()
 		vec3 eye = focus - view_distance * view_dir;
 		if (eye.z < FOCUS_HEIGHT + MAX_HEIGHT)
 		{
-			vec2 height_map_coord((eye.x - HEIGHT_MAP_AREA.left) / (HEIGHT_MAP_AREA.right - HEIGHT_MAP_AREA.left) * HEIGHT_MAP_SIZE - 0.5f,
-				(eye.y - HEIGHT_MAP_AREA.bottom) / (HEIGHT_MAP_AREA.top - HEIGHT_MAP_AREA.bottom) * HEIGHT_MAP_SIZE - 0.5f);
+			vec2 height_map_coord((eye.x - HEIGHT_MAP_AREA.x) / (HEIGHT_MAP_AREA.y - HEIGHT_MAP_AREA.x) * HEIGHT_MAP_SIZE - 0.5f,
+				(eye.y - HEIGHT_MAP_AREA.w) / (HEIGHT_MAP_AREA.z - HEIGHT_MAP_AREA.w) * HEIGHT_MAP_SIZE - 0.5f);
 			if (0 < height_map_coord.x && height_map_coord.x < HEIGHT_MAP_SIZE - 1 && 0 < height_map_coord.y && height_map_coord.y < HEIGHT_MAP_SIZE - 1)
 			{
 				float height_offset = height_map[int(height_map_coord.y)][int(height_map_coord.x)] * (int(height_map_coord.x) + 1 - height_map_coord.x) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
@@ -1068,8 +1070,8 @@ static void drawGraphics()
 	SunData sun;
 	sun.dir = logical_data.sun_dir;
 	sun.ambient = vec3(0.01f);
-	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e6f;
-	float absorb_factor = -1e-7f * (-EARTH_RADIUS * sun.dir.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.dir.z * sun.dir.z)));
+	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e4f;
+	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.dir.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.dir.z * sun.dir.z)));
 	sun.diffuse_specular = 0.5f * vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
 	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
 	if (sun.dir.z > -0.2f)
@@ -1221,7 +1223,7 @@ static void drawGraphics()
 		int num_car_lights = 2 * logical_data.num_light_on_cars;
 		for (int i = 0; i < num_car_lights; i++)
 		{
-			constexpr float POS_OFFSET = 50.0f / LIGHT_MAP_GRID_LENGTH + 1.0f;
+			constexpr float POS_OFFSET = 0.5f / LIGHT_MAP_GRID_LENGTH + 0.01f;
 			vec4 light_pos = logical_data.car_light_pos[i];
 			vec4 light_dir = logical_data.car_light_dir[i];
 			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(light_pos) + POS_OFFSET * vec2(light_dir) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
@@ -1304,7 +1306,7 @@ static void drawGraphics()
 	if (sun.dir.z > -0.2f)
 	{
 		mat3 sun_mat = rotate(acos(sun.dir.z), vec3(-sun.dir.y, sun.dir.x, 0));
-		glProgramUniformMatrix3fv(SP_sun, glGetUniformLocation(SP_sun, "sunMat"), 1, GL_FALSE, (GLfloat*)&sun_mat);
+		glProgramUniformMatrix3fv(SP_sun, glGetUniformLocation(SP_sun, "rotation"), 1, GL_FALSE, (GLfloat*)&sun_mat);
 	}
 
 	glBindTextureUnit(0, highway_tex);

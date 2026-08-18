@@ -3,7 +3,7 @@
 #define LIGHTING_DAY_DEFINES_H
 
 #define CSM_LEVELS 4
-#define MAX_PENUMBRA_RADIUS 100.0f
+#define MAX_PENUMBRA_RADIUS 1.0f
 #define MIN_SHADOW_MAP_PADDING 0.02f
 
 struct SunData

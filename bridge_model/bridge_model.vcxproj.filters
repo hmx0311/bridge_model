@@ -107,6 +107,12 @@
     <ClInclude Include="shader_headers\scene_constances.h">
       <Filter>资源文件\shader_headers\common_headers</Filter>
     </ClInclude>
+    <ClInclude Include="shader_headers\text_altas_constances.h">
+      <Filter>资源文件\shader_headers\common_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="shader_headers\lighting_night_defines.h">
+      <Filter>资源文件\shader_headers\common_headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="bridge_model.rc">
@@ -183,6 +189,9 @@
       <Filter>资源文件\shaders</Filter>
     </None>
     <None Include="shader_headers\lighting_night.glslh">
+      <Filter>资源文件\shader_headers</Filter>
+    </None>
+    <None Include="shader_headers\fog.glslh">
       <Filter>资源文件\shader_headers</Filter>
     </None>
   </ItemGroup>

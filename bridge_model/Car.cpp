@@ -5,9 +5,9 @@
 
 using namespace glm;
 
-static constexpr float ACCELERATION = 200.0f;	// cm/s^2
-static constexpr float BREAK_INTENSITY = 400.f;	// cm/s^2
-static constexpr float BREAK_DISTANCE = 12000;
+static constexpr float ACCELERATION = 2.0f;
+static constexpr float BREAK_INTENSITY = 4.0f;
+static constexpr float BREAK_DISTANCE = 120.0f;
 
 
 Car::Car(Lane* lane, float sun_height)
@@ -127,7 +127,7 @@ bool Car::update(float dt, float sun_height)
 
 void Car::collisionTest(Car* test_car)
 {
-	if (this == test_car || abs(m_transform[3].z - test_car->m_transform[3].z) > 200)
+	if (this == test_car || abs(m_transform[3].z - test_car->m_transform[3].z) > 2.0f)
 	{
 		return;
 	}

@@ -1,6 +1,7 @@
 #include "scene_constances.h"
 #include "lighting_day_defines.h"
 #include "lighting_night.glslh"
+#include "fog.glslh"
 
 struct Material
 {
@@ -9,7 +10,6 @@ struct Material
 	int shininess;
 };
 uniform Material materials[7];
-uniform float fogDensity;
 
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 
@@ -53,7 +53,7 @@ void main()
 			vec4 modelPosLight = car_light_shadow.view_proj[idx] * vec4(modelPos, 1.0);
 			modelPosLight.xy /= modelPosLight.w;
 			float r2 = dot(modelPosLight.xy, modelPosLight.xy);
-			if(lightDistance > 45 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r2 < 0.99)
+			if(lightDistance > 0.45 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r2 < 0.99)
 			{
 				if(material.shininess > 0)
 				{
@@ -73,16 +73,15 @@ void main()
 				modelPosLight.w = 0.5 * (modelPosLight.z / modelPosLight.w + 1.0);
 				modelPosLight.z = layer;
 				intensity *= texture(shadowTex, modelPosLight).x;
-				const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 500000;
+				const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 50;
 				lighting += intensity * carLightColor;
 			}
 		}
 		color *= lighting;
 	}
 
-	float temp = fogDensity * max(0.0, length(viewRay) - 30000.0);
-	float fogFactor = exp(-temp * temp);
-	color = fogFactor * color + (1.0 - fogFactor) * sun.sky_color;
+	float fog_factor = fogFactor(length(viewRay));
+	color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
 	fragColor = color;
 	bloomColor = maxColor > 1 ? color : vec3(0.0);
 }

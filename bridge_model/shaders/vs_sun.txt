@@ -1,11 +1,11 @@
 #include "camera_defines.h"
 #include "lighting_day_defines.h"
 
-uniform mat3 sunMat;
+uniform mat3 rotation;
 
-layout(location = 0) in vec3 vertex;
+layout(location = 0) in vec2 vertex;
 
 void main()
 {
-	gl_Position = camera.projection * vec4(mat3(camera.view) * (sunMat * vertex + 85600.0 * sun.dir), 1.0);
+	gl_Position = camera.projection * vec4(mat3(camera.view) * (rotation * vec3(vertex, 0.0) + 856.0 * sun.dir), 1.0);
 }

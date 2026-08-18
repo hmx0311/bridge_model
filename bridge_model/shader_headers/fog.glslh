@@ -1,0 +1,11 @@
+#define FOG_DENSITY 0.003f
+
+float fogFactor(float distance)
+{
+	float fog_factor;
+	{
+		float temp = FOG_DENSITY * max(0.0, distance - 300.0);
+		fog_factor = exp(-temp * temp);
+	}
+	return fog_factor;
+}

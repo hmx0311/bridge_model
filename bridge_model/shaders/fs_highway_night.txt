@@ -1,8 +1,7 @@
 #include "scene_constances.h"
 #include "lighting_day_defines.h"
 #include "lighting_night.glslh"
-
-uniform float fogDensity;
+#include "fog.glslh"
 
 layout(binding = 0) uniform sampler2D texture0;
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
@@ -70,13 +69,12 @@ void main()
 			}
 		}
 		aveIntensity /= 4;
-		const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 500000;
+		const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 50;
 		lighting += aveIntensity * carLightColor;
 	}
 	color *= lighting;
 	
-	float temp = fogDensity * max(0.0, length(modelPosView) - 30000.0);
-	float fogFactor = exp(-temp * temp);
-	fragColor = fogFactor * color + (1.0 - fogFactor) * sun.sky_color;
+	float fog_factor = fogFactor(length(modelPosView));
+	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
 	return;
 }

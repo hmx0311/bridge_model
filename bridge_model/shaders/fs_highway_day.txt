@@ -1,6 +1,5 @@
 #include "lighting_day.glslh"
-
-uniform float fogDensity;
+#include "fog.glslh"
 
 layout(binding = 0) uniform sampler2D texture0;
 
@@ -16,7 +15,6 @@ void main()
 	vec3 color = texture(texture0, aTexCoord).rgb;
 	vec3 lighting = sun.ambient;
 	vec3 normal = normalize(aNormal);
-	float view_dist = length(modelPosView);
 	float LdotN = dot(sun.dir, normal);
 	vec3 dpdx = dFdx(modelPos);
 	vec3 dpdy = dFdy(modelPos);
@@ -27,10 +25,6 @@ void main()
 		lighting += shadow * LdotN * sun.diffuse_specular;
 	}
 	color *= lighting;
-	float fogFactor;
-	{
-		float temp = fogDensity * max(0.0, view_dist - 30000.0);
-		fogFactor = exp(-temp * temp);
-	}
-	fragColor = fogFactor * color + (1.0 - fogFactor) * sun.sky_color;
+	float fog_factor = fogFactor(length(modelPosView));
+	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
 }
