@@ -333,35 +333,35 @@ static GLuint loadShader(const char* shader_name, GLenum type)
 	return shader;
 }
 
-static GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
+static GLuint linkShaderProgram(GLuint vert, GLuint frag, GLuint geom = 0)
 {
 	GLint status;
-	GLuint sp = glCreateProgram();
-	glAttachShader(sp, vs);
-	glAttachShader(sp, fs);
-	if (gs != 0)
+	GLuint program = glCreateProgram();
+	glAttachShader(program, vert);
+	glAttachShader(program, frag);
+	if (geom != 0)
 	{
-		glAttachShader(sp, gs);
+		glAttachShader(program, geom);
 	}
-	glLinkProgram(sp);
-	glGetProgramiv(sp, GL_LINK_STATUS, &status);
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &status);
 	if (status == GL_FALSE)
 	{
-		printf("\nERROR: Shader Program %d Link Error\n", sp);
+		printf("\nERROR: Shader Program %d Link Error\n", program);
 		int len;
-		glGetProgramiv(sp, GL_INFO_LOG_LENGTH, &len);
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
 		char* log = new char[len];
-		glGetProgramInfoLog(sp, len, nullptr, log);
+		glGetProgramInfoLog(program, len, nullptr, log);
 		printf("%s", log);
 		delete[] log;
 	}
-	glDetachShader(sp, vs);
-	glDetachShader(sp, fs);
-	if (gs != 0)
+	glDetachShader(program, vert);
+	glDetachShader(program, frag);
+	if (geom != 0)
 	{
-		glDetachShader(sp, gs);
+		glDetachShader(program, geom);
 	}
-	return sp;
+	return program;
 }
 
 static void initShader()
@@ -1086,8 +1086,13 @@ static void drawGraphics()
 			area_unit = pi<float>() - sqrt_one_minus_x2 * (x + 1);
 		}
 		float area_percent = area_unit / pi<float>();
+		float center = 2.f / 3.f * sqrt_one_minus_x2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 / area_unit;
+		if (center < x + (1 - x) / 3)
+		{
+			center = x + (1 - x) / 3;
+		}
 		sun.diffuse_specular *= area_percent;
-		sun.light_dir.z += (2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 / (3 * area_unit)) * SUN_RADIUS_DIST_RATIO;
+		sun.light_dir.z += center * SUN_RADIUS_DIST_RATIO;
 		sun.light_dir = normalize(sun.light_dir);
 	}
 	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e4f;
