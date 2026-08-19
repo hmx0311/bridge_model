@@ -1,7 +1,7 @@
 #include "lighting_day.glslh"
 #include "fog.glslh"
 
-layout(binding = 0) uniform sampler2D texture0;
+layout(binding = 0) uniform sampler2D albedo;
 
 in vec3 modelPos;
 in vec3 modelPosView;
@@ -12,7 +12,7 @@ out vec3 fragColor;
 
 void main()
 {
-	vec3 color = texture(texture0, aTexCoord).rgb;
+	vec3 color = texture(albedo, aTexCoord).rgb;
 	vec3 lighting = sun.ambient;
 	vec3 normal = normalize(aNormal);
 	float LdotN = dot(sun.light_dir, normal);

@@ -3,7 +3,7 @@
 
 struct Material
 {
-	vec3 ambientAndDiffuse;
+	vec3 albedo;
 	vec3 specular;
 	int shininess;
 };
@@ -23,7 +23,7 @@ void main()
 	Material material;
 	if(aMaterialIdx < 0)
 	{
-		material.ambientAndDiffuse = carColor;
+		material.albedo = carColor;
 		material.specular = vec3(0.0);
 		material.shininess = 0;
 	}
@@ -31,8 +31,7 @@ void main()
 	{
 		material = materials[aMaterialIdx];
 	}
-	vec3 ambientAndDiffuseLighting = sun.ambient;
-	vec3 specularLighting = vec3(0.0);
+	vec3 color = material.albedo * sun.ambient;
 	float view_dist = length(modelPosView);
 	float LdotN = dot(sun.light_dir, aNormal);
 	vec3 dpdx = dFdx(modelPos);
@@ -40,19 +39,19 @@ void main()
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
 	if(LdotN > 1e-5 && dot(surface_normal, sun.light_dir) > 1e-5)
 	{
-		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
-		ambientAndDiffuseLighting += shadow * LdotN * sun.diffuse_specular;
+		float specular_factor = 0.0;
 		if(material.shininess > 0)
 		{
 			vec3 halfway = normalize(sun.light_dir + normalize(viewRay));
 			float HdotN = dot(halfway, aNormal);
 			if(HdotN > 0)
 			{
-				specularLighting = shadow * pow(HdotN, material.shininess) * sun.diffuse_specular;
+				specular_factor = pow(HdotN, material.shininess);
 			}
 		}
+		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN + specular_factor);
+		color += (shadow * LdotN * material.albedo + shadow * specular_factor * material.specular) * sun.diffuse_specular;
 	}
-	vec3 color = ambientAndDiffuseLighting * material.ambientAndDiffuse + specularLighting * material.specular;
 	
 	float fog_factor = fogFactor(length(viewRay));
 	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;

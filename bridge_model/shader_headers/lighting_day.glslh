@@ -6,7 +6,7 @@
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 layout(binding = 2) uniform sampler2DArray shadow_tex_depth;
 
-float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float LdotN)
+float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float sample_cnt_factor)
 {
 	float shadow = 1.0;
 	int level;
@@ -125,7 +125,7 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 				}
 				uint pixelSeed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
 				pixelSeed = (pixelSeed ^ 0x9e3779b9u) * 0x85ebca6bu;
-				int sample_cnt = max(8, int(10 * LdotN * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
+				int sample_cnt = max(8, int(20 * sample_cnt_factor * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
 				for (int idx = 0; idx < sample_cnt; idx++)
 				{
 					uint scrambledIdx = uint(idx) ^ pixelSeed;

@@ -3,7 +3,7 @@
 #include "lighting_night.glslh"
 #include "fog.glslh"
 
-layout(binding = 0) uniform sampler2D texture0;
+layout(binding = 0) uniform sampler2D albedo;
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 
 in vec3 modelPos;
@@ -15,7 +15,7 @@ out vec3 fragColor;
 
 void main()
 {
-	vec3 color = texture(texture0, aTexCoord).rgb;
+	vec3 color = texture(albedo, aTexCoord).rgb;
 	
 	vec3 lighting = sun.ambient;
 	const int idxOffsets[9] = { -LIGHT_MAP_SIZE_Y - 1, -LIGHT_MAP_SIZE_Y, -LIGHT_MAP_SIZE_Y + 1, -1, 0, 1, LIGHT_MAP_SIZE_Y - 1, LIGHT_MAP_SIZE_Y, LIGHT_MAP_SIZE_Y + 1 };

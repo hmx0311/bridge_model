@@ -5,7 +5,7 @@
 
 struct Material
 {
-	vec3 ambientAndDiffuse;
+	vec3 albedo;
 	vec3 specular;
 	int shininess;
 };
@@ -29,14 +29,14 @@ void main()
 	Material material;
 	if(aMaterialIdx < 0)
 	{
-		material.ambientAndDiffuse = carColor;
+		material.albedo = carColor;
 		material.shininess = 0;
 	}
 	else
 	{
 		material = materials[aMaterialIdx];
 	}
-	vec3 color = material.ambientAndDiffuse;
+	vec3 color = material.albedo;
 	float maxColor = max(max(color.r, color.g), color.b);
 	if(maxColor <= 1.0)
 	{
