@@ -120,32 +120,32 @@
     <ResourceCompile Include="bridge_model.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="shaders\fs_buffer2screen.txt" />
-    <Text Include="shaders\fs_car_day.txt" />
-    <Text Include="shaders\fs_car_night.txt" />
-    <Text Include="shaders\fs_gaussian_blur.txt" />
-    <Text Include="shaders\fs_highway_day.txt" />
-    <Text Include="shaders\fs_highway_night.txt" />
-    <Text Include="shaders\fs_shadow.txt" />
-    <Text Include="shaders\fs_sun.txt" />
-    <Text Include="shaders\fs_tex_blit.txt" />
-    <Text Include="shaders\gs_shadow_car_night.txt" />
-    <Text Include="shaders\gs_shadow_day.txt" />
-    <Text Include="shaders\gs_shadow_highway_night.txt" />
-    <Text Include="shaders\vs_shadow_car_night.txt" />
-    <Text Include="shaders\vs_shadow_highway_night.txt" />
-    <Text Include="shaders\vs_tex_blit.txt" />
-    <Text Include="shaders\vs_car.txt" />
-    <Text Include="shaders\vs_highway.txt" />
-    <Text Include="shaders\vs_shadow_car_day.txt" />
-    <Text Include="shaders\vs_shadow_highway_day.txt" />
-    <Text Include="shaders\vs_sun.txt" />
+    <Text Include="shaders\buffer2screen.frag" />
+    <Text Include="shaders\car_day.frag" />
+    <Text Include="shaders\car_night.frag" />
+    <Text Include="shaders\gaussian_blur.frag" />
+    <Text Include="shaders\highway_day.frag" />
+    <Text Include="shaders\highway_night.frag" />
+    <Text Include="shaders\shadow.frag" />
+    <Text Include="shaders\sun.frag" />
+    <Text Include="shaders\tex_blit.frag" />
+    <Text Include="shaders\shadow_car_night.geom" />
+    <Text Include="shaders\shadow_day.geom" />
+    <Text Include="shaders\shadow_highway_night.geom" />
+    <Text Include="shaders\shadow_car_night.vert" />
+    <Text Include="shaders\shadow_highway_night.vert" />
+    <Text Include="shaders\tex_blit.vert" />
+    <Text Include="shaders\car.vert" />
+    <Text Include="shaders\highway.vert" />
+    <Text Include="shaders\shadow_car_day.vert" />
+    <Text Include="shaders\shadow_highway_day.vert" />
+    <Text Include="shaders\sun.vert" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shader_headers\fog.glslh" />
     <None Include="shader_headers\lighting_night.glslh" />
     <None Include="textures\font_atlas_r8.raw" />
-    <None Include="shaders\fs_text.txt" />
+    <None Include="shaders\text.frag" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

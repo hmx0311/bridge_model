@@ -120,64 +120,64 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="shaders\fs_buffer2screen.txt">
+    <Text Include="shaders\buffer2screen.frag">
       <Filter>资源文件\shaders</Filter>
     </Text>
-    <Text Include="shaders\fs_gaussian_blur.txt">
+    <Text Include="shaders\gaussian_blur.frag">
       <Filter>资源文件\shaders</Filter>
     </Text>
-    <Text Include="shaders\fs_tex_blit.txt">
+    <Text Include="shaders\tex_blit.frag">
       <Filter>资源文件\shaders</Filter>
     </Text>
-    <Text Include="shaders\vs_tex_blit.txt">
+    <Text Include="shaders\tex_blit.vert">
       <Filter>资源文件\shaders</Filter>
     </Text>
-    <Text Include="shaders\fs_sun.txt">
+    <Text Include="shaders\sun.frag">
       <Filter>资源文件\shaders\draw</Filter>
     </Text>
-    <Text Include="shaders\fs_shadow.txt">
+    <Text Include="shaders\shadow.frag">
       <Filter>资源文件\shaders\shadow</Filter>
     </Text>
-    <Text Include="shaders\gs_shadow_day.txt">
+    <Text Include="shaders\shadow_day.geom">
       <Filter>资源文件\shaders\shadow\day</Filter>
     </Text>
-    <Text Include="shaders\vs_shadow_car_day.txt">
+    <Text Include="shaders\shadow_car_day.vert">
       <Filter>资源文件\shaders\shadow\day</Filter>
     </Text>
-    <Text Include="shaders\vs_shadow_highway_day.txt">
+    <Text Include="shaders\shadow_highway_day.vert">
       <Filter>资源文件\shaders\shadow\day</Filter>
     </Text>
-    <Text Include="shaders\vs_shadow_highway_night.txt">
+    <Text Include="shaders\shadow_highway_night.vert">
       <Filter>资源文件\shaders\shadow\night</Filter>
     </Text>
-    <Text Include="shaders\vs_shadow_car_night.txt">
+    <Text Include="shaders\shadow_car_night.vert">
       <Filter>资源文件\shaders\shadow\night</Filter>
     </Text>
-    <Text Include="shaders\gs_shadow_highway_night.txt">
+    <Text Include="shaders\shadow_highway_night.geom">
       <Filter>资源文件\shaders\shadow\night</Filter>
     </Text>
-    <Text Include="shaders\gs_shadow_car_night.txt">
+    <Text Include="shaders\shadow_car_night.geom">
       <Filter>资源文件\shaders\shadow\night</Filter>
     </Text>
-    <Text Include="shaders\vs_car.txt">
+    <Text Include="shaders\car.vert">
       <Filter>资源文件\shaders\draw</Filter>
     </Text>
-    <Text Include="shaders\vs_highway.txt">
+    <Text Include="shaders\highway.vert">
       <Filter>资源文件\shaders\draw</Filter>
     </Text>
-    <Text Include="shaders\fs_car_day.txt">
+    <Text Include="shaders\car_day.frag">
       <Filter>资源文件\shaders\draw\day</Filter>
     </Text>
-    <Text Include="shaders\fs_highway_day.txt">
+    <Text Include="shaders\highway_day.frag">
       <Filter>资源文件\shaders\draw\day</Filter>
     </Text>
-    <Text Include="shaders\fs_car_night.txt">
+    <Text Include="shaders\car_night.frag">
       <Filter>资源文件\shaders\draw\night</Filter>
     </Text>
-    <Text Include="shaders\fs_highway_night.txt">
+    <Text Include="shaders\highway_night.frag">
       <Filter>资源文件\shaders\draw\night</Filter>
     </Text>
-    <Text Include="shaders\vs_sun.txt">
+    <Text Include="shaders\sun.vert">
       <Filter>资源文件\shaders\draw</Filter>
     </Text>
   </ItemGroup>
@@ -185,7 +185,7 @@
     <None Include="textures\font_atlas_r8.raw">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="shaders\fs_text.txt">
+    <None Include="shaders\text.frag">
       <Filter>资源文件\shaders</Filter>
     </None>
     <None Include="shader_headers\lighting_night.glslh">

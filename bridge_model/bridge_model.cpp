@@ -19,10 +19,13 @@
 #include "shader_headers/lighting_night_defines.h"
 #include "shader_headers/text_altas_constances.h"
 
+#define STR(x) #x
+#define SHADER_NAME(x) STR(x)
+
 using namespace glm;
 
-#define SHADOW_TEX_SIZE 4096
-#define MAX_CSM_RATIO 3.6f
+constexpr int SHADOW_TEX_SIZE = 4096;
+constexpr float MAX_CSM_RATIO = 3.6f;
 GLuint shadow_FBO;
 GLuint shadow_tex;
 GLuint shadow_PCF_sampler;
@@ -46,7 +49,7 @@ bool show_fps = false;
 bool need_update_view = true;
 uint64_t last_time_us;
 
-#define MAX_HEIGHT 5.0f
+constexpr float MAX_HEIGHT = 5.0f;
 constexpr int HEIGHT_MAP_SIZE = 256;
 constexpr vec4 HEIGHT_MAP_AREA = { -102.4f, -76.8f, 102.4f, 128.0f };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
@@ -58,7 +61,7 @@ GLuint depth_RBO;
 GLuint render_FBO;
 GLuint render_tex;
 
-#define BLOOM_BUFFER_HEIGHT 512
+constexpr int BLOOM_BUFFER_HEIGHT = 512;
 int bloom_buffer_width;
 GLuint bloom_FBOs[2];
 GLuint bloom_texs[2];
@@ -127,12 +130,12 @@ GLuint SP_gaussian_blur;
 GLuint SP_buffer_to_screen;
 GLuint SP_text;
 
-static GLuint loadShader(GLuint shader_id, GLenum type)
+static GLuint loadShader(const char* shader_name, GLenum type)
 {
-	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(shader_id), L"SHADER");
+	HRSRC rc_info = FindResourceA(nullptr, shader_name, "SHADER");
 	if (rc_info == nullptr)
 	{
-		printf("\nERROR: Can't Find Resource %d\n", shader_id);
+		printf("\nERROR: Can't Find Resource %s\n", shader_name);
 		return 0;
 	}
 	std::vector<int> sizes;
@@ -147,12 +150,11 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
 	if (rc_data == nullptr)
 	{
-		printf("\nERROR: Can't Load Resource %d\n", shader_id);
+		printf("\nERROR: Can't Load Resource %s\n", shader_name);
 		return 0;
 	}
 	sources.push_back(static_cast<const char*>(LockResource(rc_data)));
-	char shader_name[64];
-	source_names.push_back({ shader_name, snprintf(shader_name, sizeof(shader_name), "shader_%d", shader_id) });
+	source_names.push_back({ shader_name, static_cast<int>(strlen(shader_name)) });
 	for (int i = 0; i < sources.size(); i++)
 	{
 		const char* source = sources[i];
@@ -316,7 +318,7 @@ static GLuint loadShader(GLuint shader_id, GLenum type)
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
 	if (status == GL_FALSE)
 	{
-		printf("\nERROR: Shader %d Compilation Error\n", shader_id);
+		printf("\nERROR: Shader \"%s\" Compilation Error\n", shader_name);
 		for (const char* source : sources)
 		{
 			printf("%s", source);
@@ -364,38 +366,38 @@ static GLuint linkShaderProgram(GLuint vs, GLuint fs, GLuint gs = 0)
 
 static void initShader()
 {
-	GLuint VS_highway = loadShader(IDR_VS_HIGHWAY, GL_VERTEX_SHADER);
-	GLuint FS_highway_day = loadShader(IDR_FS_HIGHWAY_DAY, GL_FRAGMENT_SHADER);
-	GLuint FS_highway_night = loadShader(IDR_FS_HIGHWAY_NIGHT, GL_FRAGMENT_SHADER);
+	GLuint VS_highway = loadShader(SHADER_NAME(IDR_VS_HIGHWAY), GL_VERTEX_SHADER);
+	GLuint FS_highway_day = loadShader(SHADER_NAME(IDR_FS_HIGHWAY_DAY), GL_FRAGMENT_SHADER);
+	GLuint FS_highway_night = loadShader(SHADER_NAME(IDR_FS_HIGHWAY_NIGHT), GL_FRAGMENT_SHADER);
 	SP_highway_day = linkShaderProgram(VS_highway, FS_highway_day);
 	SP_highway_night = linkShaderProgram(VS_highway, FS_highway_night);
 	glDeleteShader(VS_highway);
 	glDeleteShader(FS_highway_day);
 	glDeleteShader(FS_highway_night);
 
-	GLuint VS_car = loadShader(IDR_VS_CAR, GL_VERTEX_SHADER);
-	GLuint FS_car_day = loadShader(IDR_FS_CAR_DAY, GL_FRAGMENT_SHADER);
-	GLuint FS_car_night = loadShader(IDR_FS_CAR_NIGHT, GL_FRAGMENT_SHADER);
+	GLuint VS_car = loadShader(SHADER_NAME(IDR_VS_CAR), GL_VERTEX_SHADER);
+	GLuint FS_car_day = loadShader(SHADER_NAME(IDR_FS_CAR_DAY), GL_FRAGMENT_SHADER);
+	GLuint FS_car_night = loadShader(SHADER_NAME(IDR_FS_CAR_NIGHT), GL_FRAGMENT_SHADER);
 	SP_car_day = linkShaderProgram(VS_car, FS_car_day);
 	SP_car_night = linkShaderProgram(VS_car, FS_car_night);
 	glDeleteShader(VS_car);
 	glDeleteShader(FS_car_day);
 	glDeleteShader(FS_car_night);
 
-	GLuint VS_sun = loadShader(IDR_VS_SUN, GL_VERTEX_SHADER);
-	GLuint FS_sun = loadShader(IDR_FS_SUN, GL_FRAGMENT_SHADER);
+	GLuint VS_sun = loadShader(SHADER_NAME(IDR_VS_SUN), GL_VERTEX_SHADER);
+	GLuint FS_sun = loadShader(SHADER_NAME(IDR_FS_SUN), GL_FRAGMENT_SHADER);
 	SP_sun = linkShaderProgram(VS_sun, FS_sun);
 	glDeleteShader(VS_sun);
 	glDeleteShader(FS_sun);
 
-	GLuint VS_shadow_highway_day = loadShader(IDR_VS_SHADOW_HIGHWAY_DAY, GL_VERTEX_SHADER);
-	GLuint VS_shadow_highway_night = loadShader(IDR_VS_SHADOW_HIGHWAY_NIGHT, GL_VERTEX_SHADER);
-	GLuint VS_shadow_car_day = loadShader(IDR_VS_SHADOW_CAR_DAY, GL_VERTEX_SHADER);
-	GLuint VS_shadow_car_night = loadShader(IDR_VS_SHADOW_CAR_NIGHT, GL_VERTEX_SHADER);
-	GLuint FS_shadow = loadShader(IDR_FS_SHADOW, GL_FRAGMENT_SHADER);
-	GLuint GS_shadow_day = loadShader(IDR_GS_SHADOW_DAY, GL_GEOMETRY_SHADER);
-	GLuint GS_shadow_highway_night = loadShader(IDR_GS_SHADOW_HIGHWAY_NIGHT, GL_GEOMETRY_SHADER);
-	GLuint GS_shadow_car_night = loadShader(IDR_GS_SHADOW_CAR_NIGHT, GL_GEOMETRY_SHADER);
+	GLuint VS_shadow_highway_day = loadShader(SHADER_NAME(IDR_VS_SHADOW_HIGHWAY_DAY), GL_VERTEX_SHADER);
+	GLuint VS_shadow_highway_night = loadShader(SHADER_NAME(IDR_VS_SHADOW_HIGHWAY_NIGHT), GL_VERTEX_SHADER);
+	GLuint VS_shadow_car_day = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_DAY), GL_VERTEX_SHADER);
+	GLuint VS_shadow_car_night = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_NIGHT), GL_VERTEX_SHADER);
+	GLuint FS_shadow = loadShader(SHADER_NAME(IDR_FS_SHADOW), GL_FRAGMENT_SHADER);
+	GLuint GS_shadow_day = loadShader(SHADER_NAME(IDR_GS_SHADOW_DAY), GL_GEOMETRY_SHADER);
+	GLuint GS_shadow_highway_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_HIGHWAY_NIGHT), GL_GEOMETRY_SHADER);
+	GLuint GS_shadow_car_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_CAR_NIGHT), GL_GEOMETRY_SHADER);
 	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow, GS_shadow_day);
 	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
 	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow, GS_shadow_day);
@@ -409,11 +411,11 @@ static void initShader()
 	glDeleteShader(GS_shadow_car_night);
 	glDeleteShader(FS_shadow);
 
-	GLuint VS_tex_blit = loadShader(IDR_VS_TEX_BLIT, GL_VERTEX_SHADER);
-	GLuint FS_tex_blit = loadShader(IDR_FS_TEX_BLIT, GL_FRAGMENT_SHADER);
-	GLuint FS_gaussian_blur = loadShader(IDR_FS_GAUSSIAN_BLUR, GL_FRAGMENT_SHADER);
-	GLuint FS_buffer_to_screen = loadShader(IDR_FS_BUFFER_TO_SCREEN, GL_FRAGMENT_SHADER);
-	GLuint FS_text = loadShader(IDR_FS_TEXT, GL_FRAGMENT_SHADER);
+	GLuint VS_tex_blit = loadShader(SHADER_NAME(IDR_VS_TEX_BLIT), GL_VERTEX_SHADER);
+	GLuint FS_tex_blit = loadShader(SHADER_NAME(IDR_FS_TEX_BLIT), GL_FRAGMENT_SHADER);
+	GLuint FS_gaussian_blur = loadShader(SHADER_NAME(IDR_FS_GAUSSIAN_BLUR), GL_FRAGMENT_SHADER);
+	GLuint FS_buffer_to_screen = loadShader(SHADER_NAME(IDR_FS_BUFFER_TO_SCREEN), GL_FRAGMENT_SHADER);
+	GLuint FS_text = loadShader(SHADER_NAME(IDR_FS_TEXT), GL_FRAGMENT_SHADER);
 	SP_tex_blit = linkShaderProgram(VS_tex_blit, FS_tex_blit);
 	SP_gaussian_blur = linkShaderProgram(VS_tex_blit, FS_gaussian_blur);
 	SP_buffer_to_screen = linkShaderProgram(VS_tex_blit, FS_buffer_to_screen);
