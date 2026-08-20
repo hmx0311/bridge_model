@@ -23,6 +23,7 @@ static constexpr float MAX_LOGICAL_DT = 0.01f;
 std::atomic<float> tick_rate = 60;
 std::atomic<bool> is_paused = false;
 std::atomic<int> simulate_speed = 1;
+std::atomic<double> logical_time = 0;
 std::mt19937 rd_eng;
 
 static LogicalData logical_data[3];
@@ -383,12 +384,11 @@ LogicalData& getLatestLogicalData()
 void logicalFrame()
 {
 	std::uniform_real_distribution<float> spawn_distb(0, 0.32f);
-	double elapsed_time = 0;
 	uint64_t last_frame_time_us = getTimestampMicroseconds();
 	double next_car_time[6];
 	for (int i = 0; i < 6; i++)
 	{
-		next_car_time[i] = elapsed_time + spawn_distb(rd_eng);
+		next_car_time[i] = logical_time + spawn_distb(rd_eng);
 	}
 	std::list<Car> vehicles;
 	while (is_running)
@@ -409,14 +409,14 @@ void logicalFrame()
 		{
 			logical_dt_s = MAX_LOGICAL_DT;
 		}
-		elapsed_time += logical_dt_s;
+		logical_time = logical_time + logical_dt_s;
 
-		sun.updatePosition(elapsed_time);
+		sun.updatePosition(logical_time);
 		logical_data[writing_data].sun_dir = sun.getDir();
 
 		for (int i = 0; i < 6; i++)
 		{
-			if (elapsed_time > next_car_time[i])
+			if (logical_time > next_car_time[i])
 			{
 				vehicles.emplace_back(lanes[i], sun.getDir().z);
 				next_car_time[i] += (i < 4 ? 1 : 8) * spawn_distb(rd_eng) + REACT_TIME + CAR_LENGTH / lanes[i]->speed_limit;

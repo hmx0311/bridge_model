@@ -11,6 +11,7 @@
 #include "scene.h"
 #include "mesh.h"
 #include "Car.h"
+#include "Sun.h"
 #include "logical_frame.h"
 
 #include "shader_headers/scene_constances.h"
@@ -1665,6 +1666,15 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 
+	initLogic();
+	std::thread logical_thread(logicalFrame);
+	simulate_speed = 1000000;
+	while (logical_time < 0.2 * DAY_PERIOD)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	simulate_speed = 1;
+
 	window_width = 2400;
 	window_height = 1350;
 
@@ -1719,13 +1729,8 @@ int main(int argc, char** argv)
 	glfwSetMouseButtonCallback(window, onMouseButton);
 	glfwSetScrollCallback(window, onMouseWheel);
 
-	initLogic();
-	std::thread logical_thread(logicalFrame);
-
-	simulate_speed = 500;
 	init();
 	onResize(window, window_width, window_height);
-	simulate_speed = 1;
 
 	while (!glfwWindowShouldClose(window))
 	{

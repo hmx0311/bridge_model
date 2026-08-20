@@ -4,9 +4,6 @@
 
 using namespace glm;
 
-constexpr double YEAR_PERIOD = 9000.0;
-constexpr double DAY_PERIOD = 600.0;
-
 Sun::Sun(float latitude)
 {
 	m_latitude = latitude * pi<float>() / 180;

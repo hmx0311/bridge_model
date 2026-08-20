@@ -13,7 +13,7 @@ extern std::mt19937 rd_eng;
 extern std::atomic<float> tick_rate;
 extern std::atomic<bool> is_paused;
 extern std::atomic<int> simulate_speed;
-extern std::atomic<int> simulate_speed;
+extern std::atomic<double> logical_time;
 
 struct LogicalData
 {
