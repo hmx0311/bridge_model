@@ -27,7 +27,7 @@ void main()
 			for(int k = car_light_map.idx_range[gridIdx].x; k < end; k++)
 			{
 				int layer = findMSB((k >> 3) * 3 + 1) >> 1;
-				if(layer >= 4)
+				if(layer >= NUM_TILE_LIGHT_SHADOW_LAYERS)
 				{
 					continue;
 				}

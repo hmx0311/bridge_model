@@ -142,6 +142,7 @@
     <Text Include="shaders\sun.vert" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\gen_PCSS_mips.frag" />
     <None Include="shader_headers\fog.glslh" />
     <None Include="shader_headers\lighting_night.glslh" />
     <None Include="textures\font_atlas_r8.raw" />

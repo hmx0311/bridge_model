@@ -25,12 +25,17 @@
 
 using namespace glm;
 
-constexpr int SHADOW_TEX_SIZE = 4096;
 constexpr float MAX_CSM_RATIO = 3.6f;
-GLuint shadow_FBO;
-GLuint shadow_tex;
+GLuint shadow_day_FBO;
+GLuint shadow_day_tex;
 GLuint shadow_PCF_sampler;
 GLuint shadow_depth_sampler;
+GLuint shadow_mip_gen_FBO;
+GLuint shadow_mip_gen_sampler;
+
+constexpr int SHADOW_NIGHT_TEX_SIZE = 4096;
+GLuint shadow_night_FBO;
+GLuint shadow_night_tex;
 
 constexpr float FOVY = pi<float>() / 4;
 constexpr float VIEW_Z_NEAR = 0.9f;
@@ -126,6 +131,7 @@ GLuint SP_shadow_highway_day;
 GLuint SP_shadow_highway_night;
 GLuint SP_shadow_car_day;
 GLuint SP_shadow_car_night;
+GLuint SP_gen_PCSS_mips;
 GLuint SP_tex_blit;
 GLuint SP_gaussian_blur;
 GLuint SP_buffer_to_screen;
@@ -215,7 +221,7 @@ static GLuint loadShader(const char* shader_name, GLenum type)
 						}
 					} while (source[j] != '\"');
 					int name_len = j - name_begin;
-					for(j++; j < len; j++)
+					for (j++; j < len; j++)
 					{
 						if (source[j] == '\n')
 						{
@@ -228,7 +234,7 @@ static GLuint loadShader(const char* shader_name, GLenum type)
 						}
 					}
 					bool included = false;
-					for(int k = i; k < sources.size(); k++)
+					for (int k = i; k < sources.size(); k++)
 					{
 						if (name_len == source_names[k].len && strncmp(source + name_begin, source_names[k].name, name_len) == 0)
 						{
@@ -295,7 +301,7 @@ static GLuint loadShader(const char* shader_name, GLenum type)
 	std::string cource_str;
 	for (int i = 0; i < sources.size(); i++)
 	{
-		if(sizes[i]<0)
+		if (sizes[i] < 0)
 		{
 			cource_str.append(sources[i]);
 		}
@@ -412,20 +418,30 @@ static void initShader()
 	glDeleteShader(GS_shadow_car_night);
 	glDeleteShader(FS_shadow);
 
+
 	GLuint VS_tex_blit = loadShader(SHADER_NAME(IDR_VS_TEX_BLIT), GL_VERTEX_SHADER);
+
+	GLuint FS_gen_PCSS_mips = loadShader(SHADER_NAME(IDR_FS_GEN_PCSS_MIPS), GL_FRAGMENT_SHADER);
+	SP_gen_PCSS_mips = linkShaderProgram(VS_tex_blit, FS_gen_PCSS_mips);
+	glDeleteShader(FS_gen_PCSS_mips);
+
 	GLuint FS_tex_blit = loadShader(SHADER_NAME(IDR_FS_TEX_BLIT), GL_FRAGMENT_SHADER);
-	GLuint FS_gaussian_blur = loadShader(SHADER_NAME(IDR_FS_GAUSSIAN_BLUR), GL_FRAGMENT_SHADER);
-	GLuint FS_buffer_to_screen = loadShader(SHADER_NAME(IDR_FS_BUFFER_TO_SCREEN), GL_FRAGMENT_SHADER);
-	GLuint FS_text = loadShader(SHADER_NAME(IDR_FS_TEXT), GL_FRAGMENT_SHADER);
 	SP_tex_blit = linkShaderProgram(VS_tex_blit, FS_tex_blit);
-	SP_gaussian_blur = linkShaderProgram(VS_tex_blit, FS_gaussian_blur);
-	SP_buffer_to_screen = linkShaderProgram(VS_tex_blit, FS_buffer_to_screen);
-	SP_text = linkShaderProgram(VS_tex_blit, FS_text);
-	glDeleteShader(VS_tex_blit);
 	glDeleteShader(FS_tex_blit);
+
+	GLuint FS_gaussian_blur = loadShader(SHADER_NAME(IDR_FS_GAUSSIAN_BLUR), GL_FRAGMENT_SHADER);
+	SP_gaussian_blur = linkShaderProgram(VS_tex_blit, FS_gaussian_blur);
 	glDeleteShader(FS_gaussian_blur);
+
+	GLuint FS_buffer_to_screen = loadShader(SHADER_NAME(IDR_FS_BUFFER_TO_SCREEN), GL_FRAGMENT_SHADER);
+	SP_buffer_to_screen = linkShaderProgram(VS_tex_blit, FS_buffer_to_screen);
 	glDeleteShader(FS_buffer_to_screen);
+
+	GLuint FS_text = loadShader(SHADER_NAME(IDR_FS_TEXT), GL_FRAGMENT_SHADER);
+	SP_text = linkShaderProgram(VS_tex_blit, FS_text);
 	glDeleteShader(FS_text);
+
+	glDeleteShader(VS_tex_blit);
 }
 
 static void buildHeightMap()
@@ -433,8 +449,8 @@ static void buildHeightMap()
 	glEnable(GL_DEPTH_TEST);
 	constexpr int HEIGHT_BORDER = 3;
 	constexpr int FILTER_RADIUS = 3;
-	glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
-	glViewport(0, 0, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
+	glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.w, 0.0f, MAX_HEIGHT) *
 		lookAt(vec3(0, 0, MAX_HEIGHT), vec3(0, 0, 0), vec3(0, 1, 0));
@@ -447,8 +463,8 @@ static void buildHeightMap()
 	glBindVertexArray(ground_VAO);
 	glDrawElements(GL_TRIANGLES, GROUND_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
-	GLfloat(*depth_data)[SHADOW_TEX_SIZE][SHADOW_TEX_SIZE] = new GLfloat[CSM_LEVELS][SHADOW_TEX_SIZE][SHADOW_TEX_SIZE];
-	glGetTextureImage(shadow_tex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, CSM_LEVELS * SHADOW_TEX_SIZE * SHADOW_TEX_SIZE * sizeof(GLfloat), depth_data);
+	GLfloat(*depth_data)[SHADOW_DAY_TEX_SIZE][SHADOW_DAY_TEX_SIZE] = new GLfloat[CSM_LEVELS][SHADOW_DAY_TEX_SIZE][SHADOW_DAY_TEX_SIZE];
+	glGetTextureImage(shadow_day_tex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, CSM_LEVELS * SHADOW_DAY_TEX_SIZE * SHADOW_DAY_TEX_SIZE * sizeof(GLfloat), depth_data);
 	float(*height_map_buffer)[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE] = new float[2][HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
 	constexpr int FILTER_SIZE = 2 * FILTER_RADIUS + 1;
 	int height_filter[FILTER_SIZE][FILTER_SIZE];
@@ -473,13 +489,13 @@ static void buildHeightMap()
 			for (int j = 0; j < HEIGHT_MAP_SIZE; j++)
 			{
 				float min_depth = 1.0f;
-				for (int p = 0; p < SHADOW_TEX_SIZE / HEIGHT_MAP_SIZE; p++)
+				for (int p = 0; p < SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE; p++)
 				{
-					for (int q = 0; q < SHADOW_TEX_SIZE / HEIGHT_MAP_SIZE; q++)
+					for (int q = 0; q < SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE; q++)
 					{
-						if (min_depth > depth_data[0][SHADOW_TEX_SIZE / HEIGHT_MAP_SIZE * i + p][SHADOW_TEX_SIZE / HEIGHT_MAP_SIZE * j + q])
+						if (min_depth > depth_data[0][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * i + p][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * j + q])
 						{
-							min_depth = depth_data[0][SHADOW_TEX_SIZE / HEIGHT_MAP_SIZE * i + p][SHADOW_TEX_SIZE / HEIGHT_MAP_SIZE * j + q];
+							min_depth = depth_data[0][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * i + p][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * j + q];
 						}
 					}
 				}
@@ -633,20 +649,26 @@ static void init()
 	glEnableVertexAttribArray(0);
 	glBindVertexArray(0);
 
-	glGenFramebuffers(1, &shadow_FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
+	glGenFramebuffers(1, &shadow_day_FBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
-	glGenTextures(1, &shadow_tex);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_tex);
+	glGenTextures(1, &shadow_day_tex);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_day_tex);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE, CSM_LEVELS, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_tex, 0);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1 + PCSS_MIP_LEVELS, GL_DEPTH_COMPONENT24, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE, CSM_LEVELS);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
+
+	glGenFramebuffers(1, &shadow_mip_gen_FBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadow_mip_gen_FBO);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+
 
 	glGenSamplers(1, &shadow_PCF_sampler);
 	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -660,6 +682,21 @@ static void init()
 	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glGenFramebuffers(1, &shadow_night_FBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadow_night_FBO);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glGenTextures(1, &shadow_night_tex);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_night_tex);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_DEPTH_COMPONENT24, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE, NUM_TILE_LIGHT_SHADOW_LAYERS);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0);
 
 	glGenTextures(1, &text_atlas_tex);
 	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TEXT_ATLAS), L"TEXTURE");
@@ -1071,7 +1108,7 @@ static void drawGraphics()
 	}
 
 	SunData sun;
-	sun.light_dir = logical_data.sun_dir;
+	sun.light_dir_and_radius = vec4(logical_data.sun_dir, 1.0f);
 	sun.diffuse_specular = vec3(0.5);
 	if (-SUN_RADIUS_DIST_RATIO < logical_data.sun_dir.z && logical_data.sun_dir.z < SUN_RADIUS_DIST_RATIO)
 	{
@@ -1093,30 +1130,30 @@ static void drawGraphics()
 			center = x + (1 - x) / 3;
 		}
 		sun.diffuse_specular *= area_percent;
-		sun.light_dir.z += center * SUN_RADIUS_DIST_RATIO;
-		sun.light_dir = normalize(sun.light_dir);
+		sun.light_dir_and_radius.z += center * SUN_RADIUS_DIST_RATIO;
+		sun.light_dir_and_radius = vec4(normalize(vec3(sun.light_dir_and_radius)), sqrt(area_percent));
 	}
 	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e4f;
-	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.light_dir.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.light_dir.z * sun.light_dir.z)));
+	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.light_dir_and_radius.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.light_dir_and_radius.z * sun.light_dir_and_radius.z)));
 	sun.diffuse_specular *= vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
 	sun.ambient = vec3(0.01f);
 	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
-	if (sun.light_dir.z > -0.2f)
+	if (sun.light_dir_and_radius.z > -0.2f)
 	{
-		sun.ambient += vec3((sun.light_dir.z + 0.2f) * 0.1f);
-		sun.sky_color += (sun.light_dir.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
+		sun.ambient += vec3((sun.light_dir_and_radius.z + 0.2f) * 0.1f);
+		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
 	}
 
 	int num_visible_cars;
 	int num_visible_light_on_cars;
 	int num_visible_car_lights;
 
-	if (sun.light_dir.z > 0)
+	if (sun.light_dir_and_radius.z > 0)
 	{
 		num_visible_cars = logical_data.num_cars;
-		mat4 sun_mat = lookAt(vec3(0.0f), -vec3(sun.light_dir), vec3(-sun.light_dir.x, -sun.light_dir.y, sun.light_dir.z));
+		mat4 sun_mat = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
 		float z_far = FLT_MAX;
-		float slope = sqrt(1.0f / (sun.light_dir.z * sun.light_dir.z) - 1.0f);
+		float slope = sqrt(1.0f / (sun.light_dir_and_radius.z * sun.light_dir_and_radius.z) - 1.0f);
 		float x_max[CSM_LEVELS], x_min[CSM_LEVELS], y_max[CSM_LEVELS], y_min[CSM_LEVELS], z_fars[CSM_LEVELS];
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
@@ -1173,9 +1210,9 @@ static void drawGraphics()
 			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
 			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_max[i] - x_min[i]));
 			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_max[i] - y_min[i]));
-			float z_near = std::min(MAX_HEIGHT / sun.light_dir.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
+			float z_near = std::min(MAX_HEIGHT / sun.light_dir_and_radius.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
 			float z_padding = std::max(x_padding / (x_max[i] - x_min[i]), y_padding / (y_max[i] - y_min[i])) * (z_near - z_fars[i]);
-			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding,	y_min[i] - y_padding, y_max[i] + y_padding,	-z_near, -z_fars[i] + z_padding);
+			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding, y_min[i] - y_padding, y_max[i] + y_padding, -z_near, -z_fars[i] + z_padding);
 			shadow_mat = shadow_mat * sun_mat;
 			sun_shadow.view_proj[i] = shadow_mat;
 			sun_shadow.tex[i] = mat4(
@@ -1312,7 +1349,7 @@ static void drawGraphics()
 	}
 
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(SunData), &sun);
-	if (sun.light_dir.z > 0)
+	if (sun.light_dir_and_radius.z > 0)
 	{
 		glNamedBufferSubData(shadow_UBO, 0, sizeof(sun_shadow), &sun_shadow);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_cars * sizeof(mat4), logical_data.car_transform);
@@ -1330,31 +1367,48 @@ static void drawGraphics()
 		glNamedBufferSubData(car_color_VBO, num_visible_light_on_cars * sizeof(vec3), (num_visible_cars - num_visible_light_on_cars) * sizeof(vec3), &logical_data.car_color[logical_data.num_light_on_cars]);
 		glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "numLightOnCars"), num_visible_light_on_cars);
 	}
-	if (sun.light_dir.z > -0.2f)
+	if (sun.light_dir_and_radius.z > -0.2f)
 	{
-		mat4x3 transform = rotate(acos(sun.light_dir.z), vec3(-sun.light_dir.y, sun.light_dir.x, 0));
+		mat4x3 transform = rotate(acos(sun.light_dir_and_radius.z), vec3(-sun.light_dir_and_radius.y, sun.light_dir_and_radius.x, 0));
 		transform[3] = 4.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir;
 		glProgramUniformMatrix4x3fv(SP_sun, glGetUniformLocation(SP_sun, "transform"), 1, GL_FALSE, (GLfloat*)&transform);
 	}
 
 	glBindTextureUnit(0, highway_tex);
-	glBindTextureUnit(1, shadow_tex);
-	glBindTextureUnit(2, shadow_tex);
 	glEnable(GL_DEPTH_TEST);
-	if (sun.light_dir.z > 0)
+	if (sun.light_dir_and_radius.z > 0)
 	{
+		glBindTextureUnit(1, shadow_day_tex);
+		glBindTextureUnit(2, shadow_day_tex);
 		glBindSampler(1, shadow_PCF_sampler);
 		glBindSampler(2, shadow_depth_sampler);
-		glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
+		glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glDisable(GL_CULL_FACE);
-		glViewport(0, 0, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE);
+		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_day);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_day);
 		glBindVertexArray(car_shadow_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+
+		glUseProgram(SP_gen_PCSS_mips);
+		glBindVertexArray(tex_blit_VAO);
+		glDepthFunc(GL_ALWAYS);
+		glBindFramebuffer(GL_FRAMEBUFFER, shadow_mip_gen_FBO);
+		for (int i = 0; i < PCSS_MIP_LEVELS; i++)
+		{
+			glProgramUniform1i(SP_gen_PCSS_mips, glGetUniformLocation(SP_gen_PCSS_mips, "mip_level"), i);
+			for (int j = 0; j < CSM_LEVELS; j++)
+			{
+				glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, i + 1, j);
+				glViewport(0, 0, SHADOW_DAY_TEX_SIZE >> (i + 1), SHADOW_DAY_TEX_SIZE >> (i + 1));
+				glProgramUniform1i(SP_gen_PCSS_mips, glGetUniformLocation(SP_gen_PCSS_mips, "layer"), j);
+				glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+			}
+		}
+		glDepthFunc(GL_LESS);
 		glEnable(GL_CULL_FACE);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
@@ -1378,14 +1432,15 @@ static void drawGraphics()
 	}
 	else
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, shadow_FBO);
+		glBindTextureUnit(1, shadow_night_tex);
+		glBindFramebuffer(GL_FRAMEBUFFER, shadow_night_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glDisable(GL_CULL_FACE);
 		for (int i = 0; i < 4; i++)
 		{
 			glEnable(GL_CLIP_DISTANCE0 + i);
 		}
-		glViewport(0, 0, SHADOW_TEX_SIZE, SHADOW_TEX_SIZE);
+		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_night);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
@@ -1417,7 +1472,7 @@ static void drawGraphics()
 		glBindVertexArray(car_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 	}
-	if (sun.light_dir.z > -0.2f)
+	if (sun.light_dir_and_radius.z > -0.2f)
 	{
 		glUseProgram(SP_sun);
 		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
@@ -1514,7 +1569,7 @@ static void onResize(GLFWwindow*, int width, int height)
 		glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_level, GL_RGB16F, width, height);
 	}
 	glBindRenderbuffer(GL_RENDERBUFFER, depth_RBO);
-	glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_level, GL_DEPTH_COMPONENT, width, height);
+	glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_level, GL_DEPTH_COMPONENT32, width, height);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
 	glBindTexture(GL_TEXTURE_2D, render_tex);

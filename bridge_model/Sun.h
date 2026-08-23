@@ -2,7 +2,7 @@
 #include "glm.hpp"
 
 constexpr double YEAR_PERIOD = 9000.0;
-constexpr double DAY_PERIOD = 600.0;
+constexpr double DAY_PERIOD = 720.0;
 
 class Sun
 {

@@ -33,16 +33,16 @@ void main()
 	}
 	vec3 color = material.albedo * sun.ambient;
 	float view_dist = length(modelPosView);
-	float LdotN = dot(sun.light_dir, aNormal);
+	float LdotN = dot(sun.light_dir_and_radius.xyz, aNormal);
 	vec3 dpdx = dFdx(modelPos);
 	vec3 dpdy = dFdy(modelPos);
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
-	if(LdotN > 1e-5 && dot(surface_normal, sun.light_dir) > 1e-5)
+	if(LdotN > 1e-5 && dot(surface_normal, sun.light_dir_and_radius.xyz) > 1e-5)
 	{
 		float specular_factor = 0.0;
 		if(material.shininess > 0)
 		{
-			vec3 halfway = normalize(sun.light_dir + normalize(viewRay));
+			vec3 halfway = normalize(sun.light_dir_and_radius.xyz + normalize(viewRay));
 			float HdotN = dot(halfway, aNormal);
 			if(HdotN > 0)
 			{

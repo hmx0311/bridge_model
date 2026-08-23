@@ -194,5 +194,8 @@
     <None Include="shader_headers\fog.glslh">
       <Filter>资源文件\shader_headers</Filter>
     </None>
+    <None Include="shaders\gen_PCSS_mips.frag">
+      <Filter>资源文件\shaders\shadow\day</Filter>
+    </None>
   </ItemGroup>
 </Project>

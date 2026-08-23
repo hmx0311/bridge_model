@@ -16,7 +16,7 @@ void main()
 	{
 		int idx = car_lighting.light_indices[i];
 		int layer = findMSB((idx >> 3) * 3 + 1) >> 1;
-		if(layer >= 4)
+		if(layer >= NUM_TILE_LIGHT_SHADOW_LAYERS)
 		{
 			continue;
 		}

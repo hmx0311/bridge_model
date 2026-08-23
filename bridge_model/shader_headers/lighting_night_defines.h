@@ -3,6 +3,8 @@
 #ifndef LIGHTING_NIGHT_DEFINES_H
 #define LIGHTING_NIGHT_DEFINES_H
 
+#define NUM_TILE_LIGHT_SHADOW_LAYERS 4
+
 struct CarLightMapData
 {
 	ivec2 idx_range[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];

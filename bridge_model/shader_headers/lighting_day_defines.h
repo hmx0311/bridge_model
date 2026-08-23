@@ -5,10 +5,13 @@
 #define CSM_LEVELS 4
 #define MAX_PENUMBRA_RADIUS 1.0f
 #define MIN_SHADOW_MAP_PADDING 0.02f
+#define SHADOW_DAY_TEX_SIZE_EXP  12
+#define SHADOW_DAY_TEX_SIZE  (1 << SHADOW_DAY_TEX_SIZE_EXP)
+#define PCSS_MIP_LEVELS (SHADOW_DAY_TEX_SIZE_EXP - 1)
 
 struct SunData
 {
-	alignas(16) vec3 light_dir;
+	vec4 light_dir_and_radius;
 	alignas(16) vec3 ambient;
 	alignas(16) vec3 diffuse_specular;
 	alignas(16) vec3 sky_color;

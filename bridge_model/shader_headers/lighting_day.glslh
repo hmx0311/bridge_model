@@ -1,16 +1,15 @@
 #include "scene_constances.h"
 #include "lighting_day_defines.h"
 
-#define NUM_BLOCKER_SAMPLE 16
+#define NUM_BLOCKER_SAMPLE 32
 
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 layout(binding = 2) uniform sampler2DArray shadow_tex_depth;
 
 float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float sample_cnt_factor)
 {
-	float shadow = 1.0;
 	int level;
-	vec3 shadowCoord;
+	vec3 shadow_coord;
 	vec3 u_dir, v_dir;
 	float shadow_scale_u, shadow_scale_v;
 	float tex_padding_u, tex_padding_v;
@@ -22,123 +21,121 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 		shadow_scale_v = length(v_dir);
 		tex_padding_u = max(MIN_SHADOW_MAP_PADDING, MAX_PENUMBRA_RADIUS * shadow_scale_u);
 		tex_padding_v = max(MIN_SHADOW_MAP_PADDING, MAX_PENUMBRA_RADIUS * shadow_scale_v);
-		shadowCoord = (sun_shadow.tex[level] * vec4(modelPos, 1.0)).xyz;
-		if (shadowCoord.x > tex_padding_u && shadowCoord.x < 1 - tex_padding_u &&
-			shadowCoord.y > tex_padding_v && shadowCoord.y < 1 - tex_padding_v)
+		shadow_coord = (sun_shadow.tex[level] * vec4(modelPos, 1.0)).xyz;
+		if (shadow_coord.x > tex_padding_u && shadow_coord.x < 1 - tex_padding_u &&
+			shadow_coord.y > tex_padding_v && shadow_coord.y < 1 - tex_padding_v)
 		{
 			break;
 		}
 	}
-	if (level < CSM_LEVELS)
+	if (level >= CSM_LEVELS)
 	{
-		vec3 shadow_mat_z = vec3(sun_shadow.tex[level][0].z, sun_shadow.tex[level][1].z, sun_shadow.tex[level][2].z);
-		float shadow_inv_scale_z = 1.0 / length(shadow_mat_z);
-		u_dir /= shadow_scale_u;
-		v_dir /= shadow_scale_v;
-		float dzdu, dzdv;
+		return 1.0;
+	}
+	u_dir /= shadow_scale_u;
+	v_dir /= shadow_scale_v;
+	vec2 duvdx = 0.5 * vec2(dot(u_dir, dpdx), dot(v_dir, dpdx));
+	vec2 duvdy = 0.5 * vec2(dot(u_dir, dpdy), dot(v_dir, dpdy));
+	float duvdx_len = length(duvdx);
+	float duvdy_len = length(duvdy);
+	float pixel_radius = min(max(duvdx_len, duvdy_len), min(tex_padding_u / shadow_scale_u, tex_padding_v / shadow_scale_v));
+	int mip_level = min(findMSB(int(ceil(2 * SHADOW_DAY_TEX_SIZE * max(MAX_PENUMBRA_RADIUS, pixel_radius) * max(shadow_scale_u, shadow_scale_v)) - 1)), PCSS_MIP_LEVELS);
+	float nearest_depth = 1.0;
+	ivec3 mip_idx = ivec3(ivec2(floor((SHADOW_DAY_TEX_SIZE >> mip_level) * shadow_coord.xy - 0.5)), level);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx, 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx + ivec3(0, 1, 0), 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx + ivec3(1, 0, 0), 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx + ivec3(1, 1, 0), 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
+	if(nearest_depth >= shadow_coord.z)
+	{
+		return 1.0;
+	}
+	vec3 shadow_mat_z = vec3(sun_shadow.tex[level][0].z, sun_shadow.tex[level][1].z, sun_shadow.tex[level][2].z);
+	float shadow_inv_scale_z = 1.0 / length(shadow_mat_z);
+	vec2 dzduv;
+	{
+		vec3 temp = cross(v_dir, surface_normal);
+		dzduv.s = dot(temp, shadow_mat_z) / (dot(u_dir, temp) * shadow_scale_u);
+		temp = cross(u_dir, surface_normal);
+		dzduv.t = dot(temp, shadow_mat_z) / (dot(v_dir, temp) * shadow_scale_v);
+	}
+	int blocker_cnt = 0;
+	float block_dist = 0;
+	float blocker_search_r = max(pixel_radius, min((shadow_coord.z - nearest_depth) * shadow_inv_scale_z * SUN_RADIUS_DIST_RATIO * sun.light_dir_and_radius.w, MAX_PENUMBRA_RADIUS));
+	uint pixel_seed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
+	for (int i = 0; i < NUM_BLOCKER_SAMPLE; i++)
+	{
+		float r = blocker_search_r * i / (NUM_BLOCKER_SAMPLE - 1);
+		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed);
+		vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
+		float offset_z = min(0, dot(coord_offset, dzduv));
+		vec2 coord = shadow_coord.xy + coord_offset;
+		float dist = shadow_coord.z - texture(shadow_tex_depth, vec3(coord.xy, level)).x;
+		if (dist > -offset_z)
 		{
-			vec3 temp = cross(v_dir, surface_normal);
-			dzdu = dot(temp, shadow_mat_z) / (dot(u_dir, temp) * shadow_scale_u);
-		}
-		{
-			vec3 temp = cross(u_dir, surface_normal);
-			dzdv = dot(temp, shadow_mat_z) / (dot(v_dir, temp) * shadow_scale_v);
-		}
-		float blocker_search_r = MAX_PENUMBRA_RADIUS;
-		int blocker_cnt = 0;
-		float block_dist = 0;
-		bool has_valid = false;
-		vec2 duvdx = 0.5 * vec2(dot(u_dir, dpdx), dot(v_dir, dpdx));
-		vec2 duvdy = 0.5 * vec2(dot(u_dir, dpdy), dot(v_dir, dpdy));
-		float duvdx_len = length(duvdx);
-		float duvdy_len = length(duvdy);
-		for (int i = 0, reverse_cnt = 0; i < NUM_BLOCKER_SAMPLE; i++)
-		{
-			float r = blocker_search_r * sqrt(reverse_cnt == 0 ? max(0.0, (i - 0.25) / (NUM_BLOCKER_SAMPLE - 1)) : (NUM_BLOCKER_SAMPLE - i - 0.5) / reverse_cnt);
-			float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(i));
-			vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
-			float offset_z = min(0, coord_offset.x * dzdu + coord_offset.y * dzdv);
-			vec2 coord = shadowCoord.xy + coord_offset;
-			float dist = shadowCoord.z - texture(shadow_tex_depth, vec3(coord.xy, level)).x;
-			if (dist > -offset_z)
-			{
-				dist *= shadow_inv_scale_z;
-				block_dist += dist;
-				blocker_cnt++;
-				if (1.5 * max(SUN_RADIUS_DIST_RATIO * dist, max(duvdx_len, duvdy_len)) > r)
-				{
-					has_valid = true;
-				}
-				if (reverse_cnt == 0 && blocker_cnt > 1)
-				{
-					float r_range = max(1.5 * SUN_RADIUS_DIST_RATIO * block_dist / blocker_cnt, max(duvdx_len, duvdy_len));
-					if (r > r_range)
-					{
-						reverse_cnt = NUM_BLOCKER_SAMPLE - i - 1;
-						blocker_search_r = r_range;
-					}
-				}
-			}
-		}
-		if (blocker_cnt > 0 && has_valid)
-		{
-			shadow = 0;
-			if (blocker_cnt < NUM_BLOCKER_SAMPLE)
-			{
-				block_dist /= blocker_cnt;
-				float penumbra_radius = SUN_RADIUS_DIST_RATIO * block_dist;
-				vec2 offset_i = vec2(penumbra_radius, 0);
-				vec2 offset_j = vec2(0, penumbra_radius);
-				if (duvdx_len > penumbra_radius && duvdy_len > penumbra_radius)
-				{
-					offset_i = duvdx;
-					offset_j = duvdy;
-					float max_offset_u = sqrt(offset_i.x * offset_i.x + offset_j.x * offset_j.x) * shadow_scale_u;
-					float max_offset_v = sqrt(offset_i.y * offset_i.y + offset_j.y * offset_j.y) * shadow_scale_v;
-					if(max_offset_u > tex_padding_u)
-					{
-						offset_i.x *= tex_padding_u / max_offset_u;
-						offset_j.x *= tex_padding_u / max_offset_u;
-					}
-					if(max_offset_v > tex_padding_v)
-					{
-						offset_i.y *= tex_padding_v / max_offset_v;
-						offset_j.y *= tex_padding_v / max_offset_v;
-					}
-				}
-				else if (duvdx_len > penumbra_radius || duvdy_len > penumbra_radius)
-				{
-					offset_i = duvdx_len > duvdy_len ? duvdx : duvdy;
-					offset_j = penumbra_radius / duvdy_len * vec2(-offset_i.y, offset_i.x);
-					float max_offset_x2 = offset_i.x * offset_i.x + offset_j.x * offset_j.x;
-					float tex_padding_x2 = tex_padding_u * tex_padding_u / (shadow_scale_u * shadow_scale_u);
-					if(max_offset_x2 > tex_padding_x2)
-					{
-						offset_i *= sqrt(tex_padding_x2 -  offset_j.x * offset_j.x) / offset_i.x;
-					}
-					float max_offset_y2 = offset_i.y * offset_i.y + offset_j.y * offset_j.y;
-					float tex_padding_y2 = tex_padding_v * tex_padding_v / (shadow_scale_v * shadow_scale_v);
-					if(max_offset_y2 > tex_padding_y2)
-					{
-						offset_i *= sqrt(tex_padding_y2 -  offset_j.y * offset_j.y) / offset_i.y;
-					}
-				}
-				uint pixelSeed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
-				pixelSeed = (pixelSeed ^ 0x9e3779b9u) * 0x85ebca6bu;
-				int sample_cnt = max(8, int(20 * sample_cnt_factor * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
-				for (int idx = 0; idx < sample_cnt; idx++)
-				{
-					uint scrambledIdx = uint(idx) ^ pixelSeed;
-					float r = sqrt(max(0.0, (idx - 0.25) / (sample_cnt - 1)));
-					float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(scrambledIdx);
-					vec2 coord_offset = (r * cos(angle) * offset_i + r * sin(angle) * offset_j) * vec2(shadow_scale_u, shadow_scale_v);
-					vec2 coord = shadowCoord.xy + coord_offset;
-					float offset_z = coord_offset.x * dzdu + coord_offset.y * dzdv;
-					shadow += texture(shadowTex, vec4(coord.xy, level, shadowCoord.z + offset_z)).x;
-				}
-				shadow /= sample_cnt;
-			}
+			dist *= shadow_inv_scale_z;
+			block_dist += dist;
+			blocker_cnt++;
 		}
 	}
+	if(blocker_cnt == 0)
+	{
+		return 1.0;
+	}
+	if (blocker_cnt == NUM_BLOCKER_SAMPLE)
+	{
+		return 0.0;
+	}
+	float shadow = 0.0;
+	block_dist /= blocker_cnt;
+	float penumbra_radius = min(SUN_RADIUS_DIST_RATIO * sun.light_dir_and_radius.w * block_dist, MAX_PENUMBRA_RADIUS);
+	vec2 offset_i = vec2(penumbra_radius, 0);
+	vec2 offset_j = vec2(0, penumbra_radius);
+	if (duvdx_len > penumbra_radius && duvdy_len > penumbra_radius)
+	{
+		offset_i = duvdx;
+		offset_j = duvdy;
+		float max_offset_u = sqrt(offset_i.x * offset_i.x + offset_j.x * offset_j.x) * shadow_scale_u;
+		float max_offset_v = sqrt(offset_i.y * offset_i.y + offset_j.y * offset_j.y) * shadow_scale_v;
+		if(max_offset_u > tex_padding_u)
+		{
+			offset_i.x *= tex_padding_u / max_offset_u;
+			offset_j.x *= tex_padding_u / max_offset_u;
+		}
+		if(max_offset_v > tex_padding_v)
+		{
+			offset_i.y *= tex_padding_v / max_offset_v;
+			offset_j.y *= tex_padding_v / max_offset_v;
+		}
+	}
+	else if (duvdx_len > penumbra_radius || duvdy_len > penumbra_radius)
+	{
+		offset_i = duvdx_len > duvdy_len ? duvdx : duvdy;
+		offset_j = penumbra_radius / duvdy_len * vec2(-offset_i.y, offset_i.x);
+		float max_offset_x2 = offset_i.x * offset_i.x + offset_j.x * offset_j.x;
+		float tex_padding_x2 = tex_padding_u * tex_padding_u / (shadow_scale_u * shadow_scale_u);
+		if(max_offset_x2 > tex_padding_x2)
+		{
+			offset_i *= sqrt(tex_padding_x2 -  offset_j.x * offset_j.x) / offset_i.x;
+		}
+		float max_offset_y2 = offset_i.y * offset_i.y + offset_j.y * offset_j.y;
+		float tex_padding_y2 = tex_padding_v * tex_padding_v / (shadow_scale_v * shadow_scale_v);
+		if(max_offset_y2 > tex_padding_y2)
+		{
+			offset_i *= sqrt(tex_padding_y2 -  offset_j.y * offset_j.y) / offset_i.y;
+		}
+	}
+	pixel_seed = (pixel_seed ^ 0x9e3779b9u) * 0x85ebca6bu;
+	int sample_cnt = max(8, int(20 * sample_cnt_factor * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
+	for (int idx = 0; idx < sample_cnt; idx++)
+	{
+		float r = sqrt(max(0.0, (idx - 0.25) / (sample_cnt - 1)));
+		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(idx) ^ pixel_seed);
+		vec2 coord_offset = (r * cos(angle) * offset_i + r * sin(angle) * offset_j) * vec2(shadow_scale_u, shadow_scale_v);
+		vec2 coord = shadow_coord.xy + coord_offset;
+		float offset_z = dot(coord_offset, dzduv);
+		shadow += texture(shadowTex, vec4(coord.xy, level, shadow_coord.z + offset_z)).x;
+	}
+	shadow /= sample_cnt;
 	return shadow;
 }

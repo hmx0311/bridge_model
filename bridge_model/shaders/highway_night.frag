@@ -60,11 +60,15 @@ void main()
 			float r2 = dot(coord.xy, coord.xy);
 			if(intensity > 0 && -coord.w < coord.z && coord.z < coord.w && r2 < 0.99)
 			{
-				coord.xy = (coord.xy + 1.0) / (2 * shadowMapSize) + shadowMapPos;
-				coord.w = 0.5 * (coord.z / coord.w + 1.0);
-				coord.z = layer;
-				float shadow = texture(shadowTex, coord).x;
-				intensity *= shadow * lightSmooth(r2);
+				intensity *= lightSmooth(r2);
+				if(layer <= NUM_TILE_LIGHT_SHADOW_LAYERS)
+				{
+					coord.xy = (coord.xy + 1.0) / (2 * shadowMapSize) + shadowMapPos;
+					coord.w = 0.5 * (coord.z / coord.w + 1.0);
+					coord.z = layer;
+					float shadow = texture(shadowTex, coord).x;
+					intensity *= shadow;
+				}
 				aveIntensity += intensity;
 			}
 		}

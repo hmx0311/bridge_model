@@ -66,13 +66,16 @@ void main()
 				}
 				intensity *= lightSmooth(r2);
 				int layer = findMSB((idx >> 3) * 3 + 1) >> 1;
-				ivec2 cnt = ivec2(2 << layer, 4 << layer);
-				idx -= ((8 << (2 * layer)) - 8) / 3 ;
-				vec2 shadowMapPos = vec2(idx % cnt.x, idx / cnt.x) / cnt;
-				modelPosLight.xy = (modelPosLight.xy + 1.0) / (2 * cnt) + shadowMapPos;
-				modelPosLight.w = 0.5 * (modelPosLight.z / modelPosLight.w + 1.0);
-				modelPosLight.z = layer;
-				intensity *= texture(shadowTex, modelPosLight).x;
+				if(layer <= NUM_TILE_LIGHT_SHADOW_LAYERS)
+				{
+					ivec2 cnt = ivec2(2 << layer, 4 << layer);
+					idx -= ((8 << (2 * layer)) - 8) / 3 ;
+					vec2 shadowMapPos = vec2(idx % cnt.x, idx / cnt.x) / cnt;
+					modelPosLight.xy = (modelPosLight.xy + 1.0) / (2 * cnt) + shadowMapPos;
+					modelPosLight.w = 0.5 * (modelPosLight.z / modelPosLight.w + 1.0);
+					modelPosLight.z = layer;
+					intensity *= texture(shadowTex, modelPosLight).x;
+				}
 				const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 50;
 				lighting += intensity * carLightColor;
 			}
