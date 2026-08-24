@@ -50,6 +50,7 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 	{
 		return 1.0;
 	}
+	float penumbra_ratio = SUN_RADIUS_DIST_RATIO * sun.light_dir_and_radius.w;
 	vec3 shadow_mat_z = vec3(sun_shadow.tex[level][0].z, sun_shadow.tex[level][1].z, sun_shadow.tex[level][2].z);
 	float shadow_inv_scale_z = 1.0 / length(shadow_mat_z);
 	vec2 dzduv;
@@ -61,11 +62,13 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 	}
 	int blocker_cnt = 0;
 	float block_dist = 0;
-	float blocker_search_r = max(pixel_radius, min((shadow_coord.z - nearest_depth) * shadow_inv_scale_z * SUN_RADIUS_DIST_RATIO * sun.light_dir_and_radius.w, MAX_PENUMBRA_RADIUS));
+	float total_weight = 0.0;
+	float blocker_search_r = max(pixel_radius, min((shadow_coord.z - nearest_depth) * shadow_inv_scale_z * penumbra_ratio, MAX_PENUMBRA_RADIUS));
+	float min_unblock_r = blocker_search_r;
 	uint pixel_seed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
 	for (int i = 0; i < NUM_BLOCKER_SAMPLE; i++)
 	{
-		float r = blocker_search_r * i / (NUM_BLOCKER_SAMPLE - 1);
+		float r = blocker_search_r * (i + 0.5) / NUM_BLOCKER_SAMPLE;
 		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed);
 		vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
 		float offset_z = min(0, dot(coord_offset, dzduv));
@@ -74,21 +77,28 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 		if (dist > -offset_z)
 		{
 			dist *= shadow_inv_scale_z;
-			block_dist += dist;
+			float k = blocker_search_r / (dist * penumbra_ratio) - 1;
+			float weight = (2 + k) / (1 + k * r / blocker_search_r);
+			total_weight += weight;
+			block_dist += weight * dist;
 			blocker_cnt++;
 		}
+		else
+		{
+			min_unblock_r = min(r, min_unblock_r);
+		}
 	}
-	if(blocker_cnt == 0)
+	if(total_weight == 0.0)
 	{
 		return 1.0;
 	}
-	if (blocker_cnt == NUM_BLOCKER_SAMPLE)
+	block_dist /= total_weight;
+	float penumbra_radius = min(penumbra_ratio * block_dist, MAX_PENUMBRA_RADIUS);
+	if (min_unblock_r >= max(pixel_radius, min(blocker_search_r, penumbra_radius + 4.0 / NUM_BLOCKER_SAMPLE * blocker_search_r)))
 	{
 		return 0.0;
 	}
 	float shadow = 0.0;
-	block_dist /= blocker_cnt;
-	float penumbra_radius = min(SUN_RADIUS_DIST_RATIO * sun.light_dir_and_radius.w * block_dist, MAX_PENUMBRA_RADIUS);
 	vec2 offset_i = vec2(penumbra_radius, 0);
 	vec2 offset_j = vec2(0, penumbra_radius);
 	if (duvdx_len > penumbra_radius && duvdy_len > penumbra_radius)
