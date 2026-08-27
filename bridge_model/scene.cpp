@@ -24,19 +24,19 @@ void initTex()
 	}
 
 	//accelerate lane1
-	for (int i = 40; i < 80; i++)
+	for (int i = 44; i < 76; i++)
 	{
-		for (int j = 0; j < 5; j++)
+		for (int j = 0; j < 4; j++)
 		{
-			for (int k = 0; k < 250; k++)
+			for (int k = 0; k < 400; k++)
 			{
-				highway_tex_data[k + 500 * j + 250][i] = vec3(0.9f, 0.9f, 0.9f);
+				highway_tex_data[k + 800 * j + 200][i] = vec3(0.9f, 0.9f, 0.9f);
 			}
 		}
 	}
 	for (int i = 3840; i < 4096; i++)
 	{
-		for (int j = 50; j < 70; j++)
+		for (int j = 52; j < 68; j++)
 		{
 			highway_tex_data[i][j] = vec3(0.9f, 0.9f, 0.9f);
 		}
@@ -84,17 +84,17 @@ void initTex()
 	int offset = 1024;
 
 	//accelerate lane2
-	for (int i = 944; i < 984; i++)
+	for (int i = 948; i < 980; i++)
 	{
-		for (int j = 0; j < 8; j++)
+		for (int j = 0; j < 4; j++)
 		{
-			for (int k = 0; k < 256; k++)
+			for (int k = 0; k < 512; k++)
 			{
-				highway_tex_data[128 + 512 * j + k][i + offset] = vec3(0.9f, 0.9f, 0.9f);
+				highway_tex_data[256 + 1024 * j + k][i + offset] = vec3(0.9f, 0.9f, 0.9f);
 			}
 		}
 	}
-	for (int i = 314; i < 334; i++)
+	for (int i = 316; i < 332; i++)
 	{
 		for (int j = 0; j < 4096; j++)
 		{
@@ -152,11 +152,11 @@ void initTex()
 		}
 		else if ((808 <= i && i < 824) || (2248 <= i && i < 2264))
 		{
-			for (int j = 616; j < 1432; j++)
+			for (int j = 576; j < 1472; j++)
 			{
 				highway_tex_data[j][i + offset] = vec3(0.9f, 0.9f, 0.9f);
 			}
-			for (int j = 2664; j < 3480; j++)
+			for (int j = 2624; j < 3520; j++)
 			{
 				highway_tex_data[j][i + offset] = vec3(0.9f, 0.9f, 0.9f);
 			}

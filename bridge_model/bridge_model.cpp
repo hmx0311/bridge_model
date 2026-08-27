@@ -460,8 +460,8 @@ static void buildHeightMap()
 	glUseProgram(SP_shadow_highway_day);
 	glBindVertexArray(bridge_VAO);
 	glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
-	glBindVertexArray(ground_VAO);
-	glDrawElements(GL_TRIANGLES, GROUND_EBO_SIZE, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(highway_VAO);
+	glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 	GLfloat(*depth_data)[SHADOW_DAY_TEX_SIZE][SHADOW_DAY_TEX_SIZE] = new GLfloat[CSM_LEVELS][SHADOW_DAY_TEX_SIZE][SHADOW_DAY_TEX_SIZE];
 	glGetTextureImage(shadow_day_tex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, CSM_LEVELS * SHADOW_DAY_TEX_SIZE * SHADOW_DAY_TEX_SIZE * sizeof(GLfloat), depth_data);
@@ -565,6 +565,9 @@ static void init()
 			car_light_map_grid_distance_order[i * LIGHT_MAP_SIZE_Y + j] = ivec2(i, j);
 		}
 	}
+
+	glPolygonOffset(0.2f, 1.4f);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	int UBO_offset_alignment;
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &UBO_offset_alignment);
@@ -1418,10 +1421,12 @@ static void drawGraphics()
 		glViewport(0, 0, window_width, window_height);
 		glUseProgram(SP_highway_day);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		glBindVertexArray(ground_VAO);
-		glDisable(GL_DEPTH_TEST);
-		glDrawElements(GL_TRIANGLES, GROUND_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glBindVertexArray(terrain_VAO);
+		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		glBindVertexArray(highway_VAO);
+		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_car_day);
@@ -1460,10 +1465,12 @@ static void drawGraphics()
 		glViewport(0, 0, window_width, window_height);
 		glUseProgram(SP_highway_night);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		glBindVertexArray(ground_VAO);
-		glDisable(GL_DEPTH_TEST);
-		glDrawElements(GL_TRIANGLES, GROUND_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glBindVertexArray(terrain_VAO);
+		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		glBindVertexArray(highway_VAO);
+		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_car_night);
@@ -1530,7 +1537,6 @@ static void drawGraphics()
 		sprintf_s(str, 40, "fps: %d|%d", int(round(fps)), int(round(tick_rate)));
 		glBindTextureUnit(0, text_atlas_tex);
 		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(SP_text);
 		for (int i = 0; str[i] != '\0'; i++)
 		{
@@ -1542,7 +1548,6 @@ static void drawGraphics()
 			glViewport(x + i * (TEXT_WIDTH - 5), y, TEXT_WIDTH, TEXT_HEIGHT);
 			glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 		}
-		glBlendFunc(GL_ONE, GL_ZERO);
 		glDisable(GL_BLEND);
 	}
 
