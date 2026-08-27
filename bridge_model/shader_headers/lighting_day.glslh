@@ -41,11 +41,11 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 	float pixel_radius = min(max(duvdx_len, duvdy_len), min(tex_padding_u / shadow_scale_u, tex_padding_v / shadow_scale_v));
 	int mip_level = min(findMSB(int(ceil(2 * SHADOW_DAY_TEX_SIZE * max(MAX_PENUMBRA_RADIUS, pixel_radius) * max(shadow_scale_u, shadow_scale_v)) - 1)), PCSS_MIP_LEVELS);
 	float nearest_depth = 1.0;
-	ivec3 mip_idx = ivec3(ivec2(floor((SHADOW_DAY_TEX_SIZE >> mip_level) * shadow_coord.xy - 0.5)), level);
-	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx, 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
-	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx + ivec3(0, 1, 0), 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
-	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx + ivec3(1, 0, 0), 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
-	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, clamp(mip_idx + ivec3(1, 1, 0), 0, SHADOW_DAY_TEX_SIZE >> mip_level), mip_level).x);
+	ivec2 mip_idx = ivec2(floor((SHADOW_DAY_TEX_SIZE >> mip_level) * shadow_coord.xy - 0.5));
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, ivec3(clamp(mip_idx, 0, (SHADOW_DAY_TEX_SIZE >> mip_level) - 1), level), mip_level).x);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, ivec3(clamp(mip_idx + ivec2(0, 1), 0, (SHADOW_DAY_TEX_SIZE >> mip_level) - 1), level), mip_level).x);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, ivec3(clamp(mip_idx + ivec2(1, 0), 0, (SHADOW_DAY_TEX_SIZE >> mip_level) - 1), level), mip_level).x);
+	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, ivec3(clamp(mip_idx + ivec2(1, 1), 0, (SHADOW_DAY_TEX_SIZE >> mip_level) - 1), level), mip_level).x);
 	if(nearest_depth >= shadow_coord.z)
 	{
 		return 1.0;
