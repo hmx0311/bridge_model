@@ -2,7 +2,9 @@
 #include "glad/glad.h"
 #include "glm.hpp"
 
-constexpr int TERRAIN_EBO_SIZE = 6;
+constexpr int NUM_TERRAIN_GRID_X = 2112;
+constexpr int NUM_TERRAIN_GRID_Y = 1920;
+constexpr int TERRAIN_EBO_SIZE = 6 * NUM_TERRAIN_GRID_X * NUM_TERRAIN_GRID_Y;
 constexpr int HIGHWAY_EBO_SIZE = 3981;
 constexpr int BRIDGE_EBO_SIZE = 18966;
 constexpr int CAR_EBO_SIZE = 2496;

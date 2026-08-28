@@ -147,6 +147,7 @@
     <None Include="shader_headers\lighting_night.glslh" />
     <None Include="textures\font_atlas_r8.raw" />
     <None Include="shaders\text.frag" />
+    <None Include="textures\terrain_height.r16" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

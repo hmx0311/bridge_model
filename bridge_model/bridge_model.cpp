@@ -55,7 +55,7 @@ bool show_fps = false;
 bool need_update_view = true;
 uint64_t last_time_us;
 
-constexpr float MAX_HEIGHT = 5.0f;
+constexpr float HEIGHT_RANGE[2] = { -5.0f, 33.0f };
 constexpr int HEIGHT_MAP_SIZE = 256;
 constexpr vec4 HEIGHT_MAP_AREA = { -102.4f, -76.8f, 102.4f, 128.0f };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
@@ -111,7 +111,7 @@ CameraData camera;
 float horizon_y;
 vec3 CSM_areas[CSM_LEVELS][12];
 ShadowTransformData sun_shadow;
-const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE - 0.001f), CAR_LIGHT_ASPECT, 0.5f, 0.5f + 2 * LIGHT_MAP_GRID_LENGTH);
+const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE), CAR_LIGHT_ASPECT, 0.5f, 0.5f + 2 * LIGHT_MAP_GRID_LENGTH);
 
 int num_active_car_light_map_grids = 0;
 float car_light_map_grid_distance2_to_view[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
@@ -452,8 +452,8 @@ static void buildHeightMap()
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
 	glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.w, 0.0f, MAX_HEIGHT) *
-		lookAt(vec3(0, 0, MAX_HEIGHT), vec3(0, 0, 0), vec3(0, 1, 0));
+	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.w, 0.0f, HEIGHT_RANGE[1]) *
+		lookAt(vec3(0, 0, HEIGHT_RANGE[1]), vec3(0, 0, 0), vec3(0, 1, 0));
 	vec4 v(FLT_MAX);
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(vec4), &v);
 	glNamedBufferSubData(shadow_UBO, 0, sizeof(mat4), &height_mat);
@@ -499,7 +499,7 @@ static void buildHeightMap()
 						}
 					}
 				}
-				height_map_buffer[0][i][j] = (1 - min_depth) * MAX_HEIGHT;
+				height_map_buffer[0][i][j] = (1 - min_depth) * HEIGHT_RANGE[1];
 			}
 		}
 #pragma omp for
@@ -763,7 +763,7 @@ static void drawGraphics()
 			float move_distance = move_speed * 1e-6f * dt_us;
 			vec3 new_focus = focus + vec3(dir.x * move_distance, dir.y * move_distance, 0);
 			new_focus.x = clamp(new_focus.x, -300.0f, 300.0f);
-			new_focus.y = clamp(new_focus.y, -100.0f, 200.0f);
+			new_focus.y = clamp(new_focus.y, -200.0f, 200.0f);
 			if (focus != new_focus)
 			{
 				need_update_view = true;
@@ -844,7 +844,7 @@ static void drawGraphics()
 		vec3 view_dir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
 		focus.z = FOCUS_HEIGHT;
 		vec3 eye = focus - view_distance * view_dir;
-		if (eye.z < FOCUS_HEIGHT + MAX_HEIGHT)
+		if (eye.z < FOCUS_HEIGHT + HEIGHT_RANGE[1])
 		{
 			vec2 height_map_coord((eye.x - HEIGHT_MAP_AREA.x) / (HEIGHT_MAP_AREA.z - HEIGHT_MAP_AREA.x) * HEIGHT_MAP_SIZE - 0.5f,
 				(eye.y - HEIGHT_MAP_AREA.y) / (HEIGHT_MAP_AREA.w - HEIGHT_MAP_AREA.y) * HEIGHT_MAP_SIZE - 0.5f);
@@ -854,11 +854,13 @@ static void drawGraphics()
 					height_map[int(height_map_coord.y)][int(height_map_coord.x) + 1] * (height_map_coord.x - int(height_map_coord.x)) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
 					height_map[int(height_map_coord.y) + 1][int(height_map_coord.x)] * (int(height_map_coord.x) + 1 - height_map_coord.x) * (height_map_coord.y - int(height_map_coord.y)) +
 					height_map[int(height_map_coord.y) + 1][int(height_map_coord.x) + 1] * (height_map_coord.x - int(height_map_coord.x)) * (height_map_coord.y - int(height_map_coord.y));
-				height_offset *= 1 - (eye.z - FOCUS_HEIGHT) / (MAX_HEIGHT);
+				height_offset *= 1 - (eye.z - FOCUS_HEIGHT) / (HEIGHT_RANGE[1]);
 				eye.z += height_offset;
 				focus.z += height_offset;
 			}
 		}
+		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * window_height / 2;
+
 		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
 		camera.inv_view = inverse(camera.view);
 		vec3 top_view(0, tanf(FOVY / 2), -1);
@@ -867,19 +869,18 @@ static void drawGraphics()
 		top_view = mat3(camera.inv_view) * top_view;
 		bottom_view = mat3(camera.inv_view) * bottom_view;
 		view_x = mat3(camera.inv_view) * view_x;
-		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * window_height / 2;
 
-		if (eye.z > MAX_HEIGHT)
+		if (eye.z > HEIGHT_RANGE[1])
 		{
-			float shadow_near = std::max(-(eye.z - MAX_HEIGHT) / bottom_view.z, VIEW_Z_NEAR);
+			float shadow_near = std::max(-(eye.z - HEIGHT_RANGE[1]) / bottom_view.z, VIEW_Z_NEAR);
 			float shadow_far = std::max(shadow_near, MIN_SHADOW_FAR);
-			float bottom_far = -eye.z / bottom_view.z;
+			float bottom_far = -(eye.z - HEIGHT_RANGE[0]) / bottom_view.z;
 			float top_near = VIEW_Z_FAR;
 			float top_far = VIEW_Z_FAR;
 			if (top_view.z < 0)
 			{
-				top_near = std::min(-(eye.z - MAX_HEIGHT) / top_view.z, VIEW_Z_FAR);
-				top_far = std::min(-eye.z / top_view.z, VIEW_Z_FAR);
+				top_near = std::min(-(eye.z - HEIGHT_RANGE[1]) / top_view.z, VIEW_Z_FAR);
+				top_far = std::min(-(eye.z - HEIGHT_RANGE[0]) / top_view.z, VIEW_Z_FAR);
 			}
 			float CSM_ratio = std::min(pow(top_far / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 			vec3 shadow_hexa[6];
@@ -915,7 +916,7 @@ static void drawGraphics()
 				{
 					if (bottom_far * (1 + FLT_EPSILON) < shadow_far)
 					{
-						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
+						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z - HEIGHT_RANGE[0]) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
 					}
 					else
 					{
@@ -923,7 +924,7 @@ static void drawGraphics()
 					}
 					if (top_near > shadow_far)
 					{
-						shadow_hexa[5] = shadow_far * top_view + (eye.z + shadow_far * top_view.z - MAX_HEIGHT) / (top_view.z - view_dir.z) * (view_dir - top_view);
+						shadow_hexa[5] = shadow_far * top_view + (eye.z + shadow_far * top_view.z - HEIGHT_RANGE[1]) / (top_view.z - view_dir.z) * (view_dir - top_view);
 					}
 					else
 					{
@@ -942,17 +943,17 @@ static void drawGraphics()
 		else
 		{
 			float shadow_near = VIEW_Z_NEAR;
-			float bottom = -eye.z / bottom_view.z;
+			float bottom = -(eye.z - HEIGHT_RANGE[0]) / bottom_view.z;
 			float shadow_far = MIN_SHADOW_FAR;
 			if (top_view.z > 0)
 			{
-				float top = std::min((MAX_HEIGHT - eye.z) / top_view.z, VIEW_Z_FAR);
+				float top = std::min((HEIGHT_RANGE[1] - eye.z) / top_view.z, VIEW_Z_FAR);
 				float CSM_ratio = std::min(pow(VIEW_Z_FAR / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 				vec3 shadow_hexa[6];
 				shadow_hexa[4] = shadow_near * bottom_view;
 				if (top < shadow_near)
 				{
-					shadow_hexa[5] = shadow_near * top_view - (eye.z + shadow_near * top_view.z - MAX_HEIGHT) / (view_dir.z - top_view.z) * (view_dir - top_view);
+					shadow_hexa[5] = shadow_near * top_view - (eye.z + shadow_near * top_view.z - HEIGHT_RANGE[1]) / (view_dir.z - top_view.z) * (view_dir - top_view);
 				}
 				else
 				{
@@ -981,7 +982,7 @@ static void drawGraphics()
 					}
 					if (bottom < shadow_far)
 					{
-						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
+						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z - HEIGHT_RANGE[0]) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
 					}
 					else
 					{
@@ -989,7 +990,7 @@ static void drawGraphics()
 					}
 					if (top < shadow_far)
 					{
-						shadow_hexa[5] = shadow_far * top_view - (eye.z + shadow_far * top_view.z - MAX_HEIGHT) / (view_dir.z - top_view.z) * (view_dir - top_view);
+						shadow_hexa[5] = shadow_far * top_view - (eye.z + shadow_far * top_view.z - HEIGHT_RANGE[1]) / (view_dir.z - top_view.z) * (view_dir - top_view);
 					}
 					else
 					{
@@ -1009,7 +1010,7 @@ static void drawGraphics()
 				float top = VIEW_Z_FAR;
 				if (top_view.z < 0)
 				{
-					top = std::min(-eye.z / top_view.z, VIEW_Z_FAR);
+					top = std::min(-(eye.z - HEIGHT_RANGE[0]) / top_view.z, VIEW_Z_FAR);
 				}
 				float CSM_ratio = std::min(pow(top / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
 				vec3 shadow_hexa[6];
@@ -1038,7 +1039,7 @@ static void drawGraphics()
 					{
 						if (bottom * (1 + FLT_EPSILON) < shadow_far)
 						{
-							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
+							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z - HEIGHT_RANGE[0]) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
 						}
 						else
 						{
@@ -1061,14 +1062,15 @@ static void drawGraphics()
 		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
 		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 		{
-			float offset_x = (-LIGHT_MAP_SIZE_X / 2 + i) * LIGHT_MAP_GRID_LENGTH;
+			float offset_x = (-0.5f * LIGHT_MAP_SIZE_X + i) * LIGHT_MAP_GRID_LENGTH;
 			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 			{
-				float offset_y = (-LIGHT_MAP_SIZE_Y / 2 + j) * LIGHT_MAP_GRID_LENGTH;
-				constexpr vec4 GRID_AABB[8] = { vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, 0, 1),
-					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, 0, 1),
-					vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1),
-					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, MAX_HEIGHT, 1) };
+				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + j) * LIGHT_MAP_GRID_LENGTH;
+				constexpr vec4 GRID_AABB[8] =
+				{ vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1),
+					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1),
+					vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1),
+					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1) };
 				int left = 0, right = 0, bottom = 0, top = 0, back = 0, front = 0;
 				for (vec4 vert : GRID_AABB)
 				{
@@ -1088,10 +1090,10 @@ static void drawGraphics()
 		num_active_car_light_map_grids = 0;
 		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 		{
-			float offset_x = (-LIGHT_MAP_SIZE_X / 2 + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
+			float offset_x = (-0.5f * LIGHT_MAP_SIZE_X + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
 			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 			{
-				float offset_y = (-LIGHT_MAP_SIZE_Y / 2 + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
+				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
 				if (is_light_grid_visible[i][j])
 				{
 					vec2 distance = vec2(eye) - vec2(offset_x, offset_y);
@@ -1170,7 +1172,7 @@ static void drawGraphics()
 				y_min[i] = min(y_min[i], point.y);
 				y_max[i] = max(y_max[i], point.y);
 			}
-			z_far = std::max(-y_max[i] * slope, z_far);
+			z_far = std::max(HEIGHT_RANGE[0] / sun.light_dir_and_radius.z - y_max[i] * slope, z_far);
 			z_fars[i] = z_far;
 		}
 		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
@@ -1213,7 +1215,7 @@ static void drawGraphics()
 			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
 			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_max[i] - x_min[i]));
 			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_max[i] - y_min[i]));
-			float z_near = std::min(MAX_HEIGHT / sun.light_dir_and_radius.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
+			float z_near = std::min(HEIGHT_RANGE[1] / sun.light_dir_and_radius.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
 			float z_padding = std::max(x_padding / (x_max[i] - x_min[i]), y_padding / (y_max[i] - y_min[i])) * (z_near - z_fars[i]);
 			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding, y_min[i] - y_padding, y_max[i] + y_padding, -z_near, -z_fars[i] + z_padding);
 			shadow_mat = shadow_mat * sun_mat;
@@ -1390,6 +1392,8 @@ static void drawGraphics()
 		glDisable(GL_CULL_FACE);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_day);
+		glBindVertexArray(terrain_VAO);
+		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_day);
@@ -1729,7 +1733,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.2 * DAY_PERIOD)
+	while (logical_time < 0.6 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

@@ -22,8 +22,7 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 		tex_padding_u = max(MIN_SHADOW_MAP_PADDING, MAX_PENUMBRA_RADIUS * shadow_scale_u);
 		tex_padding_v = max(MIN_SHADOW_MAP_PADDING, MAX_PENUMBRA_RADIUS * shadow_scale_v);
 		shadow_coord = (sun_shadow.tex[level] * vec4(modelPos, 1.0)).xyz;
-		if (shadow_coord.x > tex_padding_u && shadow_coord.x < 1 - tex_padding_u &&
-			shadow_coord.y > tex_padding_v && shadow_coord.y < 1 - tex_padding_v)
+		if (shadow_coord.x > tex_padding_u && shadow_coord.x < 1 - tex_padding_u &&	shadow_coord.y > tex_padding_v && shadow_coord.y < 1 - tex_padding_v)
 		{
 			break;
 		}

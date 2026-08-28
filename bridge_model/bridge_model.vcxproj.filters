@@ -197,5 +197,8 @@
     <None Include="shaders\gen_PCSS_mips.frag">
       <Filter>资源文件\shaders\shadow\day</Filter>
     </None>
+    <None Include="textures\terrain_height.r16">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
 </Project>

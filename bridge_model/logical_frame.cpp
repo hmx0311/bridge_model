@@ -151,7 +151,7 @@ static void initLanes()
 		});
 	iter->setNextLane(next_lane);
 	iter = next_lane;
-	next_lane = new Lane(834.00f, 25.0f, iter->transform(iter->length), [](float s)->mat4
+	next_lane = new Lane(834.0f, 25.0f, iter->transform(iter->length), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(0, s, 0));
 			return transform;
@@ -164,7 +164,7 @@ static void initLanes()
 			return transform;
 		});
 
-	lanes[3] = new Lane(834.40f, 25.0f, (translate(vec3(1050.0f, 5.2f, 0)) * rotate(pi<float>() / 2, vec3(0, 0, 1))), [](float s)->mat4
+	lanes[3] = new Lane(834.4f, 25.0f, (translate(vec3(1050.0f, 5.2f, 0)) * rotate(pi<float>() / 2, vec3(0, 0, 1))), [](float s)->mat4
 		{
 			mat4 transform = translate(vec3(-s, 0, 0));
 			return transform;

@@ -26,6 +26,7 @@
 #define IDR_FS_TEXT						text.frag
 
 #define IDR_TEXT_ATLAS					101
+#define IDR_TERRAIN_HEIGHT				102
 
 // Next default values for new objects
 // 
