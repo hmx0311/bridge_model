@@ -73,8 +73,7 @@ void main()
 			}
 		}
 		aveIntensity /= 4;
-		const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 50;
-		lighting += aveIntensity * carLightColor;
+		lighting += aveIntensity * CAR_LIGHT_INTENSITY;
 	}
 	color *= lighting;
 	

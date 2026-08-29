@@ -1172,7 +1172,7 @@ static void buildBridgeMesh()
 				float sin_theta = sin(k * dtheta);
 				float x = pillar_pos[j].x + R * cos_theta;
 				float y = pillar_pos[j].y + R * sin_theta;
-				positions[i_vert + 2 * k] = vec3(x, y, 0);
+				positions[i_vert + 2 * k] = vec3(x, y, -5.0f);
 				positions[i_vert + 2 * k + 1] = vec3(x, y, pillar_pos[j].z);
 				normals[i_vert + 2 * k] = vec3(cos_theta, sin_theta, 0);
 				normals[i_vert + 2 * k + 1] = vec3(cos_theta, sin_theta, 0);

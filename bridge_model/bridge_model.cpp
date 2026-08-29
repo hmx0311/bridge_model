@@ -1733,7 +1733,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.6 * DAY_PERIOD)
+	while (logical_time < 0.35 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

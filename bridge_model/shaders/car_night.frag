@@ -76,8 +76,7 @@ void main()
 					modelPosLight.z = layer;
 					intensity *= texture(shadowTex, modelPosLight).x;
 				}
-				const vec3 carLightColor = vec3(1.0, 1.0, 0.9) * 50;
-				lighting += intensity * carLightColor;
+				lighting += intensity * CAR_LIGHT_INTENSITY;
 			}
 		}
 		color *= lighting;
