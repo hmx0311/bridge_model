@@ -55,7 +55,7 @@ bool show_fps = false;
 bool need_update_view = true;
 uint64_t last_time_us;
 
-constexpr float HEIGHT_RANGE[2] = { -5.0f, 33.0f };
+constexpr float HEIGHT_RANGE[2] = { -10.0f, 56.0f };
 constexpr int HEIGHT_MAP_SIZE = 256;
 constexpr vec4 HEIGHT_MAP_AREA = { -102.4f, -76.8f, 102.4f, 128.0f };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];

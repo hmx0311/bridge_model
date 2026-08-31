@@ -33,19 +33,19 @@ static void buildTerrainMesh()
 	constexpr int TEX_COORD_SIZE = VERT_SIZE * sizeof(decltype(tex_coords)::element_type);
 	constexpr int INDEX_SIZE = TERRAIN_EBO_SIZE * sizeof(decltype(indices)::element_type);
 
-	auto height_data = std::make_unique<int16[]>(VERT_SIZE);
+	auto height_data = std::make_unique<uint16[]>(VERT_SIZE);
 	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TERRAIN_HEIGHT), L"TEXTURE");
 	if (rc_info != nullptr)
 	{
 		HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-		if (SizeofResource(nullptr, rc_info) != VERT_SIZE * sizeof(int16))
+		if (SizeofResource(nullptr, rc_info) != VERT_SIZE * sizeof(uint16))
 		{
 			printf("ERROR: Invalid terrian height data size\n");
 			return;
 		}
 		if (rc_data != nullptr)
 		{
-			memcpy(height_data.get(), LockResource(rc_data), VERT_SIZE * sizeof(int16));
+			memcpy(height_data.get(), LockResource(rc_data), VERT_SIZE * sizeof(uint16));
 		}
 		else
 		{
@@ -64,19 +64,7 @@ static void buildTerrainMesh()
 		for (int j = 0; j <= NUM_TERRAIN_GRID_X; j++)
 		{
 			int idx = i * (NUM_TERRAIN_GRID_X + 1) + j;
-			float height = 0.001f * height_data[idx];
-			positions[idx] = vec3(-0.5f * NUM_TERRAIN_GRID_X + j, -0.5f * NUM_TERRAIN_GRID_Y + i, height);
-			tex_coords[idx] = vec2(0.09375f, 1.0f);
-			normals[idx] = vec3(0, 0, 1);
-		}
-	}
-
-	for (int i = 0; i <= NUM_TERRAIN_GRID_Y; i++)
-	{
-		for (int j = 0; j <= NUM_TERRAIN_GRID_X; j++)
-		{
-			int idx = i * (NUM_TERRAIN_GRID_X + 1) + j;
-			float height = 0.001f * height_data[idx];
+			float height = 0.001f * height_data[idx] - 10.0f;
 			positions[idx] = vec3(-0.5f * NUM_TERRAIN_GRID_X + j, -0.5f * NUM_TERRAIN_GRID_Y + i, height);
 			tex_coords[idx] = vec2(0.09375f, 1.0f);
 			normals[idx] = vec3(0, 0, 1);
@@ -649,14 +637,12 @@ static void buildHighwayMesh()
 
 static void buildBridgeMesh()
 {
-	constexpr int VERTICES_SIZE = 6422;
+	constexpr int VERTICES_SIZE = 5770;
 	vec3 positions[VERTICES_SIZE];
 	vec3 normals[VERTICES_SIZE];
 	vec2 tex_coords[VERTICES_SIZE];
 	GLuint indices[BRIDGE_EBO_SIZE];
 
-	int i_vert = 8;
-	int i_idx = 12;
 	positions[0] = vec3(-3.76f, 116.0f, 0);
 	positions[1] = vec3(-4.0f, 116.0f, 0);
 	positions[2] = vec3(-4.0f, 116.0f, 0.5f);
@@ -681,6 +667,8 @@ static void buildBridgeMesh()
 	indices[9] = 4;
 	indices[10] = 6;
 	indices[11] = 7;
+	int i_vert = 8;
+	int i_idx = 12;
 	float theta = asin(61.0f / 1861);
 	int n = theta * sqrtf(37220) + 3;
 	float dtheta = theta / n;
@@ -768,68 +756,68 @@ static void buildBridgeMesh()
 	i_vert += 2 * n;
 
 	positions[i_vert] = vec3(-4.0f, 103.8f, 0.7f);
-	positions[i_vert + 1] = vec3(-4.0f, 103.8f, 0.0f);
-	positions[i_vert + 2] = vec3(-4.0f, 10.8f, 3.05f);
-	positions[i_vert + 3] = vec3(-4.0f, 10.8f, 3.75f);
+	positions[i_vert + 1] = vec3(-4.0f, 103.8f, -8.0f);
+	positions[i_vert + 2] = vec3(-4.0f, 85.2f, -8.0f);
+	positions[i_vert + 3] = vec3(-4.0f, 85.2f, 1.31f);
 	normals[i_vert] = vec3(-1, 0, 0);
 	normals[i_vert + 1] = vec3(-1, 0, 0);
 	normals[i_vert + 2] = vec3(-1, 0, 0);
 	normals[i_vert + 3] = vec3(-1, 0, 0);
 	positions[i_vert + 4] = vec3(-3.76f, 103.8f, 0.2f);
 	positions[i_vert + 5] = vec3(-3.76f, 103.8f, 0.7f);
-	positions[i_vert + 6] = vec3(-3.76f, 10.8f, 3.75f);
-	positions[i_vert + 7] = vec3(-3.76f, 10.8f, 3.25f);
+	positions[i_vert + 6] = vec3(-3.76f, 85.2f, 1.31f);
+	positions[i_vert + 7] = vec3(-3.76f, 85.2f, 0.81f);
 	normals[i_vert + 4] = vec3(1, 0, 0);
 	normals[i_vert + 5] = vec3(1, 0, 0);
 	normals[i_vert + 6] = vec3(1, 0, 0);
 	normals[i_vert + 7] = vec3(1, 0, 0);
 	positions[i_vert + 8] = vec3(3.76f, 103.8f, 0.7f);
 	positions[i_vert + 9] = vec3(3.76f, 103.8f, 0.2f);
-	positions[i_vert + 10] = vec3(3.76f, 10.8f, 3.25f);
-	positions[i_vert + 11] = vec3(3.76f, 10.8f, 3.75f);
+	positions[i_vert + 10] = vec3(3.76f, 85.2f, 0.81f);
+	positions[i_vert + 11] = vec3(3.76f, 85.2f, 1.31f);
 	normals[i_vert + 8] = vec3(-1, 0, 0);
 	normals[i_vert + 9] = vec3(-1, 0, 0);
 	normals[i_vert + 10] = vec3(-1, 0, 0);
 	normals[i_vert + 11] = vec3(-1, 0, 0);
-	positions[i_vert + 12] = vec3(4.0f, 103.8f, 0.0f);
+	positions[i_vert + 12] = vec3(4.0f, 103.8f, -8.0f);
 	positions[i_vert + 13] = vec3(4.0f, 103.8f, 0.7f);
-	positions[i_vert + 14] = vec3(4.0f, 10.8f, 3.75f);
-	positions[i_vert + 15] = vec3(4.0f, 10.8f, 3.05f);
+	positions[i_vert + 14] = vec3(4.0f, 85.2f, 1.31f);
+	positions[i_vert + 15] = vec3(4.0f, 85.2f, -8.0f);
 	normals[i_vert + 12] = vec3(1, 0, 0);
 	normals[i_vert + 13] = vec3(1, 0, 0);
 	normals[i_vert + 14] = vec3(1, 0, 0);
 	normals[i_vert + 15] = vec3(1, 0, 0);
-	positions[i_vert + 16] = vec3(-4.0f, 103.8f, 0.0f);
-	positions[i_vert + 17] = vec3(4.0f, 103.8f, 0.0f);
-	positions[i_vert + 18] = vec3(4.0f, 10.8f, 3.05f);
-	positions[i_vert + 19] = vec3(-4.0f, 10.8f, 3.05f);
-	normals[i_vert + 16] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
-	normals[i_vert + 17] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
-	normals[i_vert + 18] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
-	normals[i_vert + 19] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
-	positions[i_vert + 20] = vec3(-3.76f, 103.8f, 0.7f);
-	positions[i_vert + 21] = vec3(-4.0f, 103.8f, 0.7f);
-	positions[i_vert + 22] = vec3(-4.0f, 10.8f, 3.75f);
-	positions[i_vert + 23] = vec3(-3.76f, 10.8f, 3.75f);
+	positions[i_vert + 16] = vec3(-3.76f, 103.8f, 0.7f);
+	positions[i_vert + 17] = vec3(-4.0f, 103.8f, 0.7f);
+	positions[i_vert + 18] = vec3(-4.0f, 85.2f, 1.31f);
+	positions[i_vert + 19] = vec3(-3.76f, 85.2f, 1.31f);
+	normals[i_vert + 16] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 17] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 18] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 19] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	positions[i_vert + 20] = vec3(4.0f, 103.8f, 0.7f);
+	positions[i_vert + 21] = vec3(3.76f, 103.8f, 0.7f);
+	positions[i_vert + 22] = vec3(3.76f, 85.2f, 1.31f);
+	positions[i_vert + 23] = vec3(4.0f, 85.2f, 1.31f);
 	normals[i_vert + 20] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
 	normals[i_vert + 21] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
 	normals[i_vert + 22] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
 	normals[i_vert + 23] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
-	positions[i_vert + 24] = vec3(4.0f, 103.8f, 0.7f);
-	positions[i_vert + 25] = vec3(3.76f, 103.8f, 0.7f);
-	positions[i_vert + 26] = vec3(3.76f, 10.8f, 3.75f);
-	positions[i_vert + 27] = vec3(4.0f, 10.8f, 3.75f);
-	normals[i_vert + 24] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
-	normals[i_vert + 25] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
-	normals[i_vert + 26] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
-	normals[i_vert + 27] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	positions[i_vert + 24] = vec3(-4.0f, 85.2f, -8.0f);
+	positions[i_vert + 25] = vec3(4.0f, 85.2f, -8.0f);
+	positions[i_vert + 26] = vec3(4.0f, 85.2f, 0.61f);
+	positions[i_vert + 27] = vec3(-4.0f, 85.2f, 0.61f);
+	normals[i_vert + 24] = vec3(0,-1,0);
+	normals[i_vert + 25] = vec3(0,-1,0);
+	normals[i_vert + 26] = vec3(0,-1,0);
+	normals[i_vert + 27] = vec3(0,-1,0);
 	for (int i = 0; i < 28; i++)
 	{
 		tex_coords[i_vert + i] = vec2(0.09375f, 0.8125f);
 	}
 	positions[i_vert + 28] = vec3(-3.76f, 103.8f, 0.2f);
-	positions[i_vert + 29] = vec3(-3.76f, 10.8f, 3.25f);
-	positions[i_vert + 30] = vec3(3.76f, 10.8f, 3.25f);
+	positions[i_vert + 29] = vec3(-3.76f, 85.2f, 0.81f);
+	positions[i_vert + 30] = vec3(3.76f, 85.2f, 0.81f);
 	positions[i_vert + 31] = vec3(3.76f, 103.8f, 0.2f);
 	normals[i_vert + 28] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
 	normals[i_vert + 29] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
@@ -850,7 +838,91 @@ static void buildBridgeMesh()
 	}
 	i_vert += 32;
 	i_idx += 48;
-
+	
+	positions[i_vert] = vec3(-4.0f, 85.2f, 1.31f);
+	positions[i_vert + 1] = vec3(-4.0f, 85.2f, 0.61f);
+	positions[i_vert + 2] = vec3(-4.0f, 10.8f, 3.05f);
+	positions[i_vert + 3] = vec3(-4.0f, 10.8f, 3.75f);
+	normals[i_vert] = vec3(-1, 0, 0);
+	normals[i_vert + 1] = vec3(-1, 0, 0);
+	normals[i_vert + 2] = vec3(-1, 0, 0);
+	normals[i_vert + 3] = vec3(-1, 0, 0);
+	positions[i_vert + 4] = vec3(-3.76f, 85.2f, 0.81f);
+	positions[i_vert + 5] = vec3(-3.76f, 85.2f, 1.31f);
+	positions[i_vert + 6] = vec3(-3.76f, 10.8f, 3.75f);
+	positions[i_vert + 7] = vec3(-3.76f, 10.8f, 3.25f);
+	normals[i_vert + 4] = vec3(1, 0, 0);
+	normals[i_vert + 5] = vec3(1, 0, 0);
+	normals[i_vert + 6] = vec3(1, 0, 0);
+	normals[i_vert + 7] = vec3(1, 0, 0);
+	positions[i_vert + 8] = vec3(3.76f, 85.2f, 1.31f);
+	positions[i_vert + 9] = vec3(3.76f, 85.2f, 0.81f);
+	positions[i_vert + 10] = vec3(3.76f, 10.8f, 3.25f);
+	positions[i_vert + 11] = vec3(3.76f, 10.8f, 3.75f);
+	normals[i_vert + 8] = vec3(-1, 0, 0);
+	normals[i_vert + 9] = vec3(-1, 0, 0);
+	normals[i_vert + 10] = vec3(-1, 0, 0);
+	normals[i_vert + 11] = vec3(-1, 0, 0);
+	positions[i_vert + 12] = vec3(4.0f, 85.2f, 0.61f);
+	positions[i_vert + 13] = vec3(4.0f, 85.2f, 1.31f);
+	positions[i_vert + 14] = vec3(4.0f, 10.8f, 3.75f);
+	positions[i_vert + 15] = vec3(4.0f, 10.8f, 3.05f);
+	normals[i_vert + 12] = vec3(1, 0, 0);
+	normals[i_vert + 13] = vec3(1, 0, 0);
+	normals[i_vert + 14] = vec3(1, 0, 0);
+	normals[i_vert + 15] = vec3(1, 0, 0);
+	positions[i_vert + 16] = vec3(-4.0f, 85.2f, 0.61f);
+	positions[i_vert + 17] = vec3(4.0f, 85.2f, 0.61f);
+	positions[i_vert + 18] = vec3(4.0f, 10.8f, 3.05f);
+	positions[i_vert + 19] = vec3(-4.0f, 10.8f, 3.05f);
+	normals[i_vert + 16] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
+	normals[i_vert + 17] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
+	normals[i_vert + 18] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
+	normals[i_vert + 19] = vec3(0, -61.0f / 1861, -1860.0f / 1861);
+	positions[i_vert + 20] = vec3(-3.76f, 85.2f, 1.31f);
+	positions[i_vert + 21] = vec3(-4.0f, 85.2f, 1.31f);
+	positions[i_vert + 22] = vec3(-4.0f, 10.8f, 3.75f);
+	positions[i_vert + 23] = vec3(-3.76f, 10.8f, 3.75f);
+	normals[i_vert + 20] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 21] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 22] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 23] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	positions[i_vert + 24] = vec3(4.0f, 85.2f, 1.31f);
+	positions[i_vert + 25] = vec3(3.76f, 85.2f, 1.31f);
+	positions[i_vert + 26] = vec3(3.76f, 10.8f, 3.75f);
+	positions[i_vert + 27] = vec3(4.0f, 10.8f, 3.75f);
+	normals[i_vert + 24] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 25] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 26] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 27] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	for (int i = 0; i < 28; i++)
+	{
+		tex_coords[i_vert + i] = vec2(0.09375f, 0.8125f);
+	}
+	positions[i_vert + 28] = vec3(-3.76f, 85.2f, 0.81f);
+	positions[i_vert + 29] = vec3(-3.76f, 10.8f, 3.25f);
+	positions[i_vert + 30] = vec3(3.76f, 10.8f, 3.25f);
+	positions[i_vert + 31] = vec3(3.76f, 85.2f, 0.81f);
+	normals[i_vert + 28] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 29] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 30] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	normals[i_vert + 31] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
+	tex_coords[i_vert + 28] = vec2(0.4082031f, 0.0f);
+	tex_coords[i_vert + 29] = vec2(0.4082031f, 18.61f / 20.48f);
+	tex_coords[i_vert + 30] = vec2(0.59179687f, 18.61f / 20.48f);
+	tex_coords[i_vert + 31] = vec2(0.59179687f, 0.0f);
+	for (int i = 0; i < 8; i++)
+	{
+		indices[i_idx + 6 * i] = i_vert + 4 * i;
+		indices[i_idx + 6 * i + 1] = i_vert + 4 * i + 1;
+		indices[i_idx + 6 * i + 2] = i_vert + 4 * i + 2;
+		indices[i_idx + 6 * i + 3] = i_vert + 4 * i;
+		indices[i_idx + 6 * i + 4] = i_vert + 4 * i + 2;
+		indices[i_idx + 6 * i + 5] = i_vert + 4 * i + 3;
+	}
+	i_vert += 32;
+	i_idx += 48;
+	
 	theta = asin(61.0f / 1861);
 	n = 2 * theta * sqrtf(37220) + 3;
 	dtheta = 2 * theta / n;
@@ -999,7 +1071,7 @@ static void buildBridgeMesh()
 	i_vert += 32;
 	i_idx += 48;
 
-	theta = acos(-12.0f / 13) - 244.0f / 600;
+	theta = acos(-12.0f / 13) - (18.6f + 12.2f) / 30;
 	n = theta * sqrtf(3400) + 3;
 	dtheta = theta / n;
 	n++;
@@ -1007,7 +1079,7 @@ static void buildBridgeMesh()
 	{
 		float cos_theta = cos(i * dtheta);
 		float sin_theta = sin(i * dtheta);
-		float z = float(n - 1 - i) / (n - 1) * 70.2f * 61 / 1860 + 0.2f;
+		float z = (float(n - 1 - i) / (n - 1) * 51.6f + 18.6f) * 61 / 1860 + 0.2f;
 		positions[i_vert + i] = vec3(30.0f - 26.24f * cos_theta, -36.4f - 26.24f * sin_theta, z);
 		normals[i_vert + i] = vec3(-cos_theta, -sin_theta, 0);
 		positions[i_vert + n + i] = vec3(30.0f - 26.24f * cos_theta, -36.4f - 26.24f * sin_theta, z + 0.5f);
@@ -1061,8 +1133,90 @@ static void buildBridgeMesh()
 	}
 	i_vert += 16 * n;
 	i_idx += 6 * 8 * (n - 1);
-
-	theta = 244.0f / 600;
+	
+	theta = 18.6f / 30;
+	n = theta * sqrtf(3400) + 3;
+	dtheta = theta / n;
+	n++;
+	{
+		float cos_theta = cos(acos(-12.0f / 13) - (18.6f + 12.2f) / 30);
+		float sin_theta = sin(acos(-12.0f / 13) - (18.6f + 12.2f) / 30);
+		float z = 18.6f * 61 / 1860;
+		vec3 normal = vec3(-sin_theta , cos_theta, 0);
+		positions[i_vert] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -8.0f);
+		positions[i_vert + 1] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, z);
+		positions[i_vert + 2] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -8.0f);
+		positions[i_vert + 3] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, z);
+		for (int i = 0; i < 4; i++)
+		{
+			normals[i_vert + i] = normal;
+			tex_coords[i_vert + i] = vec2(0.09375f, 0.8125f);
+		}
+		indices[i_idx] = i_vert;
+		indices[i_idx + 1] = i_vert + 3;
+		indices[i_idx + 2] = i_vert + 1;
+		indices[i_idx + 3] = i_vert;
+		indices[i_idx + 4] = i_vert + 2;
+		indices[i_idx + 5] = i_vert + 3;
+	}
+	i_vert += 4;
+	i_idx += 6;
+	for (int i = 0; i < n; i++)
+	{
+		float cos_theta = cos(acos(-12.0f / 13) - (18.6f + 12.2f) / 30 + i * dtheta);
+		float sin_theta = sin(acos(-12.0f / 13) - (18.6f + 12.2f) / 30 + i * dtheta);
+		float z = (float(n - 1 - i) / (n - 1) * 18.6f) * 61 / 1860 + 0.2f;
+		positions[i_vert + i] = vec3(30.0f - 26.24f * cos_theta, -36.4f - 26.24f * sin_theta, z);
+		normals[i_vert + i] = vec3(-cos_theta, -sin_theta, 0);
+		positions[i_vert + n + i] = vec3(30.0f - 26.24f * cos_theta, -36.4f - 26.24f * sin_theta, z + 0.5f);
+		normals[i_vert + n + i] = vec3(-cos_theta, -sin_theta, 0);
+		positions[i_vert + 2 * n + i] = vec3(30.0f - 26.24f * cos_theta, -36.4f - 26.24f * sin_theta, z + 0.5f);
+		normals[i_vert + 2 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
+		positions[i_vert + 3 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, z + 0.5f);
+		normals[i_vert + 3 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
+		positions[i_vert + 4 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, z + 0.5f);
+		normals[i_vert + 4 * n + i] = vec3(cos_theta, sin_theta, 0);
+		positions[i_vert + 5 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -8.0f);
+		normals[i_vert + 5 * n + i] = vec3(cos_theta, sin_theta, 0);
+		positions[i_vert + 6 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -8.0f);
+		normals[i_vert + 6 * n + i] = vec3(-cos_theta, -sin_theta, 0);
+		positions[i_vert + 7 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, z + 0.5f);
+		normals[i_vert + 7 * n + i] = vec3(-cos_theta, -sin_theta, 0);
+		positions[i_vert + 8 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, z + 0.5f);
+		normals[i_vert + 8 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
+		positions[i_vert + 9 * n + i] = vec3(30.0f - 33.76f * cos_theta, -36.4f - 33.76f * sin_theta, z + 0.5f);
+		normals[i_vert + 9 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
+		positions[i_vert + 10 * n + i] = vec3(30.0f - 33.76f * cos_theta, -36.4f - 33.76f * sin_theta, z + 0.5f);
+		normals[i_vert + 10 * n + i] = vec3(cos_theta, sin_theta, 0);
+		positions[i_vert + 11 * n + i] = vec3(30.0f - 33.76f * cos_theta, -36.4f - 33.76f * sin_theta, z);
+		normals[i_vert + 11 * n + i] = vec3(cos_theta, sin_theta, 0);
+		positions[i_vert + 12 * n + i] = vec3(30.0f - 33.76f * cos_theta, -36.4f - 33.76f * sin_theta, z);
+		normals[i_vert + 12 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
+		tex_coords[i_vert + 12 * n + i] = vec2(0.4082031f, 30.0f * theta * 18.61f / 18.6f / (20.48f * (n - 1)) * i);
+		positions[i_vert + 13 * n + i] = vec3(30.0f - 26.24f * cos_theta, -36.4f - 26.24f * sin_theta, z);
+		normals[i_vert + 13 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
+		tex_coords[i_vert + 13 * n + i] = vec2(0.59179687f, 30.0f * theta * 18.61f / 18.6f / (20.48f * (n - 1)) * i);
+	}
+	for (int i = 0; i < 12 * n; i++)
+	{
+		tex_coords[i_vert + i] = vec2(0.09375f, 0.8125f);
+	}
+	for (int i = 0; i < 7; i++)
+	{
+		for (int j = 0; j < n - 1; j++)
+		{
+			indices[i_idx + 6 * (i * (n - 1) + j)] = i_vert + 2 * (i * n) + j;
+			indices[i_idx + 6 * (i * (n - 1) + j) + 1] = i_vert + 2 * (i * n) + j + n + 1;
+			indices[i_idx + 6 * (i * (n - 1) + j) + 2] = i_vert + 2 * (i * n) + j + n;
+			indices[i_idx + 6 * (i * (n - 1) + j) + 3] = i_vert + 2 * (i * n) + j;
+			indices[i_idx + 6 * (i * (n - 1) + j) + 4] = i_vert + 2 * (i * n) + j + 1;
+			indices[i_idx + 6 * (i * (n - 1) + j) + 5] = i_vert + 2 * (i * n) + j + n + 1;
+		}
+	}
+	i_vert += 14 * n;
+	i_idx += 6 * 7 * (n - 1);
+	
+	theta = 12.2f / 30;
 	n = theta * sqrtf(3400) + 3;
 	dtheta = theta / n;
 	n++;
@@ -1153,17 +1307,15 @@ static void buildBridgeMesh()
 	dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < 4; i++)
 	{
-		vec3 pillar_pos[10] = { { -3.0f + 2.0f * i, 88.6f,  0.65f},
-							{ -3.0f + 2.0f * i, 68.6f, 1.3f },
+		vec3 pillar_pos[] = { { -3.0f + 2.0f * i, 68.6f, 1.3f },
 							{ -3.0f + 2.0f * i, 48.6f, 1.95f },
 							{ -3.0f + 2.0f * i, 28.6f, 2.6f },
 							{ -3.0f + 2.0f * i, 8.6f, 3.25f},
 							{ -3.0f + 2.0f * i, -11.4f, 3.25f },
 							{ -3.0f + 2.0f * i, -31.4f, 2.6f },
-							{ 30.0f - (33.0f - i * 2.0f) * cos(300.0f / 600), -36.4f - (33.0f - i * 2.0f) * sin(300.0f / 600), 1.95f },
-							{ 30.0f - (33.0f - i * 2.0f) * cos(700.0f / 600), -36.4f - (33.0f - i * 2.0f) * sin(700.0f / 600), 1.3f },
-							{ 30.0f - (33.0f - i * 2.0f) * cos(1100.0f / 600), -36.4f - (33.0f - i * 2.0f) * sin(1100.0f / 600), 0.65f } };
-		for (int j = 0; j < 10; j++)
+							{ 30.0f - (33.0f - i * 2.0f) * cos(15.0f / 30), -36.4f - (33.0f - i * 2.0f) * sin(15.0f / 30), 1.95f },
+							{ 30.0f - (33.0f - i * 2.0f) * cos(35.0f / 30), -36.4f - (33.0f - i * 2.0f) * sin(35.0f / 30), 1.3f } };
+		for (int j = 0; j < 8; j++)
 		{
 			for (int k = 0; k < n; k++)
 			{
@@ -1172,7 +1324,7 @@ static void buildBridgeMesh()
 				float sin_theta = sin(k * dtheta);
 				float x = pillar_pos[j].x + R * cos_theta;
 				float y = pillar_pos[j].y + R * sin_theta;
-				positions[i_vert + 2 * k] = vec3(x, y, -5.0f);
+				positions[i_vert + 2 * k] = vec3(x, y, -8.0f);
 				positions[i_vert + 2 * k + 1] = vec3(x, y, pillar_pos[j].z);
 				normals[i_vert + 2 * k] = vec3(cos_theta, sin_theta, 0);
 				normals[i_vert + 2 * k + 1] = vec3(cos_theta, sin_theta, 0);
