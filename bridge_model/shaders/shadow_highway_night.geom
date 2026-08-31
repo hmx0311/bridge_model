@@ -43,13 +43,6 @@ void main()
 				{
 					continue;
 				}
-				if(projNoraml.z * pos[0].w * pos[1].w * pos[2].w > 0)
-				{
-					float offsetScale = 0.002 * (1 << layer) * sqrt(dot(projNoraml.xy, projNoraml.xy) / (projNoraml.z * projNoraml.z));
-					pos[0].z += offsetScale * pos[0].w;
-					pos[1].z += offsetScale * pos[1].w;
-					pos[2].z += offsetScale * pos[2].w;
-				}
 				bool surroundTest[3] = { (test[0].x * test[1].y - test[0].y * test[1].x) * pos[2].w > 0,
 										(test[1].x * test[2].y - test[1].y * test[2].x) * pos[0].w > 0,
 										(test[2].x * test[0].y - test[2].y * test[0].x) * pos[1].w > 0 };

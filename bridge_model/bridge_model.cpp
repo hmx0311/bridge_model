@@ -39,10 +39,10 @@ GLuint shadow_night_tex;
 
 constexpr float FOVY = pi<float>() / 4;
 constexpr float VIEW_Z_NEAR = 0.9f;
-constexpr float VIEW_Z_FAR = 900.0f;
+constexpr float VIEW_Z_FAR = 1800.0f;
 constexpr float FOCUS_HEIGHT = 2.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
-constexpr float MAX_VIEW_DISTANCE = 250.0f;
+constexpr float MAX_VIEW_DISTANCE = 500.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
@@ -566,7 +566,8 @@ static void init()
 		}
 	}
 
-	glPolygonOffset(0.2f, 1.4f);
+	glEnable(GL_CULL_FACE);
+	glPolygonOffset(0.9f, 1.4f);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	int UBO_offset_alignment;
@@ -1180,34 +1181,34 @@ static void drawGraphics()
 			float x_group_min = FLT_MAX, x_group_max = -FLT_MAX, y_group_min = FLT_MAX, y_group_max = -FLT_MAX, furthest_z_far = FLT_MAX;
 			for (int j = 0; j < 4; j++)
 			{
-				furthest_z_far = min(furthest_z_far, z_fars[4 * i + j]);
-				x_group_min = min(x_group_min, x_min[4 * i + j]);
-				x_group_max = max(x_group_max, x_max[4 * i + j]);
-				y_group_min = min(y_group_min, y_min[4 * i + j]);
-				y_group_max = max(y_group_max, y_max[4 * i + j]);
+				furthest_z_far = min(furthest_z_far, z_fars[i + j]);
+				x_group_min = min(x_group_min, x_min[i + j]);
+				x_group_max = max(x_group_max, x_max[i + j]);
+				y_group_min = min(y_group_min, y_min[i + j]);
+				y_group_max = max(y_group_max, y_max[i + j]);
 			}
-			if (4 * (x_max[4 * i] - x_min[4 * i]) * (y_max[4 * i] - y_min[4 * i]) > (x_group_max - x_group_min) * (y_group_max - y_group_min))
+			if (4 * (x_max[i] - x_min[i]) * (y_max[i] - y_min[i]) > (x_group_max - x_group_min) * (y_group_max - y_group_min))
 			{
-				x_min[4 * i] = x_group_min;
-				x_max[4 * i] = (x_group_min + x_group_max) / 2;
-				y_min[4 * i] = y_group_min;
-				y_max[4 * i] = (y_group_min + y_group_max) / 2;
-				z_fars[4 * i] = furthest_z_far;
-				x_min[4 * i + 1] = (x_group_min + x_group_max) / 2;
-				x_max[4 * i + 1] = x_group_max;
-				y_min[4 * i + 1] = y_group_min;
-				y_max[4 * i + 1] = (y_group_min + y_group_max) / 2;
-				z_fars[4 * i + 1] = furthest_z_far;
-				x_min[4 * i + 2] = x_group_min;
-				x_max[4 * i + 2] = (x_group_min + x_group_max) / 2;
-				y_min[4 * i + 2] = (y_group_min + y_group_max) / 2;
-				y_max[4 * i + 2] = y_group_max;
-				z_fars[4 * i + 2] = furthest_z_far;
-				x_min[4 * i + 3] = (x_group_min + x_group_max) / 2;
-				x_max[4 * i + 3] = x_group_max;
-				y_min[4 * i + 3] = (y_group_min + y_group_max) / 2;
-				y_max[4 * i + 3] = y_group_max;
-				z_fars[4 * i + 3] = furthest_z_far;
+				x_min[i] = x_group_min;
+				x_max[i] = (x_group_min + x_group_max) / 2;
+				y_min[i] = y_group_min;
+				y_max[i] = (y_group_min + y_group_max) / 2;
+				z_fars[i] = furthest_z_far;
+				x_min[i + 1] = (x_group_min + x_group_max) / 2;
+				x_max[i + 1] = x_group_max;
+				y_min[i + 1] = y_group_min;
+				y_max[i + 1] = (y_group_min + y_group_max) / 2;
+				z_fars[i + 1] = furthest_z_far;
+				x_min[i + 2] = x_group_min;
+				x_max[i + 2] = (x_group_min + x_group_max) / 2;
+				y_min[i + 2] = (y_group_min + y_group_max) / 2;
+				y_max[i + 2] = y_group_max;
+				z_fars[i + 2] = furthest_z_far;
+				x_min[i + 3] = (x_group_min + x_group_max) / 2;
+				x_max[i + 3] = x_group_max;
+				y_min[i + 3] = (y_group_min + y_group_max) / 2;
+				y_max[i + 3] = y_group_max;
+				z_fars[i + 3] = furthest_z_far;
 			}
 		}
 		for (int i = 0; i < CSM_LEVELS; i++)
@@ -1389,16 +1390,20 @@ static void drawGraphics()
 		glBindSampler(2, shadow_depth_sampler);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glDisable(GL_CULL_FACE);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_day);
+		glCullFace(GL_FRONT);
+		glDisable(GL_POLYGON_OFFSET_FILL);
 		glBindVertexArray(terrain_VAO);
 		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glCullFace(GL_BACK);
+		glEnable(GL_POLYGON_OFFSET_FILL);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_day);
 		glBindVertexArray(car_shadow_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+		glDisable(GL_POLYGON_OFFSET_FILL);
 
 		glUseProgram(SP_gen_PCSS_mips);
 		glBindVertexArray(tex_blit_VAO);
@@ -1416,7 +1421,6 @@ static void drawGraphics()
 			}
 		}
 		glDepthFunc(GL_LESS);
-		glEnable(GL_CULL_FACE);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
@@ -1444,11 +1448,11 @@ static void drawGraphics()
 		glBindTextureUnit(1, shadow_night_tex);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadow_night_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glDisable(GL_CULL_FACE);
 		for (int i = 0; i < 4; i++)
 		{
 			glEnable(GL_CLIP_DISTANCE0 + i);
 		}
+		glEnable(GL_POLYGON_OFFSET_FILL);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_night);
 		glBindVertexArray(bridge_VAO);
@@ -1460,7 +1464,7 @@ static void drawGraphics()
 		{
 			glDisable(GL_CLIP_DISTANCE0 + i);
 		}
-		glEnable(GL_CULL_FACE);
+		glDisable(GL_POLYGON_OFFSET_FILL);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
@@ -1733,7 +1737,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.35 * DAY_PERIOD)
+	while (logical_time < 0.45 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
