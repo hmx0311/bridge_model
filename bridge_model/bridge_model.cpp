@@ -12,6 +12,7 @@
 #include "mesh.h"
 #include "Car.h"
 #include "Sun.h"
+#include "terrain.h"
 #include "logical_frame.h"
 
 #include "shader_headers/scene_constances.h"
@@ -862,6 +863,8 @@ static void drawGraphics()
 		}
 		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * window_height / 2;
 
+		updateTerrainLOD(1.0f, eye);
+
 		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
 		camera.inv_view = inverse(camera.view);
 		vec3 top_view(0, tanf(FOVY / 2), -1);
@@ -1392,12 +1395,8 @@ static void drawGraphics()
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_day);
-		glCullFace(GL_FRONT);
-		glDisable(GL_POLYGON_OFFSET_FILL);
-		glBindVertexArray(terrain_VAO);
-		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		glCullFace(GL_BACK);
 		glEnable(GL_POLYGON_OFFSET_FILL);
+		drawTerrainMesh();
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_day);
@@ -1430,8 +1429,9 @@ static void drawGraphics()
 		glUseProgram(SP_highway_day);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glBindVertexArray(terrain_VAO);
-		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		drawTerrainMesh();
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
@@ -1474,8 +1474,7 @@ static void drawGraphics()
 		glUseProgram(SP_highway_night);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glBindVertexArray(terrain_VAO);
-		glDrawElements(GL_TRIANGLES, TERRAIN_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		drawTerrainMesh();
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
@@ -1734,15 +1733,6 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 
-	initLogic();
-	std::thread logical_thread(logicalFrame);
-	simulate_speed = 1000000;
-	while (logical_time < 0.45 * DAY_PERIOD)
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
-	simulate_speed = 1;
-
 	window_width = 2400;
 	window_height = 1350;
 
@@ -1799,6 +1789,15 @@ int main(int argc, char** argv)
 
 	init();
 	onResize(window, window_width, window_height);
+
+	initLogic();
+	std::thread logical_thread(logicalFrame);
+	simulate_speed = 1000000;
+	while (logical_time < 0.35 * DAY_PERIOD)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	simulate_speed = 1;
 
 	while (!glfwWindowShouldClose(window))
 	{

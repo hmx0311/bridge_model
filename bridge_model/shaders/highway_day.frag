@@ -21,8 +21,14 @@ void main()
 	vec3 surface_normal = normalize(cross(dpdx, dpdy));
 	if(LdotN > 1e-5)
 	{
-		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
-		lighting += shadow * LdotN * sun.diffuse_specular;
+		vec3 position = modelPos;
+		if(dot(surface_normal, sun.light_dir_and_radius.xyz) < 1e-5)
+		{
+			position += normal * 0.005 * length(modelPosView);
+		}
+		surface_normal = normal;
+		//float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);
+		//lighting += shadow * LdotN * sun.diffuse_specular;
 	}
 	color *= lighting;
 	float fog_factor = fogFactor(length(modelPosView));

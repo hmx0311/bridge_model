@@ -1,17 +1,12 @@
 #include "mesh.h"
 
-#include <Windows.h>
-
-#include <memory>
-
 #include "ext/scalar_constants.hpp"
 
 #include "common.h"
-#include "resource.h"
+#include "terrain.h"
 
 #include "shader_headers/scene_constances.h"
 
-GLuint terrain_VAO, terrain_VBO, terrain_EBO;
 GLuint highway_VAO, highway_VBO, highway_EBO;
 GLuint bridge_VAO, bridge_VBO, bridge_EBO;
 GLuint car_VAO, car_VBO, car_EBO, car_transform_VBO, car_color_VBO;
@@ -19,103 +14,6 @@ GLuint car_shadow_VAO, car_shadow_VBO, car_shadow_EBO;
 GLuint sun_VAO, sun_VBO;
 
 using namespace glm;
-
-static void buildTerrainMesh()
-{
-	constexpr int VERT_SIZE = (NUM_TERRAIN_GRID_X + 1) * (NUM_TERRAIN_GRID_Y + 1);
-	auto positions = std::make_unique<vec3[]>(VERT_SIZE);
-	auto normals = std::make_unique<vec3[]>(VERT_SIZE);
-	auto tex_coords = std::make_unique<vec2[]>(VERT_SIZE);
-	auto indices = std::make_unique<GLuint[]>(TERRAIN_EBO_SIZE);
-
-	constexpr int POSITION_SIZE = VERT_SIZE * sizeof(decltype(positions)::element_type);
-	constexpr int NORMAL_SIZE = VERT_SIZE * sizeof(decltype(normals)::element_type);
-	constexpr int TEX_COORD_SIZE = VERT_SIZE * sizeof(decltype(tex_coords)::element_type);
-	constexpr int INDEX_SIZE = TERRAIN_EBO_SIZE * sizeof(decltype(indices)::element_type);
-
-	auto height_data = std::make_unique<uint16[]>(VERT_SIZE);
-	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TERRAIN_HEIGHT), L"TEXTURE");
-	if (rc_info != nullptr)
-	{
-		HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-		if (SizeofResource(nullptr, rc_info) != VERT_SIZE * sizeof(uint16))
-		{
-			printf("ERROR: Invalid terrian height data size\n");
-			return;
-		}
-		if (rc_data != nullptr)
-		{
-			memcpy(height_data.get(), LockResource(rc_data), VERT_SIZE * sizeof(uint16));
-		}
-		else
-		{
-			printf("ERROR: Can't Load Resource Text Altas\n");
-			return;
-		}
-	}
-	else
-	{
-		printf("ERROR: Can't Find Resource Text Altas\n");
-		return;
-	}
-
-	for (int i = 0; i <= NUM_TERRAIN_GRID_Y; i++)
-	{
-		for (int j = 0; j <= NUM_TERRAIN_GRID_X; j++)
-		{
-			int idx = i * (NUM_TERRAIN_GRID_X + 1) + j;
-			float height = 0.001f * height_data[idx] - 10.0f;
-			positions[idx] = vec3(-0.5f * NUM_TERRAIN_GRID_X + j, -0.5f * NUM_TERRAIN_GRID_Y + i, height);
-			tex_coords[idx] = vec2(0.09375f, 1.0f);
-			normals[idx] = vec3(0, 0, 1);
-		}
-	}
-
-	for (int i = 0; i <= NUM_TERRAIN_GRID_Y; i++)
-	{
-		for (int j = 0; j <= NUM_TERRAIN_GRID_X; j++)
-		{
-			int idx = i * (NUM_TERRAIN_GRID_X + 1) + j;
-			vec3 x = positions[i * (NUM_TERRAIN_GRID_X + 1) + std::min(NUM_TERRAIN_GRID_X, j + 1)] - positions[i * (NUM_TERRAIN_GRID_X + 1) + std::max(0, j - 1)];
-			vec3 y = positions[std::min(NUM_TERRAIN_GRID_Y, i + 1) * (NUM_TERRAIN_GRID_X + 1) + j] - positions[std::max(0, i - 1) * (NUM_TERRAIN_GRID_X + 1) + j];
-			normals[idx] = normalize(cross(x,y));
-		}
-	}
-
-
-	for (int i = 0; i < NUM_TERRAIN_GRID_Y; i++)
-	{
-		for (int j = 0; j < NUM_TERRAIN_GRID_X; j++)
-		{
-			int idx = 6 * (i * NUM_TERRAIN_GRID_X + j);
-			indices[idx + 0] = i * (NUM_TERRAIN_GRID_X + 1) + j;
-			indices[idx + 1] = i * (NUM_TERRAIN_GRID_X + 1) + j + 1;
-			indices[idx + 2] = (i + 1) * (NUM_TERRAIN_GRID_X + 1) + j;
-			indices[idx + 3] = (i + 1) * (NUM_TERRAIN_GRID_X + 1) + j;
-			indices[idx + 4] = i * (NUM_TERRAIN_GRID_X + 1) + j + 1;
-			indices[idx + 5] = (i + 1) * (NUM_TERRAIN_GRID_X + 1) + j + 1;
-		}
-	}
-
-	glGenVertexArrays(1, &terrain_VAO);
-	glBindVertexArray(terrain_VAO);
-	glGenBuffers(1, &terrain_VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, terrain_VBO);
-	glBufferData(GL_ARRAY_BUFFER, POSITION_SIZE + NORMAL_SIZE + TEX_COORD_SIZE, nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, POSITION_SIZE, positions.get());
-	glBufferSubData(GL_ARRAY_BUFFER, POSITION_SIZE, NORMAL_SIZE, normals.get());
-	glBufferSubData(GL_ARRAY_BUFFER, POSITION_SIZE + NORMAL_SIZE, TEX_COORD_SIZE, tex_coords.get());
-	glGenBuffers(1, &terrain_EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain_EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_SIZE, indices.get(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)POSITION_SIZE);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(POSITION_SIZE + NORMAL_SIZE));
-	glEnableVertexAttribArray(2);
-	glBindVertexArray(0);
-}
 
 static void buildHighwayMesh()
 {
@@ -125,21 +23,21 @@ static void buildHighwayMesh()
 	vec2 tex_coords[VERT_SIZE];
 	GLuint indices[HIGHWAY_EBO_SIZE];
 
-	positions[0] = vec3(-1056.0f, -7.2f, 0);
-	tex_coords[0] = vec2(0.63671875f, -1056.0f / 20.48f);
+	positions[0] = vec3(-1536.0f, -7.2f, 0);
+	tex_coords[0] = vec2(0.63671875f, -1536.0f / 20.48f);
 	positions[1] = vec3(-204.8f, -7.2f, 0);
 	tex_coords[1] = vec2(0.63671875f, -204.8f / 20.48f);
 	positions[2] = vec3(-204.8f, 7.2f, 0);
 	tex_coords[2] = vec2(0.98828125f, -204.8f / 20.48f);
-	positions[3] = vec3(-1056.0f, 7.2f, 0);
-	tex_coords[3] = vec2(0.98828125f, -1056.0f / 20.48f);
+	positions[3] = vec3(-1536.0f, 7.2f, 0);
+	tex_coords[3] = vec2(0.98828125f, -1536.0f / 20.48f);
 
 	positions[4] = vec3(204.8f, -7.2f, 0);
 	tex_coords[4] = vec2(0.63671875f, 204.8f / 20.48f);
-	positions[5] = vec3(1056.0f, -7.2f, 0);
-	tex_coords[5] = vec2(0.63671875f, 1056.0f / 20.48f);
-	positions[6] = vec3(1056.0f, 7.2f, 0);
-	tex_coords[6] = vec2(0.98828125f, 1056.0f / 20.48f);
+	positions[5] = vec3(1536.0f, -7.2f, 0);
+	tex_coords[5] = vec2(0.63671875f, 1536.0f / 20.48f);
+	positions[6] = vec3(1536.0f, 7.2f, 0);
+	tex_coords[6] = vec2(0.98828125f, 1536.0f / 20.48f);
 	positions[7] = vec3(204.8f, 7.2f, 0);
 	tex_coords[7] = vec2(0.98828125f, 204.8f / 20.48f);
 
@@ -147,10 +45,10 @@ static void buildHighwayMesh()
 	tex_coords[8] = vec2(0.63671875f, 128.0f / 20.48f);
 	positions[9] = vec3(7.2f, 128.0f, 0);
 	tex_coords[9] = vec2(0.98828125f, 128.0f / 20.48f);
-	positions[10] = vec3(7.2f, 960.0f, 0);
-	tex_coords[10] = vec2(0.98828125f, 960.0f / 20.48f);
-	positions[11] = vec3(-7.2f, 960.0f, 0);
-	tex_coords[11] = vec2(0.63671875f, 960.0f / 20.48f);
+	positions[10] = vec3(7.2f, 1280.0f, 0);
+	tex_coords[10] = vec2(0.98828125f, 1280.0f / 20.48f);
+	positions[11] = vec3(-7.2f, 1280.0f, 0);
+	tex_coords[11] = vec2(0.63671875f, 1280.0f / 20.48f);
 
 	positions[12] = vec3(-124.8f, 10.4f, 0);
 	tex_coords[12] = vec2(0.15478516f, 3.8f);

@@ -66,6 +66,9 @@
     <ClCompile Include="glad\src\glad.c">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="terrain.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Car.h">
@@ -112,6 +115,9 @@
     </ClInclude>
     <ClInclude Include="shader_headers\lighting_night_defines.h">
       <Filter>资源文件\shader_headers\common_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="terrain.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
