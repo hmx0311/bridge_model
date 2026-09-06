@@ -524,11 +524,11 @@ static void buildHighwayMesh()
 	glGenBuffers(1, &highway_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, highway_EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)sizeof(positions));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions)));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(sizeof(positions) + sizeof(normals)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
 	glEnableVertexAttribArray(2);
 	glBindVertexArray(0);
 }
@@ -1251,11 +1251,11 @@ static void buildBridgeMesh()
 	glGenBuffers(1, &bridge_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bridge_EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*)sizeof(positions));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions)));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, (void*)(sizeof(positions) + sizeof(normals)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
 	glEnableVertexAttribArray(2);
 	glBindVertexArray(0);
 }
@@ -1518,34 +1518,34 @@ static void buildCarMesh()
 	glGenBuffers(1, &car_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), (void*)sizeof(positions));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(sizeof(positions)));
 	glEnableVertexAttribArray(1);
-	glVertexAttribIPointer(2, 1, GL_INT, sizeof(int), (void*)(sizeof(positions) + sizeof(normals)));
+	glVertexAttribIPointer(2, 1, GL_INT, sizeof(int), reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
 	glEnableVertexAttribArray(2);
 
 	glGenBuffers(1, &car_transform_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, car_transform_VBO);
 	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_CNT * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(3);
-	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)0);
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
 	glVertexAttribDivisor(3, 1);
 	glEnableVertexAttribArray(4);
-	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(sizeof(vec4)));
+	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(sizeof(vec4)));
 	glVertexAttribDivisor(4, 1);
 	glEnableVertexAttribArray(5);
-	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(2 * sizeof(vec4)));
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(2 * sizeof(vec4)));
 	glVertexAttribDivisor(5, 1);
 	glEnableVertexAttribArray(6);
-	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(3 * sizeof(vec4)));
+	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(3 * sizeof(vec4)));
 	glVertexAttribDivisor(6, 1);
 
 	glGenBuffers(1, &car_color_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, car_color_VBO);
 	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_CNT * sizeof(vec3), nullptr, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(7);
-	glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
 	glVertexAttribDivisor(7, 1);
 
 	glBindVertexArray(0);
@@ -1671,23 +1671,23 @@ static void buildCarShadowMesh()
 	glGenBuffers(1, &car_shadow_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_shadow_EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), (void*)sizeof(positions));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(sizeof(positions)));
 	glEnableVertexAttribArray(1);
 
 	glBindBuffer(GL_ARRAY_BUFFER, car_transform_VBO);
 	glEnableVertexAttribArray(3);
-	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)0);
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
 	glVertexAttribDivisor(3, 1);
 	glEnableVertexAttribArray(4);
-	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(sizeof(vec4)));
+	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(sizeof(vec4)));
 	glVertexAttribDivisor(4, 1);
 	glEnableVertexAttribArray(5);
-	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(2 * sizeof(vec4)));
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(2 * sizeof(vec4)));
 	glVertexAttribDivisor(5, 1);
 	glEnableVertexAttribArray(6);
-	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), (void*)(3 * sizeof(vec4)));
+	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(3 * sizeof(vec4)));
 	glVertexAttribDivisor(6, 1);
 
 	glBindVertexArray(0);
@@ -1709,7 +1709,7 @@ static void buildSunMesh()
 	glBindBuffer(GL_ARRAY_BUFFER, sun_VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), nullptr, GL_STATIC_DRAW);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(positions), positions);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2), (void*)0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2), reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
 
 	glBindVertexArray(0);

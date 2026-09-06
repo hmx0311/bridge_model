@@ -26,6 +26,8 @@
 
 using namespace glm;
 
+constexpr float TERRAIN_LOD_FACTOR = 4.0f;
+
 constexpr float MAX_CSM_RATIO = 3.6f;
 GLuint shadow_day_FBO;
 GLuint shadow_day_tex;
@@ -650,7 +652,7 @@ static void init()
 	glGenBuffers(1, &tex_mapping_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, tex_mapping_VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(screen_coords), screen_coords, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
 	glBindVertexArray(0);
 
@@ -863,7 +865,7 @@ static void drawGraphics()
 		}
 		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * window_height / 2;
 
-		updateTerrainLOD(1.0f, eye);
+		updateTerrainLOD(TERRAIN_LOD_FACTOR, eye);
 
 		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
 		camera.inv_view = inverse(camera.view);

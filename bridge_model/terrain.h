@@ -2,6 +2,7 @@
 #include "glad/glad.h"
 #include "glm.hpp"
 
+constexpr float TERRAIN_FINEST_VERTEX_SPACING = 1.0f;
 constexpr int TERRAIN_TILE_SIZE = 32;
 constexpr int NUM_TERRAIN_LOD = 5;
 constexpr int TERRAIN_TILE_ROOT_SIZE = (TERRAIN_TILE_SIZE << (NUM_TERRAIN_LOD - 1));
