@@ -26,7 +26,7 @@
 
 using namespace glm;
 
-constexpr float TERRAIN_LOD_FACTOR = 4.0f;
+constexpr float TERRAIN_LOD_FACTOR = 1000.0f;
 
 constexpr float MAX_CSM_RATIO = 3.6f;
 GLuint shadow_day_FBO;
@@ -42,10 +42,10 @@ GLuint shadow_night_tex;
 
 constexpr float FOVY = pi<float>() / 4;
 constexpr float VIEW_Z_NEAR = 0.9f;
-constexpr float VIEW_Z_FAR = 1800.0f;
+constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float FOCUS_HEIGHT = 2.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
-constexpr float MAX_VIEW_DISTANCE = 500.0f;
+constexpr float MAX_VIEW_DISTANCE = 5000.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
@@ -570,7 +570,7 @@ static void init()
 	}
 
 	glEnable(GL_CULL_FACE);
-	glPolygonOffset(0.9f, 1.4f);
+	glPolygonOffset(1.0f, 1.4f);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	int UBO_offset_alignment;
@@ -1431,9 +1431,9 @@ static void drawGraphics()
 		glUseProgram(SP_highway_day);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		drawTerrainMesh();
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);

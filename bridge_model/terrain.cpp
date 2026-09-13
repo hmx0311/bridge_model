@@ -16,6 +16,7 @@ namespace
 		uint8 stitching = 0;
 		float min_height;
 		float max_height;
+		float max_curvature;
 	};
 
 	enum EDGE_STITCHING
@@ -33,6 +34,11 @@ constexpr int NUM_VERTICES_PER_TILE = NUM_TILE_SIDE_VERTICES * NUM_TILE_SIDE_VER
 static constexpr int NUM_TILES_TO_LOD_PER_ROOT(int lod = NUM_TERRAIN_LOD)
 {
 	return ((1 << (2 * lod)) - 1) / 3;
+}
+
+static constexpr int TILE_IDX(int level, int x, int y)
+{
+	return NUM_TILES_TO_LOD_PER_ROOT(level) + x * (1 << level) + y;
 }
 
 static constexpr int NUM_INDICES(uint8 stitching)
@@ -124,6 +130,7 @@ void buildTerrainMesh()
 						vec2 tile_tex_coords[NUM_TILE_SIDE_VERTICES][NUM_TILE_SIDE_VERTICES];
 						float min_height = FLT_MAX;
 						float max_height = -FLT_MAX;
+						float max_curvature = 0.0f;
 						for (int p = 0; p < NUM_TILE_SIDE_VERTICES; p++)
 						{
 							for (int q = 0; q < NUM_TILE_SIDE_VERTICES; q++)
@@ -132,6 +139,7 @@ void buildTerrainMesh()
 								int x = i * TERRAIN_TILE_ROOT_SIZE + (m * TERRAIN_TILE_SIZE + p) * stride;
 								int y = j * TERRAIN_TILE_ROOT_SIZE + (n * TERRAIN_TILE_SIZE + q) * stride;
 								vec3 normal;
+								float min_cos_angle = 1.0f;
 								if (x == 0)
 								{
 									normal.x = -(positions[x + stride][y].z - positions[x][y].z) / (stride * TERRAIN_FINEST_VERTEX_SPACING);
@@ -143,6 +151,9 @@ void buildTerrainMesh()
 								else
 								{
 									normal.x = -(positions[x + stride][y].z - positions[x - stride][y].z) / (2 * stride * TERRAIN_FINEST_VERTEX_SPACING);
+									vec3 v1 = positions[x][y] - positions[x - stride][y];
+									vec3 v2 = positions[x + stride][y] - positions[x][y];
+									min_cos_angle = std::min(min_cos_angle, dot(v1, v2) / sqrt(dot(v1, v1) * dot(v2, v2)));
 								}
 								if (y == 0)
 								{
@@ -155,6 +166,9 @@ void buildTerrainMesh()
 								else
 								{
 									normal.y = -(positions[x][y + stride].z - positions[x][y - stride].z) / (2 * stride * TERRAIN_FINEST_VERTEX_SPACING);
+									vec3 v1 = positions[x][y] - positions[x][y - stride];
+									vec3 v2 = positions[x][y + stride] - positions[x][y];
+									min_cos_angle = std::min(min_cos_angle, dot(v1, v2) / sqrt(dot(v1, v1) * dot(v2, v2)));
 								}
 								normal.z = 1;
 								normal = normalize(normal);
@@ -163,14 +177,60 @@ void buildTerrainMesh()
 								tile_tex_coords[p][q] = vec2(0.09375f, 1.0f);
 								min_height = std::min(min_height, positions[x][y].z);
 								max_height = std::max(max_height, positions[x][y].z);
+								max_curvature = std::max(max_curvature, sqrt((1.0f - min_cos_angle) / std::max(FLT_EPSILON, 1.0f + min_cos_angle)));
 							}
 						}
 						(&tiles[0][0][0])[data_offset].min_height = min_height;
 						(&tiles[0][0][0])[data_offset].max_height = max_height;
+						(&tiles[0][0][0])[data_offset].max_curvature = max_curvature;
 						glBufferSubData(GL_ARRAY_BUFFER, data_offset * NUM_VERTICES_PER_TILE * sizeof(vec3), NUM_VERTICES_PER_TILE * sizeof(vec3), tile_positions);
 						glBufferSubData(GL_ARRAY_BUFFER, POSITION_SIZE + data_offset * NUM_VERTICES_PER_TILE * sizeof(vec3), NUM_VERTICES_PER_TILE * sizeof(vec3), tile_normals);
 						glBufferSubData(GL_ARRAY_BUFFER, POSITION_SIZE + NORMAL_SIZE + data_offset * NUM_VERTICES_PER_TILE * sizeof(vec2), NUM_VERTICES_PER_TILE * sizeof(vec2), tile_tex_coords);
 						data_offset--;
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < NUM_TERRAIN_TILE_ROOTS_X; i++)
+	{
+		for (int j = 0; j < NUM_TERRAIN_TILE_ROOTS_Y; j++)
+		{
+			for (int k = 0; k < NUM_TERRAIN_LOD - 1; k++)
+			{
+				for (int m = 0; m < (1 << k); m++)
+				{
+					for (int n = 0; n < (1 << k); n++)
+					{
+						float max_child_curvature = 0.0f;
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m, 2 * n)].max_curvature);
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m + 1, 2 * n)].max_curvature);
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m, 2 * n + 1)].max_curvature);
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m + 1, 2 * n + 1)].max_curvature);
+						tiles[i][j][TILE_IDX(k, m, n)].max_curvature = max_child_curvature;
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = NUM_TERRAIN_TILE_ROOTS_X - 1; i >= 0; i--)
+	{
+		for (int j = NUM_TERRAIN_TILE_ROOTS_Y - 1; j >= 0; j--)
+		{
+			for (int k = NUM_TERRAIN_LOD - 3; k >= 0; k--)
+			{
+				for (int m = (1 << k) - 1; m >= 0; m--)
+				{
+					for (int n = (1 << k) - 1; n >= 0; n--)
+					{
+						float max_child_curvature = 0.0f;
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m, 2 * n)].max_curvature);
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m + 1, 2 * n)].max_curvature);
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m, 2 * n + 1)].max_curvature);
+						max_child_curvature = std::max(max_child_curvature, tiles[i][j][TILE_IDX(k + 1, 2 * m + 1, 2 * n + 1)].max_curvature);
+						tiles[i][j][TILE_IDX(k, m, n)].max_curvature = std::max(tiles[i][j][TILE_IDX(k, m, n)].max_curvature, 0.5f * max_child_curvature);
 					}
 				}
 			}
@@ -294,7 +354,7 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 			Tile* root = tiles[i][j];
 			[root_offset, root, lod_factor, &camera_position](this auto&& self, int lod, int tile_x, int tile_y) -> void
 				{
-					Tile& tile = root[NUM_TILES_TO_LOD_PER_ROOT(lod) + tile_x * (1 << lod) + tile_y];
+					Tile& tile = root[TILE_IDX(lod, tile_x, tile_y)];
 					if (lod == NUM_TERRAIN_LOD - 1)
 					{
 						tile.active = true;
@@ -304,7 +364,7 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 					vec3 bound_min = vec3(root_offset + vec2(tile_side_lenght * tile_x, tile_side_lenght * tile_y), tile.min_height);
 					vec3 bound_max = vec3(root_offset + vec2(tile_side_lenght * (tile_x + 1), tile_side_lenght * (tile_y + 1)), tile.max_height);
 					float distance = length(clamp(camera_position, bound_min, bound_max) - camera_position);
-					if (distance > lod_factor *32 * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod)))
+					if (distance > lod_factor * tile.max_curvature * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod)))
 					{
 						tile.active = true;
 					}
@@ -325,7 +385,7 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 		{
 			[](this auto&& build_stitching, int root_x, int root_y, int lod, int tile_x, int tile_y) -> void
 				{
-					Tile& tile = tiles[root_x][root_y][NUM_TILES_TO_LOD_PER_ROOT(lod) + tile_x * (1 << lod) + tile_y];
+					Tile& tile = tiles[root_x][root_y][TILE_IDX(lod, tile_x, tile_y)];
 					if (tile.active)
 					{
 						if (lod == 0)
@@ -370,7 +430,7 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 								{
 									int lod_tile_x = neighbor_tile_x >> (lod - neighbor_lod);
 									int lod_tile_y = neighbor_tile_y >> (lod - neighbor_lod);
-									Tile& neighbor_tile = neighbor_root[NUM_TILES_TO_LOD_PER_ROOT(neighbor_lod) + lod_tile_x * (1 << neighbor_lod) + lod_tile_y];
+									Tile& neighbor_tile = neighbor_root[TILE_IDX(neighbor_lod, lod_tile_x, lod_tile_y)];
 									if (neighbor_tile.active)
 									{
 										if (lod - neighbor_lod == 1)
@@ -439,7 +499,7 @@ void drawTerrainMesh()
 			Tile* root = tiles[i][j];
 			[&tile_cnt, root](this auto&& self, int lod, int tile_x, int tile_y) -> void
 				{
-					Tile& tile = root[NUM_TILES_TO_LOD_PER_ROOT(lod) + tile_x * (1 << lod) + tile_y];
+					Tile& tile = root[TILE_IDX(lod, tile_x, tile_y)];
 					if (tile.active || lod == NUM_TERRAIN_LOD - 1)
 					{
 						count[tile_cnt] = NUM_INDICES(tile.stitching);
