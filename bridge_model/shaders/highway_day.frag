@@ -24,7 +24,7 @@ void main()
 		vec3 position = modelPos;
 		if(dot(surface_normal, sun.light_dir_and_radius.xyz) < 1e-5)
 		{
-			position += normal * 0.02 * length(modelPosView);
+			position += normal * 0.05 * length(modelPosView);
 			surface_normal = normal;
 		}
 		float shadow = shadowPCSS(modelPos, dpdx, dpdy, surface_normal, LdotN);

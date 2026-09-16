@@ -24,7 +24,7 @@ struct CarLightShadowTransformData
 	mat4 view_proj[2 * MAX_CAR_CNT];
 };
 
-DECLARE_UNIFORM(CarLightShadowTransformData, car_light_shadow, 5);
+DECLARE_BUFFER(CarLightShadowTransformData, car_light_shadow, 5);
 
 struct CarLightingData
 {

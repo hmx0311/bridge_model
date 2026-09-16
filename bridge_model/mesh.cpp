@@ -17,75 +17,84 @@ using namespace glm;
 
 static void buildHighwayMesh()
 {
-	constexpr int VERT_SIZE = 1377;
+	constexpr int VERT_SIZE = 1675;
 	vec3 positions[VERT_SIZE];
 	vec3 normals[VERT_SIZE];
 	vec2 tex_coords[VERT_SIZE];
 	GLuint indices[HIGHWAY_EBO_SIZE];
 
-	positions[0] = vec3(-1536.0f, -7.2f, 0);
-	tex_coords[0] = vec2(0.63671875f, -1536.0f / 20.48f);
+	positions[0] = vec3(-2560.0f, -7.2f, 0);
+	tex_coords[0] = vec2(0.63671875f, -2560.0f / 20.48f);
 	positions[1] = vec3(-204.8f, -7.2f, 0);
 	tex_coords[1] = vec2(0.63671875f, -204.8f / 20.48f);
 	positions[2] = vec3(-204.8f, 7.2f, 0);
 	tex_coords[2] = vec2(0.98828125f, -204.8f / 20.48f);
-	positions[3] = vec3(-1536.0f, 7.2f, 0);
-	tex_coords[3] = vec2(0.98828125f, -1536.0f / 20.48f);
+	positions[3] = vec3(-2560.0f, 7.2f, 0);
+	tex_coords[3] = vec2(0.98828125f, -2560.0f / 20.48f);
 
 	positions[4] = vec3(204.8f, -7.2f, 0);
 	tex_coords[4] = vec2(0.63671875f, 204.8f / 20.48f);
-	positions[5] = vec3(1536.0f, -7.2f, 0);
-	tex_coords[5] = vec2(0.63671875f, 1536.0f / 20.48f);
-	positions[6] = vec3(1536.0f, 7.2f, 0);
-	tex_coords[6] = vec2(0.98828125f, 1536.0f / 20.48f);
+	positions[5] = vec3(376.0f, -7.2f, 0);
+	tex_coords[5] = vec2(0.63671875f, 376.0f / 20.48f);
+	positions[6] = vec3(376.0f, 7.2f, 0);
+	tex_coords[6] = vec2(0.98828125f, 376.0f / 20.48f);
 	positions[7] = vec3(204.8f, 7.2f, 0);
 	tex_coords[7] = vec2(0.98828125f, 204.8f / 20.48f);
 
-	positions[8] = vec3(-7.2f, 128.0f, 0);
-	tex_coords[8] = vec2(0.63671875f, 128.0f / 20.48f);
-	positions[9] = vec3(7.2f, 128.0f, 0);
-	tex_coords[9] = vec2(0.98828125f, 128.0f / 20.48f);
-	positions[10] = vec3(7.2f, 1280.0f, 0);
-	tex_coords[10] = vec2(0.98828125f, 1280.0f / 20.48f);
-	positions[11] = vec3(-7.2f, 1280.0f, 0);
-	tex_coords[11] = vec2(0.63671875f, 1280.0f / 20.48f);
+	positions[8] = vec3(671.68f, -105.76f, 0);
+	tex_coords[8] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
+	positions[9] = vec3(2560.0f, -1522.0f, 0);
+	tex_coords[9] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f) + 2360.4f) / 20.48f);
+	positions[10] = vec3(2560.0f, -1504.0f, 0);
+	tex_coords[10] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f) + 2349.6) / 20.48f);
+	positions[11] = vec3(680.32f, -94.24f, 0);
+	tex_coords[11] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
 
-	positions[12] = vec3(-124.8f, 10.4f, 0);
-	tex_coords[12] = vec2(0.15478516f, 3.8f);
-	positions[13] = vec3(-185.6f, 10.4f, 0);
-	tex_coords[13] = vec2(0.15478516f, 0.0f);
-	positions[14] = vec3(-185.6f, 6.5f, 0);
-	tex_coords[14] = vec2(0.25f, 0.0f);
-	positions[15] = vec3(-124.8f, 6.5f, 0);
-	tex_coords[15] = vec2(0.25f, 3.8f);
+	positions[12]  = vec3(-7.2f, 128.0f, 0);
+	tex_coords[12] = vec2(0.63671875f, 128.0f / 20.48f);
+	positions[13]  = vec3(7.2f, 128.0f, 0);
+	tex_coords[13] = vec2(0.98828125f, 128.0f / 20.48f);
+	positions[14]  = vec3(7.2f, 2048.0f, 0);
+	tex_coords[14] = vec2(0.98828125f, 2048.0f / 20.48f);
+	positions[15]  = vec3(-7.2f, 2048.0f, 0);
+	tex_coords[15] = vec2(0.63671875f, 2048.0f / 20.48f);
 
-	positions[16] = vec3(185.6f, 10.4f, 0);
-	tex_coords[16] = vec2(0.15478516f, 0.0f);
-	positions[17] = vec3(124.8f, 10.4f, 0);
-	tex_coords[17] = vec2(0.15478516f, 3.8f);
-	positions[18] = vec3(124.8f, 6.5f, 0);
-	tex_coords[18] = vec2(0.25f, 3.8f);
-	positions[19] = vec3(185.6f, 6.5f, 0);
-	tex_coords[19] = vec2(0.25f, 0.0f);
+	positions[16] = vec3(-124.8f, 10.4f, 0);
+	tex_coords[16] = vec2(0.15478516f, 3.8f);
+	positions[17] = vec3(-185.6f, 10.4f, 0);
+	tex_coords[17] = vec2(0.15478516f, 0.0f);
+	positions[18] = vec3(-185.6f, 6.5f, 0);
+	tex_coords[18] = vec2(0.25f, 0.0f);
+	positions[19] = vec3(-124.8f, 6.5f, 0);
+	tex_coords[19] = vec2(0.25f, 3.8f);
 
-	positions[20] = vec3(-30.8f, -10.4f, 0);
+	positions[20] = vec3(185.6f, 10.4f, 0);
 	tex_coords[20] = vec2(0.15478516f, 0.0f);
-	positions[21] = vec3(30.0f, -10.4f, 0);
+	positions[21] = vec3(124.8f, 10.4f, 0);
 	tex_coords[21] = vec2(0.15478516f, 3.8f);
-	positions[22] = vec3(30.0f, -6.5f, 0);
+	positions[22] = vec3(124.8f, 6.5f, 0);
 	tex_coords[22] = vec2(0.25f, 3.8f);
-	positions[23] = vec3(-30.8f, -6.5f, 0);
+	positions[23] = vec3(185.6f, 6.5f, 0);
 	tex_coords[23] = vec2(0.25f, 0.0f);
 
-	positions[24] = vec3(120.0f, -10.4f, 0);
-	tex_coords[24] = vec2(0.15478516f, 3.8f);
-	positions[25] = vec3(180.8f, -10.4f, 0);
-	tex_coords[25] = vec2(0.15478516f, 0.0f);
-	positions[26] = vec3(180.8f, -6.5f, 0);
-	tex_coords[26] = vec2(0.25f, 0.0f);
-	positions[27] = vec3(120.0f, -6.5f, 0);
-	tex_coords[27] = vec2(0.25f, 3.8f);
-	for (int i = 0; i < 7; i++)
+	positions[24] = vec3(-30.8f, -10.4f, 0);
+	tex_coords[24] = vec2(0.15478516f, 0.0f);
+	positions[25] = vec3(30.0f, -10.4f, 0);
+	tex_coords[25] = vec2(0.15478516f, 3.8f);
+	positions[26] = vec3(30.0f, -6.5f, 0);
+	tex_coords[26] = vec2(0.25f, 3.8f);
+	positions[27] = vec3(-30.8f, -6.5f, 0);
+	tex_coords[27] = vec2(0.25f, 0.0f);
+
+	positions[28] = vec3(120.0f, -10.4f, 0);
+	tex_coords[28] = vec2(0.15478516f, 3.8f);
+	positions[29] = vec3(180.8f, -10.4f, 0);
+	tex_coords[29] = vec2(0.15478516f, 0.0f);
+	positions[30] = vec3(180.8f, -6.5f, 0);
+	tex_coords[30] = vec2(0.25f, 0.0f);
+	positions[31] = vec3(120.0f, -6.5f, 0);
+	tex_coords[31] = vec2(0.25f, 3.8f);
+	for (int i = 0; i < 8; i++)
 	{
 		indices[6 * i] = 4 * i;
 		indices[6 * i + 1] = 4 * i + 1;
@@ -94,12 +103,42 @@ static void buildHighwayMesh()
 		indices[6 * i + 4] = 4 * i + 2;
 		indices[6 * i + 5] = 4 * i + 3;
 	}
-	int i_vert = 28;
-	int i_idx = 42;
+	int i_vert = 32;
+	int i_idx = 48;
 
-	float theta = asin(12.0f / 37);
-	int n = theta * sqrtf(2960) + 3;
+	float theta = asin(0.6f);
+	int n = theta * sqrtf(50000.0f) + 3;
 	float dtheta = theta / n;
+	n++;
+	for (int i = 0; i < n; i++)
+	{
+		float sin_theta = sin(i * dtheta);
+		float cos_theta = cos(i * dtheta);
+		constexpr float O[2] = { 376.0f, -500.0f };
+		float R = 507.2f;
+		float r = 492.8f;
+		float X = O[0] + R * sin_theta, Y = O[1] + R * cos_theta;
+		float x = O[0] + r * sin_theta, y = O[1] + r * cos_theta;
+		positions[i_vert + 2 * i] = vec3(X, Y, 0);
+		tex_coords[i_vert + 2 * i] = vec2(0.98828125f, (O[0] + 500.0f * i * dtheta)/ 20.48f);
+		positions[i_vert + 2 * i + 1] = vec3(x, y, 0);
+		tex_coords[i_vert + 2 * i + 1] = vec2(0.63671875f, (O[0] + 500.0f * i * dtheta) / 20.48f);
+	}
+	for (int j = 0; j < n - 1; j++)
+	{
+		indices[i_idx + 6 * j] = i_vert + 2 * j;
+		indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
+		indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
+		indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
+		indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
+		indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+	}
+	i_vert += 2 * n;
+	i_idx += 6 * (n - 1);
+
+	theta = asin(12.0f / 37);
+	n = theta * sqrtf(2960) + 3;
+	dtheta = theta / n;
 	n++;
 	positions[i_vert] = vec3(-185.6f, 6.5f, 0);
 	tex_coords[i_vert] = vec2(0.0f, 0.0f);
@@ -1700,7 +1739,7 @@ static void buildSunMesh()
 	float dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < n; i++)
 	{
-		positions[i] = vec2(4.0f * cos(i * dtheta), -4.0f * sin(i * dtheta));
+		positions[i] = vec2(20.0f * cos(i * dtheta), -20.0f * sin(i * dtheta));
 	}
 
 	glGenVertexArrays(1, &sun_VAO);

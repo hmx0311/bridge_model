@@ -206,5 +206,11 @@
     <None Include="textures\terrain_height.r16">
       <Filter>资源文件</Filter>
     </None>
+    <None Include="shaders\terrain_day.frag">
+      <Filter>资源文件\shaders\draw\day</Filter>
+    </None>
+    <None Include="shaders\terrain_night.frag">
+      <Filter>资源文件\shaders\draw\night</Filter>
+    </None>
   </ItemGroup>
 </Project>

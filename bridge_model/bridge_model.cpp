@@ -58,7 +58,7 @@ bool show_fps = false;
 bool need_update_view = true;
 uint64_t last_time_us;
 
-constexpr float HEIGHT_RANGE[2] = { -10.0f, 56.0f };
+constexpr float HEIGHT_RANGE[2] = { -10.0f, 646.0f };
 constexpr int HEIGHT_MAP_SIZE = 256;
 constexpr vec4 HEIGHT_MAP_AREA = { -102.4f, -76.8f, 102.4f, 128.0f };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
@@ -105,7 +105,7 @@ GLuint car_light_map_SSBO;
 // binding = 4
 GLuint car_light_pos_UBO;
 // binding = 5
-GLuint car_light_shadow_mat_UBO;
+GLuint car_light_shadow_mat_SSBO;
 // binding = 6
 GLuint car_lighting_SSBO;
 
@@ -127,6 +127,8 @@ CarLightingData car_lightings;
 
 GLuint SP_highway_day;
 GLuint SP_highway_night;
+GLuint SP_terrain_day;
+GLuint SP_terrain_night;
 GLuint SP_car_day;
 GLuint SP_car_night;
 GLuint SP_sun;
@@ -379,11 +381,17 @@ static void initShader()
 	GLuint VS_highway = loadShader(SHADER_NAME(IDR_VS_HIGHWAY), GL_VERTEX_SHADER);
 	GLuint FS_highway_day = loadShader(SHADER_NAME(IDR_FS_HIGHWAY_DAY), GL_FRAGMENT_SHADER);
 	GLuint FS_highway_night = loadShader(SHADER_NAME(IDR_FS_HIGHWAY_NIGHT), GL_FRAGMENT_SHADER);
+	GLuint FS_terrain_day = loadShader(SHADER_NAME(IDR_FS_TERRAIN_DAY), GL_FRAGMENT_SHADER);
+	GLuint FS_terrain_night = loadShader(SHADER_NAME(IDR_FS_TERRAIN_NIGHT), GL_FRAGMENT_SHADER);
 	SP_highway_day = linkShaderProgram(VS_highway, FS_highway_day);
 	SP_highway_night = linkShaderProgram(VS_highway, FS_highway_night);
+	SP_terrain_day = linkShaderProgram(VS_highway, FS_terrain_day);
+	SP_terrain_night = linkShaderProgram(VS_highway, FS_terrain_night);
 	glDeleteShader(VS_highway);
 	glDeleteShader(FS_highway_day);
 	glDeleteShader(FS_highway_night);
+	glDeleteShader(FS_terrain_day);
+	glDeleteShader(FS_terrain_night);
 
 	GLuint VS_car = loadShader(SHADER_NAME(IDR_VS_CAR), GL_VERTEX_SHADER);
 	GLuint FS_car_day = loadShader(SHADER_NAME(IDR_FS_CAR_DAY), GL_FRAGMENT_SHADER);
@@ -569,7 +577,6 @@ static void init()
 		}
 	}
 
-	glEnable(GL_CULL_FACE);
 	glPolygonOffset(1.0f, 1.4f);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -597,10 +604,10 @@ static void init()
 	glBindBuffer(GL_UNIFORM_BUFFER, car_light_pos_UBO);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(car_light_pos), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, car_light_binding, car_light_pos_UBO, 0, sizeof(car_light_pos));
-	glGenBuffers(1, &car_light_shadow_mat_UBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, car_light_shadow_mat_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, car_light_shadow_binding, car_light_shadow_mat_UBO, 0, sizeof(CarLightShadowTransformData));
+	glGenBuffers(1, &car_light_shadow_mat_SSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_light_shadow_mat_SSBO);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, car_light_shadow_binding, car_light_shadow_mat_SSBO, 0, sizeof(CarLightShadowTransformData));
 	glGenBuffers(1, &car_lighting_SSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_lighting_SSBO);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
@@ -1370,7 +1377,7 @@ static void drawGraphics()
 	{
 		glNamedBufferSubData(car_light_map_SSBO, 0, sizeof(car_light_map), &car_light_map);
 		glNamedBufferSubData(car_light_pos_UBO, 0, num_visible_car_lights * sizeof(vec4), &car_light_pos);
-		glNamedBufferSubData(car_light_shadow_mat_UBO, 0, num_visible_car_lights * sizeof(mat4), &car_light_mats);
+		glNamedBufferSubData(car_light_shadow_mat_SSBO, 0, num_visible_car_lights * sizeof(mat4), &car_light_mats);
 		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_cars * MAX_LIGHT_PER_CAR * sizeof(int), &car_lightings);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_light_on_cars * sizeof(mat4), logical_data.car_transform);
 		glNamedBufferSubData(car_color_VBO, 0, num_visible_light_on_cars * sizeof(vec3), logical_data.car_color);
@@ -1381,12 +1388,13 @@ static void drawGraphics()
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
 		mat4x3 transform = rotate(acos(sun.light_dir_and_radius.z), vec3(-sun.light_dir_and_radius.y, sun.light_dir_and_radius.x, 0));
-		transform[3] = 4.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir;
+		transform[3] = 20.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir;
 		glProgramUniformMatrix4x3fv(SP_sun, glGetUniformLocation(SP_sun, "transform"), 1, GL_FALSE, (GLfloat*)&transform);
 	}
 
 	glBindTextureUnit(0, highway_tex);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
 	if (sun.light_dir_and_radius.z > 0)
 	{
 		glBindTextureUnit(1, shadow_day_tex);
@@ -1398,7 +1406,9 @@ static void drawGraphics()
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_day);
 		glEnable(GL_POLYGON_OFFSET_FILL);
+		glDisable(GL_CULL_FACE);
 		drawTerrainMesh();
+		glEnable(GL_CULL_FACE);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_day);
@@ -1425,16 +1435,17 @@ static void drawGraphics()
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glClearBufferfv(GL_COLOR, 0, (GLfloat*)&sun.sky_color);
-		glClearBufferfv(GL_COLOR, 1, (GLfloat*)&COLOR_BLACK);
+		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
+		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
-		glUseProgram(SP_highway_day);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glUseProgram(SP_terrain_day);
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		drawTerrainMesh();
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glDisable(GL_POLYGON_OFFSET_FILL);
+		glUseProgram(SP_highway_day);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
@@ -1473,11 +1484,12 @@ static void drawGraphics()
 		glClearBufferfv(GL_COLOR, 0, (GLfloat*)&sun.sky_color);
 		glClearBufferfv(GL_COLOR, 1, (GLfloat*)&COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
-		glUseProgram(SP_highway_night);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glUseProgram(SP_terrain_night);
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		drawTerrainMesh();
 		glDisable(GL_POLYGON_OFFSET_FILL);
+		glUseProgram(SP_highway_night);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
@@ -1795,7 +1807,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.35 * DAY_PERIOD)
+	while (logical_time < 0.2 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

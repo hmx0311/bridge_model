@@ -153,6 +153,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\gen_PCSS_mips.frag" />
+    <None Include="shaders\terrain_day.frag" />
+    <None Include="shaders\terrain_night.frag" />
     <None Include="shader_headers\fog.glslh" />
     <None Include="shader_headers\lighting_night.glslh" />
     <None Include="textures\font_atlas_r8.raw" />

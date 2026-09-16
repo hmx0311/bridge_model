@@ -13,6 +13,7 @@ namespace
 	struct Tile
 	{
 		bool active = false;
+		bool half_level = false;
 		uint8 stitching = 0;
 		float min_height;
 		float max_height;
@@ -25,6 +26,8 @@ namespace
 		STITCHING_RIGHT = 0b0010,
 		STITCHING_BOTTOM = 0b0100,
 		STITCHING_TOP = 0b1000,
+		STITCHING_HALF = 0b10000,
+		STITCHING_MAX = 0b10001,
 	};
 }
 
@@ -43,18 +46,33 @@ static constexpr int TILE_IDX(int level, int x, int y)
 
 static constexpr int NUM_INDICES(uint8 stitching)
 {
-	int NUM_INDICES = 3 * 2 * TERRAIN_TILE_SIZE * TERRAIN_TILE_SIZE;
-	for (int i = 0; i < 4; i++)
+	int num_indices;
+	if (stitching & STITCHING_HALF)
 	{
-		if (stitching & (1 << i))
+		num_indices = 3 * TERRAIN_TILE_SIZE * TERRAIN_TILE_SIZE;
+		for (int i = 0; i < 4; i++)
 		{
-			NUM_INDICES -= 3 * TERRAIN_TILE_SIZE / 2;
+			if (stitching & (1 << i))
+			{
+				num_indices += 3 * TERRAIN_TILE_SIZE / 2;
+			}
 		}
 	}
-	return NUM_INDICES;
+	else
+	{
+		num_indices = 3 * 2 * TERRAIN_TILE_SIZE * TERRAIN_TILE_SIZE;
+		for (int i = 0; i < 4; i++)
+		{
+			if (stitching & (1 << i))
+			{
+				num_indices -= 3 * TERRAIN_TILE_SIZE / 2;
+			}
+		}
+	}
+	return num_indices;
 }
 
-static constexpr int INDICES_OFFSET(uint8 stitching = 16)
+static constexpr int INDICES_OFFSET(uint8 stitching = STITCHING_MAX)
 {
 	int total_num_indices = 0;
 	for (int i = 0; i < stitching; i++)
@@ -99,7 +117,7 @@ void buildTerrainMesh()
 			int idx = i * (NUM_TERRAIN_GRID_X + 1) + j;
 			uint16 raw_height;
 			memcpy(&raw_height, height_data + idx * sizeof(uint16), sizeof(uint16));
-			float height = 0.001f * raw_height - 10.0f;
+			float height = 0.01f * raw_height - 10.0f;
 			positions[j][i] = vec3((-0.5f * NUM_TERRAIN_GRID_X + j) * TERRAIN_FINEST_VERTEX_SPACING, (-0.5f * NUM_TERRAIN_GRID_Y + i) * TERRAIN_FINEST_VERTEX_SPACING, height);
 		}
 	}
@@ -334,6 +352,33 @@ void buildTerrainMesh()
 		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, INDICES_OFFSET(i) * sizeof(int), NUM_INDICES(i) * sizeof(int), indices);
 	}
 
+	{
+		int indices[NUM_INDICES(STITCHING_HALF)];
+		int idx = 0;
+		for (int i = 0; i < TERRAIN_TILE_SIZE; i += 2)
+		{
+			for (int j = 0; j < TERRAIN_TILE_SIZE; j += 2)
+			{
+				indices[idx + 0] = i * NUM_TILE_SIDE_VERTICES + j;
+				indices[idx + 1] = (i + 1) * NUM_TILE_SIDE_VERTICES + j + 1;
+				indices[idx + 2] = i * NUM_TILE_SIDE_VERTICES + j + 2;
+				idx += 3;
+				indices[idx + 0] = i * NUM_TILE_SIDE_VERTICES + j;
+				indices[idx + 1] = (i + 2) * NUM_TILE_SIDE_VERTICES + j;
+				indices[idx + 2] = (i + 1) * NUM_TILE_SIDE_VERTICES + j + 1;
+				idx += 3;
+				indices[idx + 0] = (i + 1) * NUM_TILE_SIDE_VERTICES + j + 1;
+				indices[idx + 1] = (i + 2) * NUM_TILE_SIDE_VERTICES + j + 2;
+				indices[idx + 2] = i * NUM_TILE_SIDE_VERTICES + j + 2;
+				idx += 3;
+				indices[idx + 0] = (i + 1) * NUM_TILE_SIDE_VERTICES + j + 1;
+				indices[idx + 1] = (i + 2) * NUM_TILE_SIDE_VERTICES + j;
+				indices[idx + 2] = (i + 2) * NUM_TILE_SIDE_VERTICES + j + 2;
+				idx += 3;
+			}
+		}
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, INDICES_OFFSET(STITCHING_HALF) * sizeof(int), NUM_INDICES(STITCHING_HALF) * sizeof(int), indices);
+	}
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
@@ -352,25 +397,23 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 		{
 			vec2 root_offset = TERRAIN_TILE_ROOT_SIZE * TERRAIN_FINEST_VERTEX_SPACING * vec2(i - 0.5f * NUM_TERRAIN_TILE_ROOTS_X, j - 0.5f * NUM_TERRAIN_TILE_ROOTS_Y);
 			Tile* root = tiles[i][j];
-			[root_offset, root, lod_factor, &camera_position](this auto&& self, int lod, int tile_x, int tile_y) -> void
+			[root_offset, root, lod_factor, &camera_position](this auto&& self, int lod, int tile_x, int tile_y)->void
 				{
 					Tile& tile = root[TILE_IDX(lod, tile_x, tile_y)];
-					if (lod == NUM_TERRAIN_LOD - 1)
-					{
-						tile.active = true;
-						return;
-					}
 					float tile_side_lenght = TERRAIN_TILE_SIZE * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod));
 					vec3 bound_min = vec3(root_offset + vec2(tile_side_lenght * tile_x, tile_side_lenght * tile_y), tile.min_height);
 					vec3 bound_max = vec3(root_offset + vec2(tile_side_lenght * (tile_x + 1), tile_side_lenght * (tile_y + 1)), tile.max_height);
-					float distance = length(clamp(camera_position, bound_min, bound_max) - camera_position);
-					if (distance > lod_factor * tile.max_curvature * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod)))
+					vec3 v = clamp(camera_position, bound_min, bound_max) - camera_position;
+					float distance2 = dot(v, v);
+					float threshold2 = lod_factor * tile.max_curvature * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod));
+					threshold2 *= threshold2;
+					tile.active = distance2 > threshold2 || lod == NUM_TERRAIN_LOD - 1;
+					if (tile.active)
 					{
-						tile.active = true;
+						tile.stitching = distance2 > 2.0f * threshold2 ? STITCHING_HALF : 0;
 					}
 					else
 					{
-						tile.active = false;
 						self(lod + 1, 2 * tile_x, 2 * tile_y);
 						self(lod + 1, 2 * tile_x + 1, 2 * tile_y);
 						self(lod + 1, 2 * tile_x, 2 * tile_y + 1);
@@ -379,21 +422,122 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 				}(0, 0, 0);
 		}
 	}
+
 	for (int i = 0; i < NUM_TERRAIN_TILE_ROOTS_X; i++)
 	{
 		for (int j = 0; j < NUM_TERRAIN_TILE_ROOTS_Y; j++)
 		{
-			[](this auto&& build_stitching, int root_x, int root_y, int lod, int tile_x, int tile_y) -> void
+			[](this auto&& check_lod, int root_x, int root_y, int lod, int tile_x, int tile_y)->void
 				{
 					Tile& tile = tiles[root_x][root_y][TILE_IDX(lod, tile_x, tile_y)];
 					if (tile.active)
 					{
-						if (lod == 0)
+						auto check_neighbor = [check_lod, root_x, root_y, lod, tile_x, tile_y](this auto&& self, int offset_x, int offset_y)->void
+							{
+								int lod_side_size = (1 << lod);
+								int neighbor_root_x = root_x;
+								int neighbor_root_y = root_y;
+								int neighbor_tile_x = tile_x + offset_x;
+								int neighbor_tile_y = tile_y + offset_y;
+								if (neighbor_tile_x < 0)
+								{
+									neighbor_tile_x = lod_side_size - 1;
+									neighbor_root_x--;
+								}
+								else if (neighbor_tile_x >= lod_side_size)
+								{
+									neighbor_tile_x = 0;
+									neighbor_root_x++;
+								}
+								if (neighbor_tile_y < 0)
+								{
+									neighbor_tile_y = lod_side_size - 1;
+									neighbor_root_y--;
+								}
+								else if (neighbor_tile_y >= lod_side_size)
+								{
+									neighbor_tile_y = 0;
+									neighbor_root_y++;
+								}
+								if (neighbor_root_x < 0 || neighbor_root_x >= NUM_TERRAIN_TILE_ROOTS_X || neighbor_root_y < 0 || neighbor_root_y >= NUM_TERRAIN_TILE_ROOTS_Y)
+								{
+									return;
+								}
+								Tile* neighbor_root = tiles[neighbor_root_x][neighbor_root_y];
+								int neighbor_lod = 0;
+								for (neighbor_lod = 0; neighbor_lod <= lod; neighbor_lod++)
+								{
+									int lod_tile_x = neighbor_tile_x >> (lod - neighbor_lod);
+									int lod_tile_y = neighbor_tile_y >> (lod - neighbor_lod);
+									Tile& neighbor_tile = neighbor_root[TILE_IDX(neighbor_lod, lod_tile_x, lod_tile_y)];
+									if (neighbor_tile.active)
+									{
+										if (lod == neighbor_lod)
+										{
+											return;
+										}
+										if (lod - neighbor_lod == 1)
+										{
+											if (neighbor_tile.stitching == STITCHING_HALF)
+											{
+												neighbor_tile.stitching = 0;
+												check_lod(neighbor_root_x, neighbor_root_y, neighbor_lod, lod_tile_x, lod_tile_y);
+											}
+											return;
+										}
+										neighbor_tile.active = false;
+										for (int i = 0; i < 2; i++)
+										{
+											for (int j = 0; j < 2; j++)
+											{
+												int x = 2 * lod_tile_x + i;
+												int y = 2 * lod_tile_y + j;
+												neighbor_root[TILE_IDX(neighbor_lod + 1, x, y)].active = true;
+												neighbor_root[TILE_IDX(neighbor_lod + 1, x, y)].stitching = STITCHING_HALF;
+											}
+										}
+										for (int i = 0; i < 2; i++)
+										{
+											for (int j = 0; j < 2; j++)
+											{
+												int x = 2 * lod_tile_x + i;
+												int y = 2 * lod_tile_y + j;
+												check_lod(neighbor_root_x, neighbor_root_y, neighbor_lod + 1, x, y);
+											}
+										}
+									}
+								}
+								return;
+							};
+						check_neighbor(-1, 0);
+						check_neighbor(1, 0);
+						check_neighbor(0, -1);
+						check_neighbor(0, 1);
+					}
+					else
+					{
+						check_lod(root_x, root_y, lod + 1, 2 * tile_x, 2 * tile_y);
+						check_lod(root_x, root_y, lod + 1, 2 * tile_x + 1, 2 * tile_y);
+						check_lod(root_x, root_y, lod + 1, 2 * tile_x, 2 * tile_y + 1);
+						check_lod(root_x, root_y, lod + 1, 2 * tile_x + 1, 2 * tile_y + 1);
+					}
+				}(i, j, 0, 0, 0);
+		}
+	}
+	for (int i = 0; i < NUM_TERRAIN_TILE_ROOTS_X; i++)
+	{
+		for (int j = 0; j < NUM_TERRAIN_TILE_ROOTS_Y; j++)
+		{
+			[](this auto&& build_stitching, int root_x, int root_y, int lod, int tile_x, int tile_y)->void
+				{
+					Tile& tile = tiles[root_x][root_y][TILE_IDX(lod, tile_x, tile_y)];
+					if (tile.active)
+					{
+						if (tile.stitching == STITCHING_HALF)
 						{
 							return;
 						}
-						tile.stitching = 0;
-						auto check_tile_coarser = [build_stitching, root_x, root_y, lod, tile_x, tile_y](this auto&& self, int offset_x, int offset_y)->bool
+						auto check_tile_coarser = [root_x, root_y, lod, tile_x, tile_y](int offset_x, int offset_y)->bool
 							{
 								int lod_side_size = (1 << lod);
 								int neighbor_root_x = root_x;
@@ -426,30 +570,14 @@ void updateTerrainLOD(float lod_factor, const vec3& camera_position)
 								}
 								Tile* neighbor_root = tiles[neighbor_root_x][neighbor_root_y];
 								int neighbor_lod = 0;
-								for (neighbor_lod = 0; neighbor_lod < lod; neighbor_lod++)
+								for (neighbor_lod = 0; neighbor_lod <= lod; neighbor_lod++)
 								{
 									int lod_tile_x = neighbor_tile_x >> (lod - neighbor_lod);
 									int lod_tile_y = neighbor_tile_y >> (lod - neighbor_lod);
 									Tile& neighbor_tile = neighbor_root[TILE_IDX(neighbor_lod, lod_tile_x, lod_tile_y)];
 									if (neighbor_tile.active)
 									{
-										if (lod - neighbor_lod == 1)
-										{
-											return true;
-										}
-										neighbor_tile.active = false;
-										Tile* next_lod_tiles = neighbor_root + NUM_TILES_TO_LOD_PER_ROOT(neighbor_lod + 1);
-										int next_lod_size = (1 << (neighbor_lod + 1));
-										for (int i = 0; i < 2; i++)
-										{
-											for (int j = 0; j < 2; j++)
-											{
-												int x = (2 * lod_tile_x + i);
-												int y = 2 * lod_tile_y + j;
-												next_lod_tiles[x * next_lod_size + y].active = true;
-												build_stitching(neighbor_root_x, neighbor_root_y, neighbor_lod + 1, x, y);
-											}
-										}
+										return lod > neighbor_lod || neighbor_tile.stitching == STITCHING_HALF;
 									}
 								}
 								return false;

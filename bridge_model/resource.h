@@ -5,6 +5,8 @@
 #define IDR_VS_HIGHWAY                  highway.vert
 #define IDR_FS_HIGHWAY_DAY              highway_day.frag
 #define IDR_FS_HIGHWAY_NIGHT            highway_night.frag
+#define IDR_FS_TERRAIN_DAY              terrain_day.frag
+#define IDR_FS_TERRAIN_NIGHT            terrain_night.frag
 #define IDR_VS_CAR                      car.vert
 #define IDR_FS_CAR_DAY                  car_day.frag
 #define IDR_FS_CAR_NIGHT                car_night.frag
