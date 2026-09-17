@@ -73,10 +73,10 @@ static void buildHighwayMesh()
 	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
 	i_vert += 4;
 
-	//positions[i_vert] = vec3(36.0f, -7.2f, 0);
-	//positions[i_vert + 1] = vec3(36.0f, -8.2f, -1.0f);
-	//positions[i_vert + 2] = vec3(112.0f, -8.2f, -1.0f);
-	//positions[i_vert + 3] = vec3(112.0f, -7.2f, 0);
+	positions[i_vert] = vec3(36.0f, -7.2f, 0);
+	positions[i_vert + 1] = vec3(36.0f, -8.2f, -1.0f);
+	positions[i_vert + 2] = vec3(112.0f, -8.2f, -1.0f);
+	positions[i_vert + 3] = vec3(112.0f, -7.2f, 0);
 	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
 	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
 	i_vert += 4;
