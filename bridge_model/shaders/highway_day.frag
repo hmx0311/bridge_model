@@ -31,6 +31,6 @@ void main()
 		lighting += shadow * LdotN * sun.diffuse_specular;
 	}
 	color *= lighting;
-	float fog_factor = fogFactor(length(modelPosView));
+	float fog_factor = fogFactor(modelPos);
 	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
 }

@@ -53,6 +53,6 @@ void main()
 		color += (shadow * LdotN * material.albedo + shadow * specular_factor * material.specular) * sun.diffuse_specular;
 	}
 	
-	float fog_factor = fogFactor(length(viewRay));
+	float fog_factor = fogFactor(modelPos);
 	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
 }

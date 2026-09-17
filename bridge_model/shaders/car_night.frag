@@ -82,7 +82,7 @@ void main()
 		color *= lighting;
 	}
 
-	float fog_factor = fogFactor(length(viewRay));
+	float fog_factor = fogFactor(modelPos);
 	color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
 	fragColor = color;
 	bloomColor = maxColor > 1 ? color : vec3(0.0);

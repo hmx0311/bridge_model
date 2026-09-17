@@ -45,7 +45,7 @@ constexpr float VIEW_Z_NEAR = 0.9f;
 constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float FOCUS_HEIGHT = 2.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
-constexpr float MAX_VIEW_DISTANCE = 5000.0f;
+constexpr float MAX_VIEW_DISTANCE = 1000.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
@@ -773,7 +773,7 @@ static void drawGraphics()
 			float move_speed = 1.0f * view_distance + 10.0f;
 			float move_distance = move_speed * 1e-6f * dt_us;
 			vec3 new_focus = focus + vec3(dir.x * move_distance, dir.y * move_distance, 0);
-			new_focus.x = clamp(new_focus.x, -300.0f, 300.0f);
+			new_focus.x = clamp(new_focus.x, -700.0f, 700.0f);
 			new_focus.y = clamp(new_focus.y, -200.0f, 200.0f);
 			if (focus != new_focus)
 			{
@@ -1440,11 +1440,9 @@ static void drawGraphics()
 		glViewport(0, 0, window_width, window_height);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glUseProgram(SP_terrain_day);
-		glEnable(GL_POLYGON_OFFSET_FILL);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		drawTerrainMesh();
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glDisable(GL_POLYGON_OFFSET_FILL);
 		glUseProgram(SP_highway_day);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);

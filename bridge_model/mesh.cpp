@@ -17,7 +17,7 @@ using namespace glm;
 
 static void buildHighwayMesh()
 {
-	constexpr int VERT_SIZE = 1675;
+	constexpr int VERT_SIZE = 4765;
 	vec3 positions[VERT_SIZE];
 	vec3 normals[VERT_SIZE];
 	vec2 tex_coords[VERT_SIZE];
@@ -31,70 +31,222 @@ static void buildHighwayMesh()
 	tex_coords[2] = vec2(0.98828125f, -204.8f / 20.48f);
 	positions[3] = vec3(-2560.0f, 7.2f, 0);
 	tex_coords[3] = vec2(0.98828125f, -2560.0f / 20.48f);
+	normals[0] = normals[1] = normals[2] = normals[3] = vec3(0, 0, 1);
 
-	positions[4] = vec3(204.8f, -7.2f, 0);
-	tex_coords[4] = vec2(0.63671875f, 204.8f / 20.48f);
-	positions[5] = vec3(376.0f, -7.2f, 0);
-	tex_coords[5] = vec2(0.63671875f, 376.0f / 20.48f);
-	positions[6] = vec3(376.0f, 7.2f, 0);
-	tex_coords[6] = vec2(0.98828125f, 376.0f / 20.48f);
-	positions[7] = vec3(204.8f, 7.2f, 0);
-	tex_coords[7] = vec2(0.98828125f, 204.8f / 20.48f);
+	int i_vert = 4;
 
-	positions[8] = vec3(671.68f, -105.76f, 0);
-	tex_coords[8] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
-	positions[9] = vec3(2560.0f, -1522.0f, 0);
-	tex_coords[9] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f) + 2360.4f) / 20.48f);
-	positions[10] = vec3(2560.0f, -1504.0f, 0);
-	tex_coords[10] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f) + 2349.6) / 20.48f);
-	positions[11] = vec3(680.32f, -94.24f, 0);
-	tex_coords[11] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
+	positions[i_vert] = vec3(-2560.0f, -7.2f, 0);
+	positions[i_vert + 1] = vec3(-2560.0f, -8.2f, -1.0f);
+	positions[i_vert + 2] = vec3(-50.0f, -8.2f, -1.0f);
+	positions[i_vert + 3] = vec3(-50.0f, -7.2f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
 
-	positions[12]  = vec3(-7.2f, 128.0f, 0);
-	tex_coords[12] = vec2(0.63671875f, 128.0f / 20.48f);
-	positions[13]  = vec3(7.2f, 128.0f, 0);
-	tex_coords[13] = vec2(0.98828125f, 128.0f / 20.48f);
-	positions[14]  = vec3(7.2f, 2048.0f, 0);
-	tex_coords[14] = vec2(0.98828125f, 2048.0f / 20.48f);
-	positions[15]  = vec3(-7.2f, 2048.0f, 0);
-	tex_coords[15] = vec2(0.63671875f, 2048.0f / 20.48f);
+	positions[i_vert] = vec3(-2560.0f, 8.2f, -1.0f);
+	positions[i_vert + 1] = vec3(-2560.0f, 7.2f, 0);
+	positions[i_vert + 2] = vec3(-204.8f, 7.2f, 0);
+	positions[i_vert + 3] = vec3(-204.8f, 8.2f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
 
-	positions[16] = vec3(-124.8f, 10.4f, 0);
-	tex_coords[16] = vec2(0.15478516f, 3.8f);
-	positions[17] = vec3(-185.6f, 10.4f, 0);
-	tex_coords[17] = vec2(0.15478516f, 0.0f);
-	positions[18] = vec3(-185.6f, 6.5f, 0);
-	tex_coords[18] = vec2(0.25f, 0.0f);
-	positions[19] = vec3(-124.8f, 6.5f, 0);
-	tex_coords[19] = vec2(0.25f, 3.8f);
+	positions[i_vert] = vec3(-112.8f, -7.2f, 0);
+	tex_coords[i_vert] = vec2(0.63671875f, -112.8f / 20.48f);
+	positions[i_vert + 1] = vec3(-50.0f, -7.2f, 0);
+	tex_coords[i_vert + 1] = vec2(0.63671875f, -50.0f / 20.48f);
+	positions[i_vert + 2] = vec3(-50.0f, 7.2f, 0);
+	tex_coords[i_vert + 2] = vec2(0.98828125f, -50.0f / 20.48f);
+	positions[i_vert + 3] = vec3(-112.8f, 7.2f, 0);
+	tex_coords[i_vert + 3] = vec2(0.98828125f, -112.8f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
 
-	positions[20] = vec3(185.6f, 10.4f, 0);
-	tex_coords[20] = vec2(0.15478516f, 0.0f);
-	positions[21] = vec3(124.8f, 10.4f, 0);
-	tex_coords[21] = vec2(0.15478516f, 3.8f);
-	positions[22] = vec3(124.8f, 6.5f, 0);
-	tex_coords[22] = vec2(0.25f, 3.8f);
-	positions[23] = vec3(185.6f, 6.5f, 0);
-	tex_coords[23] = vec2(0.25f, 0.0f);
+	positions[i_vert] = vec3(36.0f, -7.2f, 0);
+	tex_coords[i_vert] = vec2(0.63671875f, 36.0f / 20.48f);
+	positions[i_vert + 1] = vec3(112.0f, -7.2f, 0);
+	tex_coords[i_vert + 1] = vec2(0.63671875f, 112.0f / 20.48f);
+	positions[i_vert + 2] = vec3(112.0f, 7.2f, 0);
+	tex_coords[i_vert + 2] = vec2(0.98828125f, 112.0f / 20.48f);
+	positions[i_vert + 3] = vec3(36.0f, 7.2f, 0);
+	tex_coords[i_vert + 3] = vec2(0.98828125f, 36.0f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
 
-	positions[24] = vec3(-30.8f, -10.4f, 0);
-	tex_coords[24] = vec2(0.15478516f, 0.0f);
-	positions[25] = vec3(30.0f, -10.4f, 0);
-	tex_coords[25] = vec2(0.15478516f, 3.8f);
-	positions[26] = vec3(30.0f, -6.5f, 0);
-	tex_coords[26] = vec2(0.25f, 3.8f);
-	positions[27] = vec3(-30.8f, -6.5f, 0);
-	tex_coords[27] = vec2(0.25f, 0.0f);
+	//positions[i_vert] = vec3(36.0f, -7.2f, 0);
+	//positions[i_vert + 1] = vec3(36.0f, -8.2f, -1.0f);
+	//positions[i_vert + 2] = vec3(112.0f, -8.2f, -1.0f);
+	//positions[i_vert + 3] = vec3(112.0f, -7.2f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
 
-	positions[28] = vec3(120.0f, -10.4f, 0);
-	tex_coords[28] = vec2(0.15478516f, 3.8f);
-	positions[29] = vec3(180.8f, -10.4f, 0);
-	tex_coords[29] = vec2(0.15478516f, 0.0f);
-	positions[30] = vec3(180.8f, -6.5f, 0);
-	tex_coords[30] = vec2(0.25f, 0.0f);
-	positions[31] = vec3(120.0f, -6.5f, 0);
-	tex_coords[31] = vec2(0.25f, 3.8f);
-	for (int i = 0; i < 8; i++)
+	positions[i_vert] = vec3(-112.8f, 8.2f, -1.0f);
+	positions[i_vert + 1] = vec3(-112.8f, 7.2f, 0);
+	positions[i_vert + 2] = vec3(112.8f, 7.2f, 0);
+	positions[i_vert + 3] = vec3(112.8f, 8.2f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(204.8f, -7.2f, 0);
+	tex_coords[i_vert] = vec2(0.63671875f, 204.8f / 20.48f);
+	positions[i_vert + 1] = vec3(376.0f, -7.2f, 0);
+	tex_coords[i_vert + 1] = vec2(0.63671875f, 376.0f / 20.48f);
+	positions[i_vert + 2] = vec3(376.0f, 7.2f, 0);
+	tex_coords[i_vert + 2] = vec2(0.98828125f, 376.0f / 20.48f);
+	positions[i_vert + 3] = vec3(204.8f, 7.2f, 0);
+	tex_coords[i_vert + 3] = vec2(0.98828125f, 204.8f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(200.0f, -7.2f, 0);
+	positions[i_vert + 1] = vec3(200.0f, -8.2f, -1.0f);
+	positions[i_vert + 2] = vec3(376.0f, -8.2f, -1.0f);
+	positions[i_vert + 3] = vec3(376.0f, -7.2f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(204.8f, 8.2f, -1.0f);
+	positions[i_vert + 1] = vec3(204.8f, 7.2f, 0);
+	positions[i_vert + 2] = vec3(376.0f, 7.2f, 0);
+	positions[i_vert + 3] = vec3(376.0f, 8.2f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(671.68f, -105.76f, 0);
+	tex_coords[i_vert] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
+	positions[i_vert + 1] = vec3(2560.0f, -1522.0f, 0);
+	tex_coords[i_vert + 1] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f) + 2360.4f) / 20.48f);
+	positions[i_vert + 2] = vec3(2560.0f, -1504.0f, 0);
+	tex_coords[i_vert + 2] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f) + 2349.6) / 20.48f);
+	positions[i_vert + 3] = vec3(680.32f, -94.24f, 0);
+	tex_coords[i_vert + 3] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(671.68f, -105.76f, 0);
+	positions[i_vert + 1] = vec3(671.08f, -106.56f, -1.0f);
+	positions[i_vert + 2] = vec3(2560.0f, -1523.25f, -1.0f);
+	positions[i_vert + 3] = vec3(2560.0f, -1522.0f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(-0.42426407f, -0.565685424f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(680.92f, -93.44f, -1.0f);
+	positions[i_vert + 1] = vec3(680.32f, -94.24f, 0);
+	positions[i_vert + 2] = vec3(2560.0f, -1504.0f, 0);
+	positions[i_vert + 3] = vec3(2560.0f, -1502.75f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0.42426407f, 0.565685424f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(-7.2f, 128.0f, 0);
+	tex_coords[i_vert] = vec2(0.63671875f, 128.0f / 20.48f);
+	positions[i_vert + 1] = vec3(7.2f, 128.0f, 0);
+	tex_coords[i_vert + 1] = vec2(0.98828125f, 128.0f / 20.48f);
+	positions[i_vert + 2] = vec3(7.2f, 2048.0f, 0);
+	tex_coords[i_vert + 2] = vec2(0.98828125f, 2048.0f / 20.48f);
+	positions[i_vert + 3] = vec3(-7.2f, 2048.0f, 0);
+	tex_coords[i_vert + 3] = vec2(0.63671875f, 2048.0f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(7.2f, 128.0f, 0);
+	positions[i_vert + 1] = vec3(8.2f, 128.0f, -1.0f);
+	positions[i_vert + 2] = vec3(8.2f, 2048.0f, -1.0f);
+	positions[i_vert + 3] = vec3(7.2f, 2048.0f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0.70710678f, 0, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(-8.2f, 128.0f, -1.0f);
+	positions[i_vert + 1] = vec3(-7.2f, 128.0f, 0);
+	positions[i_vert + 2] = vec3(-7.2f, 2048.0f, 0);
+	positions[i_vert + 3] = vec3(-8.2f, 2048.0f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(-0.70710678f, 0, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(-124.8f, 10.4f, 0);
+	tex_coords[i_vert] = vec2(0.15478516f, 3.8f);
+	positions[i_vert + 1] = vec3(-185.6f, 10.4f, 0);
+	tex_coords[i_vert + 1] = vec2(0.15478516f, 0.0f);
+	positions[i_vert + 2] = vec3(-185.6f, 6.5f, 0);
+	tex_coords[i_vert + 2] = vec2(0.25f, 0.0f);
+	positions[i_vert + 3] = vec3(-124.8f, 6.5f, 0);
+	tex_coords[i_vert + 3] = vec2(0.25f, 3.8f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(-185.6f, 11.4f, -1.0f);
+	positions[i_vert + 1] = vec3(-185.6f, 10.4f, 0);
+	positions[i_vert + 2] = vec3(-124.8f, 10.4f, 0);
+	positions[i_vert + 3] = vec3(-124.8f, 11.4f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(185.6f, 10.4f, 0);
+	tex_coords[i_vert] = vec2(0.15478516f, 0.0f);
+	positions[i_vert + 1] = vec3(124.8f, 10.4f, 0);
+	tex_coords[i_vert + 1] = vec2(0.15478516f, 3.8f);
+	positions[i_vert + 2] = vec3(124.8f, 6.5f, 0);
+	tex_coords[i_vert + 2] = vec2(0.25f, 3.8f);
+	positions[i_vert + 3] = vec3(185.6f, 6.5f, 0);
+	tex_coords[i_vert + 3] = vec2(0.25f, 0.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(124.8f, 11.4f, -1.0f);
+	positions[i_vert + 1] = vec3(124.8f, 10.4f, 0);
+	positions[i_vert + 2] = vec3(185.6f, 10.4f, 0);
+	positions[i_vert + 3] = vec3(185.6f, 11.4f, -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(-30.8f, -10.4f, 0);
+	tex_coords[i_vert] = vec2(0.15478516f, 0.0f);
+	positions[i_vert + 1] = vec3(30.0f, -10.4f, 0);
+	tex_coords[i_vert + 1] = vec2(0.15478516f, 3.8f);
+	positions[i_vert + 2] = vec3(30.0f, -6.5f, 0);
+	tex_coords[i_vert + 2] = vec2(0.25f, 3.8f);
+	positions[i_vert + 3] = vec3(-30.8f, -6.5f, 0);
+	tex_coords[i_vert + 3] = vec2(0.25f, 0.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(-30.8f, -10.4f, 0);
+	positions[i_vert + 1] = vec3(-30.8f, -11.4f, -1.0f);
+	positions[i_vert + 2] = vec3(30.0f, -11.4f, -1.0f);
+	positions[i_vert + 3] = vec3(30.0f, -10.4f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(120.0f, -10.4f, 0);
+	tex_coords[i_vert] = vec2(0.15478516f, 3.8f);
+	positions[i_vert + 1] = vec3(180.8f, -10.4f, 0);
+	tex_coords[i_vert + 1] = vec2(0.15478516f, 0.0f);
+	positions[i_vert + 2] = vec3(180.8f, -6.5f, 0);
+	tex_coords[i_vert + 2] = vec2(0.25f, 0.0f);
+	positions[i_vert + 3] = vec3(120.0f, -6.5f, 0);
+	tex_coords[i_vert + 3] = vec2(0.25f, 3.8f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
+	i_vert += 4;
+
+	positions[i_vert] = vec3(120.0f, -10.4f, 0);
+	positions[i_vert + 1] = vec3(120.0f, -11.4f, -1.0f);
+	positions[i_vert + 2] = vec3(180.8f, -11.4f, -1.0f);
+	positions[i_vert + 3] = vec3(180.8f, -10.4f, 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
+	i_vert += 4;
+
+	for (int i = 0; i < i_vert / 4; i++)
 	{
 		indices[6 * i] = 4 * i;
 		indices[6 * i + 1] = 4 * i + 1;
@@ -103,8 +255,8 @@ static void buildHighwayMesh()
 		indices[6 * i + 4] = 4 * i + 2;
 		indices[6 * i + 5] = 4 * i + 3;
 	}
-	int i_vert = 32;
-	int i_idx = 48;
+
+	int i_idx = i_vert / 4 * 6;
 
 	float theta = asin(0.6f);
 	int n = theta * sqrtf(50000.0f) + 3;
@@ -117,24 +269,41 @@ static void buildHighwayMesh()
 		constexpr float O[2] = { 376.0f, -500.0f };
 		float R = 507.2f;
 		float r = 492.8f;
+		float berm_R = R + 1.0f;
+		float berm_r = r - 1.0f;
 		float X = O[0] + R * sin_theta, Y = O[1] + R * cos_theta;
 		float x = O[0] + r * sin_theta, y = O[1] + r * cos_theta;
+		float berm_X = O[0] + berm_R * sin_theta, berm_Y = O[1] + berm_R * cos_theta;
+		float berm_x = O[0] + berm_r * sin_theta, berm_y = O[1] + berm_r * cos_theta;
 		positions[i_vert + 2 * i] = vec3(X, Y, 0);
-		tex_coords[i_vert + 2 * i] = vec2(0.98828125f, (O[0] + 500.0f * i * dtheta)/ 20.48f);
+		tex_coords[i_vert + 2 * i] = vec2(0.98828125f, (O[0] + 500.0f * i * dtheta) / 20.48f);
 		positions[i_vert + 2 * i + 1] = vec3(x, y, 0);
 		tex_coords[i_vert + 2 * i + 1] = vec2(0.63671875f, (O[0] + 500.0f * i * dtheta) / 20.48f);
+		normals[i_vert + 2 * i] = normals[i_vert + 2 * i + 1] = vec3(0, 0, 1);
+
+		positions[i_vert + 2 * n + 2 * i] = vec3(x, y, 0);
+		positions[i_vert + 2 * n + 2 * i + 1] = vec3(berm_x, berm_y, -1.0f);
+		normals[i_vert + 2 * n + 2 * i] = normals[i_vert + 2 * n + 2 * i + 1] = vec3(-0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+
+		positions[i_vert + 4 * n + 2 * i] = vec3(berm_X, berm_Y, -1.0f);
+		positions[i_vert + 4 * n + 2 * i + 1] = vec3(X, Y, 0);
+		normals[i_vert + 4 * n + 2 * i] = normals[i_vert + 4 * n + 2 * i + 1] = vec3(0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 2 * n + 2 * i] = tex_coords[i_vert + 2 * n + 2 * i + 1] = tex_coords[i_vert + 4 * n + 2 * i] = tex_coords[i_vert + 4 * n + 2 * i + 1] = vec2(0.09375f, 0.8125f);
 	}
-	for (int j = 0; j < n - 1; j++)
+	for (int i = 0; i < 3; i++)
 	{
-		indices[i_idx + 6 * j] = i_vert + 2 * j;
-		indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
-		indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
-		indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
-		indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
-		indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+		for (int j = 0; j < n - 1; j++)
+		{
+			indices[i_idx + 6 * j] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
+			indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+		}
+		i_vert += 2 * n;
+		i_idx += 6 * (n - 1);
 	}
-	i_vert += 2 * n;
-	i_idx += 6 * (n - 1);
 
 	theta = asin(12.0f / 37);
 	n = theta * sqrtf(2960) + 3;
@@ -156,10 +325,15 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 6 * n + 3] = vec2(0.0f, 0.0f);
 	positions[i_vert + 8 * n + 3] = vec3(200.0f, -6.5f, 0);
 	tex_coords[i_vert + 8 * n + 3] = vec2(0.0f, 19.2f / 20.48f);
+	normals[i_vert] = normals[i_vert + 2 * n] = normals[i_vert + 2 * n + 1] = normals[i_vert + 4 * n + 1] = normals[i_vert + 4 * n + 2] = normals[i_vert + 6 * n + 2] = normals[i_vert + 6 * n + 3] = normals[i_vert + 8 * n + 3] = vec3(0, 0, 1);
 	for (int i = 0; i < n; i++)
 	{
-		float x = 29.6f * sin(i * dtheta);
-		float y = -25.7f + 29.6f * cos(i * dtheta);
+		float sin_theta = sin(i * dtheta);
+		float cos_theta = cos(i * dtheta);
+		float x = 29.6f * sin_theta;
+		float y = -25.7f + 29.6f * cos_theta;
+		float berm_x = 30.6f * sin_theta;
+		float berm_y = -25.7f + 30.6f * cos_theta;
 		positions[i_vert + 1 + i] = vec3(-185.6f - x, 6.5f + y, 0);
 		tex_coords[i_vert + 1 + i] = vec2(y / 40.96f, x / 20.48f);
 		positions[i_vert + 2 * n + 2 + i] = vec3(185.6f + x, 6.5f + y, 0);
@@ -168,11 +342,33 @@ static void buildHighwayMesh()
 		tex_coords[i_vert + 4 * n + 3 + i] = vec2(y / 40.96f, x / 20.48f);
 		positions[i_vert + 6 * n + 4 + i] = vec3(180.8f + x, -6.5f - y, 0);
 		tex_coords[i_vert + 6 * n + 4 + i] = vec2(y / 40.96f, x / 20.48f);
+		normals[i_vert + 1 + i] = normals[i_vert + 2 * n + 2 + i] = normals[i_vert + 4 * n + 3 + i] = normals[i_vert + 6 * n + 4 + i] = vec3(0, 0, 1);
+
+		positions[i_vert + 8 * n + 4 + 2 * i] = vec3(-185.6f - x, 6.5f + y, 0);
+		positions[i_vert + 8 * n + 5 + 2 * i] = vec3(-185.6f - berm_x, 6.5f + berm_y, -1.0f);
+		normals[i_vert + 8 * n + 4 + 2 * i] = normals[i_vert + 8 * n + 5 + 2 * i] = vec3(-0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 8 * n + 4 + 2 * i] = tex_coords[i_vert + 8 * n + 5 + 2 * i] = vec2(0.09375f, 0.8125f);
+		positions[i_vert + 12 * n + 2 + 2 * i] = vec3(185.6f + berm_x, 6.5f + berm_y, -1.0f);
+		positions[i_vert + 12 * n + 3 + 2 * i] = vec3(185.6f + x, 6.5f + y, 0);
+		normals[i_vert + 12 * n + 2 + 2 * i] = normals[i_vert + 12 * n + 3 + 2 * i] = vec3(0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 12 * n + 2 + 2 * i] = tex_coords[i_vert + 12 * n + 3 + 2 * i] = vec2(0.09375f, 0.8125f);
+		positions[i_vert + 16 * n + 2 * i] = vec3(-30.8f - berm_x, -6.5f - berm_y, -1.0f);
+		positions[i_vert + 16 * n + 1 + 2 * i] = vec3(-30.8f - x, -6.5f - y, 0);
+		normals[i_vert + 16 * n + 2 * i] = normals[i_vert + 16 * n + 1 + 2 * i] = vec3(-0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 16 * n + 2 * i] = tex_coords[i_vert + 16 * n + 1 + 2 * i] = vec2(0.09375f, 0.8125f);
+		positions[i_vert + 20 * n - 2 + 2 * i] = vec3(180.8f + x, -6.5f - y, 0);
+		positions[i_vert + 20 * n - 1 + 2 * i] = vec3(180.8f + berm_x, -6.5f - berm_y, -1.0f);
+		normals[i_vert + 20 * n - 2 + 2 * i] = normals[i_vert + 20 * n - 1 + 2 * i] = vec3(0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 20 * n - 2 + 2 * i] = tex_coords[i_vert + 20 * n - 1 + 2 * i] = vec2(0.09375f, 0.8125f);
 	}
 	for (int i = 1; i < n; i++)
 	{
-		float x = 19.2f - 29.6f * sin(theta - i * dtheta);
-		float y = 30.3f - 29.6f * cos(theta - i * dtheta);
+		float sin_theta = sin(theta - i * dtheta);
+		float cos_theta = cos(theta - i * dtheta);
+		float x = 19.2f - 29.6f * sin_theta;
+		float y = 30.3f - 29.6f * cos_theta;
+		float berm_x = 19.2f - 28.6f * sin_theta;
+		float berm_y = 30.3f - 28.6f * cos_theta;
 		positions[i_vert + n + i] = vec3(-185.6f - x, 6.5f + y, 0);
 		tex_coords[i_vert + n + i] = vec2(y / 40.96f, x / 20.48f);
 		positions[i_vert + 3 * n + 1 + i] = vec3(185.6f + x, 6.5f + y, 0);
@@ -181,6 +377,24 @@ static void buildHighwayMesh()
 		tex_coords[i_vert + 5 * n + 2 + i] = vec2(y / 40.96f, x / 20.48f);
 		positions[i_vert + 7 * n + 3 + i] = vec3(180.8f + x, -6.5f - y, 0);
 		tex_coords[i_vert + 7 * n + 3 + i] = vec2(y / 40.96f, x / 20.48f);
+		normals[i_vert + n + i] = normals[i_vert + 3 * n + 1 + i] = normals[i_vert + 5 * n + 2 + i] = normals[i_vert + 7 * n + 3 + i] = vec3(0, 0, 1);
+
+		positions[i_vert + 10 * n + 2 + 2 * i] = vec3(-185.6f - x, 6.5f + y, 0);
+		positions[i_vert + 10 * n + 3 + 2 * i] = vec3(-185.6f - berm_x, 6.5f + berm_y, -1.0f);
+		normals[i_vert + 10 * n + 2 + 2 * i] = normals[i_vert + 10 * n + 3 + 2 * i] = vec3(-0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 10 * n + 2 + 2 * i] = tex_coords[i_vert + 10 * n + 3 + 2 * i] = vec2(0.09375f, 0.8125f);
+		positions[i_vert + 14 * n + 2 * i] = vec3(185.6f + berm_x, 6.5f + berm_y, -1.0f);
+		positions[i_vert + 14 * n + 1 + 2 * i] = vec3(185.6f + x, 6.5f + y, 0);
+		normals[i_vert + 14 * n + 2 * i] = normals[i_vert + 14 * n + 1 + 2 * i] = vec3(0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 14 * n + 2 * i] = tex_coords[i_vert + 14 * n + 1 + 2 * i] = vec2(0.09375f, 0.8125f);
+		positions[i_vert + 18 * n - 2 + 2 * i] = vec3(-30.8f - berm_x, -6.5f - berm_y, -1.0f);
+		positions[i_vert + 18 * n - 1 + 2 * i] = vec3(-30.8f - x, -6.5f - y, 0);
+		normals[i_vert + 18 * n - 2 + 2 * i] = normals[i_vert + 18 * n - 1 + 2 * i] = vec3(-0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 18 * n - 2 + 2 * i] = tex_coords[i_vert + 18 * n - 1 + 2 * i] = vec2(0.09375f, 0.8125f);
+		positions[i_vert + 22 * n - 4 + 2 * i] = vec3(180.8f + x, -6.5f - y, 0);
+		positions[i_vert + 22 * n - 3 + 2 * i] = vec3(180.8f + berm_x, -6.5f - berm_y, -1.0f);
+		normals[i_vert + 22 * n - 4 + 2 * i] = normals[i_vert + 22 * n - 3 + 2 * i] = vec3(0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 22 * n - 4 + 2 * i] = tex_coords[i_vert + 22 * n - 3 + 2 * i] = vec2(0.09375f, 0.8125f);
 	}
 	for (int i = 0; i < 2 * n - 1; i++)
 	{
@@ -200,6 +414,22 @@ static void buildHighwayMesh()
 	i_vert += 4 * (2 * n + 1);
 	i_idx += 3 * 4 * (2 * n - 1);
 
+	n = 2 * n - 1;
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < n - 1; j++)
+		{
+			indices[i_idx + 6 * j] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
+			indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 2;
+			indices[i_idx + 6 * j + 3] = i_vert + 2 * j + 1;
+			indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+		}
+		i_vert += 2 * n;
+		i_idx += 6 * (n - 1);
+	}
+
 	positions[i_vert] = vec3(-204.8f, -7.2f, 0);
 	tex_coords[i_vert] = vec2(0.63671875f, -204.8f / 20.48f);
 	positions[i_vert + 1] = vec3(-204.8f, 6.5f, 0);
@@ -208,6 +438,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 2] = vec2(0.63671875f, -124.8f / 20.48f);
 	positions[i_vert + 3] = vec3(-124.8f, 6.5f, 0);
 	tex_coords[i_vert + 3] = vec2(0.9711914f, -124.8f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 3;
@@ -218,7 +449,6 @@ static void buildHighwayMesh()
 
 	i_vert += 4;
 	i_idx += 6;
-
 	positions[i_vert] = vec3(-124.8f, -7.2f, 0);
 	tex_coords[i_vert] = vec2(0.63671875f, -124.8f / 20.48f);
 	positions[i_vert + 1] = vec3(-124.8f, 6.76352f, 0);
@@ -229,6 +459,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 3] = vec2(0.63671875f, -112.8f / 20.48f);
 	positions[i_vert + 4] = vec3(-112.8f, 6.85f, 0);
 	tex_coords[i_vert + 4] = vec2(0.9797363f, -112.8f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = normals[i_vert + 4] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 2;
@@ -243,25 +474,6 @@ static void buildHighwayMesh()
 	i_vert += 5;
 	i_idx += 9;
 
-	positions[i_vert] = vec3(-112.8f, -7.2f, 0);
-	tex_coords[i_vert] = vec2(0.63671875f, -112.8f / 20.48f);
-	positions[i_vert + 1] = vec3(-112.8f, 7.2f, 0);
-	tex_coords[i_vert + 1] = vec2(0.98828125f, -112.8f / 20.48f);
-	positions[i_vert + 2] = vec3(-50.0f, -7.2f, 0);
-	tex_coords[i_vert + 2] = vec2(0.63671875f, -50.0f / 20.48f);
-	positions[i_vert + 3] = vec3(-50.0f, 7.2f, 0);
-	tex_coords[i_vert + 3] = vec2(0.98828125f, -50.0f / 20.48f);
-
-	indices[i_idx] = i_vert;
-	indices[i_idx + 1] = i_vert + 3;
-	indices[i_idx + 2] = i_vert + 1;
-	indices[i_idx + 3] = i_vert;
-	indices[i_idx + 4] = i_vert + 2;
-	indices[i_idx + 5] = i_vert + 3;
-
-	i_vert += 4;
-	i_idx += 6;
-
 	positions[i_vert] = vec3(-50.0f, -6.5f, 0);
 	tex_coords[i_vert] = vec2(0.6538086f, -50.0f / 20.48f);
 	positions[i_vert + 1] = vec3(-50.0f, 7.2f, 0);
@@ -270,6 +482,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 2] = vec2(0.6538086f, 30.0f / 20.48f);
 	positions[i_vert + 3] = vec3(30.0f, 7.2f, 0);
 	tex_coords[i_vert + 3] = vec2(0.98828125f, 30.0f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 3;
@@ -291,6 +504,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 3] = vec2(0.6452637f, 36.0f / 20.48f);
 	positions[i_vert + 4] = vec3(36.0f, 7.2f, 0);
 	tex_coords[i_vert + 4] = vec2(0.98828125f, 36.0f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = normals[i_vert + 4] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 2;
@@ -304,25 +518,6 @@ static void buildHighwayMesh()
 
 	i_vert += 5;
 	i_idx += 9;
-
-	positions[i_vert] = vec3(36.0f, -7.2f, 0);
-	tex_coords[i_vert] = vec2(0.63671875f, 36.0f / 20.48f);
-	positions[i_vert + 1] = vec3(36.0f, 7.2f, 0);
-	tex_coords[i_vert + 1] = vec2(0.98828125f, 36.0f / 20.48f);
-	positions[i_vert + 2] = vec3(112.0f, -7.2f, 0);
-	tex_coords[i_vert + 2] = vec2(0.63671875f, 112.0f / 20.48f);
-	positions[i_vert + 3] = vec3(112.0f, 7.2f, 0);
-	tex_coords[i_vert + 3] = vec2(0.98828125f, 112.0f / 20.48f);
-
-	indices[i_idx] = i_vert;
-	indices[i_idx + 1] = i_vert + 3;
-	indices[i_idx + 2] = i_vert + 1;
-	indices[i_idx + 3] = i_vert;
-	indices[i_idx + 4] = i_vert + 2;
-	indices[i_idx + 5] = i_vert + 3;
-
-	i_vert += 4;
-	i_idx += 6;
 
 	positions[i_vert] = vec3(112.0f, -6.85f, 0);
 	tex_coords[i_vert] = vec2(0.6452637f, 112.0f / 20.48f);
@@ -338,6 +533,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 5] = vec2(0.9711914f, 124.8f / 20.48f);
 	positions[i_vert + 6] = vec3(124.8f, 6.76352f, 0);
 	tex_coords[i_vert + 6] = vec2(0.977625f, 124.8f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = normals[i_vert + 4] = normals[i_vert + 5] = normals[i_vert + 6] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 2;
@@ -366,6 +562,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 2] = vec2(0.6538086f, 200.0f / 20.48f);
 	positions[i_vert + 3] = vec3(200.0f, 6.5f, 0);
 	tex_coords[i_vert + 3] = vec2(0.9711914f, 200.0f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 3;
@@ -385,6 +582,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 2] = vec2(0.63671875f, 204.8f / 20.48f);
 	positions[i_vert + 3] = vec3(204.8f, 6.5f, 0);
 	tex_coords[i_vert + 3] = vec2(0.9711914f, 204.8f / 20.48f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 3;
@@ -408,6 +606,7 @@ static void buildHighwayMesh()
 	tex_coords[i_vert + 4] = vec2(0.5891113f, 0.0f);
 	positions[i_vert + 5] = vec3(-3.65f, 116.0f, 0);
 	tex_coords[i_vert + 5] = vec2(0.41088867f, 0.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = normals[i_vert + 4] = normals[i_vert + 5] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 1;
@@ -429,6 +628,9 @@ static void buildHighwayMesh()
 	n = theta * sqrtf(12160) + 3;
 	dtheta = theta / n;
 	n++;
+	int n1 = 0.07f * n;
+	int n2 = 0.93f * n;
+	int berm_n = n2 - n1;
 	for (int i = 0; i < n; i++)
 	{
 		float sin_theta = sin(i * dtheta);
@@ -436,15 +638,19 @@ static void buildHighwayMesh()
 		constexpr float O[2] = { -124.8f, 128.0f };
 		float R = 121.6f;
 		float r = 117.6f;
+		float berm_R = R + 1.0f;
+		float berm_r = r - 1.0f;
 		float X = O[0] + R * cos_theta, Y = O[1] - R * sin_theta;
 		float x = O[0] + r * cos_theta, y = O[1] - r * sin_theta;
-		if (i < 0.07f * n)
+		float berm_X = O[0] + berm_R * cos_theta, berm_Y = O[1] - berm_R * sin_theta;
+		float berm_x = O[0] + berm_r * cos_theta, berm_y = O[1] - berm_r * sin_theta;
+		if (i < n1)
 		{
 			R -= std::min(0.36352f, (X + 3.65f) / cos_theta);
 			X = O[0] + R * cos_theta;
 			Y = O[1] - R * sin_theta;
 		}
-		else if (i > 0.925f * n)
+		else if (i >= n2)
 		{
 			R -= std::min(0.36352f, (6.85f - Y) / sin_theta);
 			X = O[0] + R * cos_theta;
@@ -458,6 +664,101 @@ static void buildHighwayMesh()
 		tex_coords[i_vert + 2 * n + 2 * i] = vec2(0.263671875f, 119.6f * theta / (20.48f * (n - 1)) * i);
 		positions[i_vert + 2 * n + 2 * i + 1] = vec3(-X, Y, 0);
 		tex_coords[i_vert + 2 * n + 2 * i + 1] = vec2(0.3125f + (R - 119.6f) / 40.96f, 119.6f * theta / (20.48f * (n - 1)) * i);
+		normals[i_vert + 2 * i] = normals[i_vert + 2 * i + 1] = normals[i_vert + 2 * n + 2 * i] = normals[i_vert + 2 * n + 2 * i + 1] = vec3(0, 0, 1);
+
+		positions[i_vert + 4 * n + 2 * i] = vec3(x, y, 0);
+		positions[i_vert + 4 * n + 2 * i + 1] = vec3(berm_x, berm_y, -1.0f);
+		normals[i_vert + 4 * n + 2 * i] = normals[i_vert + 4 * n + 2 * i + 1] = vec3(-0.70710678f * cos_theta, 0.70710678f * sin_theta, 0.70710678f);
+		positions[i_vert + 6 * n + 2 * i] = vec3(-berm_x, berm_y, -1.0f);
+		positions[i_vert + 6 * n + 2 * i + 1] = vec3(-x, y, 0);
+		normals[i_vert + 6 * n + 2 * i] = normals[i_vert + 6 * n + 2 * i + 1] = vec3(0.70710678f * cos_theta, 0.70710678f * sin_theta, 0.70710678f);
+		tex_coords[i_vert + 4 * n + 2 * i] = tex_coords[i_vert + 4 * n + 2 * i + 1] = tex_coords[i_vert + 6 * n + 2 * i] = tex_coords[i_vert + 6 * n + 2 * i + 1] = vec2(0.09375f, 0.8125f);
+
+		if (i >= n1 && i < n2)
+		{
+			int berm_i = i_vert + 8 * n + 2 * (i - n1);
+			positions[berm_i] = vec3(berm_X, berm_Y, -1.0f);
+			positions[berm_i + 1] = vec3(X, Y, 0);
+			normals[berm_i] = normals[berm_i + 1] = vec3(0.70710678f * cos_theta, -0.70710678f * sin_theta, 0.70710678f);
+			positions[2 * berm_n + berm_i] = vec3(-X, Y, 0);
+			positions[2 * berm_n + berm_i + 1] = vec3(-berm_X, berm_Y, -1.0f);
+			normals[2 * berm_n + berm_i] = normals[2 * berm_n + berm_i + 1] = vec3(-0.70710678f * cos_theta, -0.70710678f * sin_theta, 0.70710678f);
+			tex_coords[berm_i] = tex_coords[berm_i + 1] = tex_coords[2 * berm_n + berm_i] = tex_coords[2 * berm_n + berm_i + 1] = vec2(0.09375f, 0.8125f);
+		}
+	}
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < n - 1; j++)
+		{
+			indices[i_idx + 6 * j] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
+			indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+		}
+		i_vert += 2 * n;
+		i_idx += 6 * (n - 1);
+	}
+	for (int i = 0; i < 2; i++)
+	{
+		for (int j = 0; j < berm_n - 1; j++)
+		{
+			indices[i_idx + 6 * j] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
+			indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+		}
+		i_vert += 2 * berm_n;
+		i_idx += 6 * (berm_n - 1);
+	}
+
+	theta = acos(-5.0f / 13);
+	n = theta * sqrtf(3000) + 3;
+	dtheta = theta / n;
+	n++;
+	n1 = 0.11f * n;
+	berm_n = n - n1;
+	for (int i = 0; i < n; i++)
+	{
+		float sin_theta = sin(i * dtheta);
+		float cos_theta = cos(i * dtheta);
+		constexpr float O[2] = { 30.0f, -36.4f };
+		float R = 30.0f;
+		float r = 26.0f;
+		float berm_R = R + 1.0f;
+		float berm_r = r - 1.0f;
+		float X = O[0] + R * sin_theta, Y = O[1] + R * cos_theta;
+		float x = O[0] + r * sin_theta, y = O[1] + r * cos_theta;
+		float berm_X = O[0] + berm_R * sin_theta, berm_Y = O[1] + berm_R * cos_theta;
+		float berm_x = O[0] + berm_r * sin_theta, berm_y = O[1] + berm_r * cos_theta;
+		if (i < 0.11f * n)
+		{
+			R -= std::min(0.36352f, (6.85f + Y) / cos_theta);
+			X = O[0] + R * sin_theta;
+			Y = O[1] + R * cos_theta;
+		}
+		positions[i_vert + 2 * i] = vec3(X, Y, 0);
+		tex_coords[i_vert + 2 * i] = vec2(0.3125f + (R - 28.0f) / 40.96f, 28.0f * theta / (20.48f * (n - 1)) * i);
+		positions[i_vert + 2 * i + 1] = vec3(x, y, 0);
+		tex_coords[i_vert + 2 * i + 1] = vec2(0.263671875f, 28.0f * theta / (20.48f * (n - 1)) * i);
+		normals[i_vert + 2 * i] = normals[i_vert + 2 * i + 1] = vec3(0, 0, 1);
+
+		positions[i_vert + 2 * n + 2 * i] = vec3(x, y, 0);
+		positions[i_vert + 2 * n + 2 * i + 1] = vec3(berm_x, berm_y, -1.0f);
+		normals[i_vert + 2 * n + 2 * i] = normals[i_vert + 2 * n + 2 * i + 1] = vec3(-0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 2 * n + 2 * i] = tex_coords[i_vert + 2 * n + 2 * i + 1] = vec2(0.09375f, 0.8125f);
+
+		if (i >= n1)
+		{
+			int berm_i = i_vert + 4 * n + 2 * (i - n1) + 3;
+			positions[berm_i] = vec3(berm_X, berm_Y, -1.0f);
+			positions[berm_i + 1] = vec3(X, Y, 0);
+			normals[berm_i] = normals[berm_i + 1] = vec3(0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+			tex_coords[berm_i] = tex_coords[berm_i + 1] = vec2(0.09375f, 0.8125f);
+		}
 	}
 	for (int i = 0; i < 2; i++)
 	{
@@ -473,48 +774,34 @@ static void buildHighwayMesh()
 		i_vert += 2 * n;
 		i_idx += 6 * (n - 1);
 	}
-
-	theta = acos(-5.0f / 13);
-	n = theta * sqrtf(3000) + 3;
-	dtheta = theta / n;
-	n++;
-	for (int i = 0; i < n; i++)
+	positions[i_vert] = positions[i_vert - 2];
+	positions[i_vert + 1] = positions[i_vert - 1];
+	positions[i_vert + 2] = vec3(vec2(positions[i_vert - 2]), -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = vec3(cos(theta), - sin(theta), 0);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = vec2(0.09375f, 0.8125f);
+	indices[i_idx] = i_vert;
+	indices[i_idx + 1] = i_vert + 1;
+	indices[i_idx + 2] = i_vert + 2;
+	i_vert += 3;
+	i_idx += 3;
+	for (int i = 0; i < berm_n - 1; i++)
 	{
-
-		float sin_theta = sin(i * dtheta);
-		float cos_theta = cos(i * dtheta);
-		constexpr float O[2] = { 30.0f, -36.4f };
-		float R = 30.0f;
-		float r = 26.0f;
-		float X = O[0] + R * sin_theta, Y = O[1] + R * cos_theta;
-		float x = O[0] + r * sin_theta, y = O[1] + r * cos_theta;
-		if (i < 0.11f * n)
-		{
-			R -= std::min(0.36352f, (6.85f + Y) / cos_theta);
-			X = O[0] + R * sin_theta;
-			Y = O[1] + R * cos_theta;
-		}
-		positions[i_vert + 2 * i] = vec3(X, Y, 0);
-		tex_coords[i_vert + 2 * i] = vec2(0.3125f + (R - 28.0f) / 40.96f, 28.0f * theta / (20.48f * (n - 1)) * i);
-		positions[i_vert + 2 * i + 1] = vec3(x, y, 0);
-		tex_coords[i_vert + 2 * i + 1] = vec2(0.263671875f, 28.0f * theta / (20.48f * (n - 1)) * i);
+		indices[i_idx + 6 * i] = i_vert + 2 * i;
+		indices[i_idx + 6 * i + 1] = i_vert + 2 * i + 1;
+		indices[i_idx + 6 * i + 2] = i_vert + 2 * i + 3;
+		indices[i_idx + 6 * i + 3] = i_vert + 2 * i;
+		indices[i_idx + 6 * i + 4] = i_vert + 2 * i + 3;
+		indices[i_idx + 6 * i + 5] = i_vert + 2 * i + 2;
 	}
-	for (int j = 0; j < n - 1; j++)
-	{
-		indices[i_idx + 6 * j] = i_vert + 2 * j;
-		indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
-		indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
-		indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
-		indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
-		indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
-	}
-	i_vert += 2 * n;
-	i_idx += 6 * (n - 1);
+	i_vert += 2 * berm_n;
+	i_idx += 6 * (berm_n - 1);
 
 	theta = asin(12.0f / 13);
 	n = theta * sqrtf(6750) + 3;
 	dtheta = theta / n;
 	n++;
+	n1 = 0.12f * n;
+	berm_n = n - n1;
 	for (int i = 0; i < n; i++)
 	{
 		float sin_theta = sin(i * dtheta);
@@ -522,8 +809,12 @@ static void buildHighwayMesh()
 		constexpr float O[2] = { 120.0f, -73.9f };
 		float R = 67.5f;
 		float r = 63.5f;
+		float berm_R = R + 1.0f;
+		float berm_r = r - 1.0f;
 		float X = O[0] - R * sin_theta, Y = O[1] + R * cos_theta;
 		float x = O[0] - r * sin_theta, y = O[1] + r * cos_theta;
+		float berm_X = O[0] - berm_R * sin_theta, berm_Y = O[1] + berm_R * cos_theta;
+		float berm_x = O[0] - berm_r * sin_theta, berm_y = O[1] + berm_r * cos_theta;
 		if (i < 0.11f * n)
 		{
 			R -= std::min(0.36352f, (6.85f + Y) / cos_theta);
@@ -534,23 +825,57 @@ static void buildHighwayMesh()
 		tex_coords[i_vert + 2 * i] = vec2(0.263671875f, 65.5f * theta / (20.48f * (n - 1)) * i);
 		positions[i_vert + 2 * i + 1] = vec3(X, Y, 0);
 		tex_coords[i_vert + 2 * i + 1] = vec2(0.3125f + (R - 65.5f) / 40.96f, 65.5f * theta / (20.48f * (n - 1)) * i);
-	}
-	for (int j = 0; j < n - 1; j++)
-	{
-		indices[i_idx + 6 * j] = i_vert + 2 * j;
-		indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
-		indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
-		indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
-		indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
-		indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
-	}
-	i_vert += 2 * n;
-	i_idx += 6 * (n - 1);
+		normals[i_vert + 2 * i] = normals[i_vert + 2 * i + 1] = vec3(0, 0, 1);
 
-	for (int i = 0; i < i_vert; i++)
-	{
-		normals[i] = vec3(0, 0, 1);
+		positions[i_vert + 2 * n + 2 * i] = vec3(berm_x, berm_y, -1.0f); 
+		positions[i_vert + 2 * n + 2 * i + 1] = vec3(x, y, 0);
+		normals[i_vert + 2 * n + 2 * i] = normals[i_vert + 2 * n + 2 * i + 1] = vec3(0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
+		tex_coords[i_vert + 2 * n + 2 * i] = tex_coords[i_vert + 2 * n + 2 * i + 1] = vec2(0.09375f, 0.8125f);
+
+		if (i >= n1)
+		{
+			int berm_i = i_vert + 4 * n + 2 * (i - n1) + 3;
+			positions[berm_i] = vec3(X, Y, 0);
+			positions[berm_i + 1] = vec3(berm_X, berm_Y, -1.0f);
+			normals[berm_i] = normals[berm_i + 1] = vec3(-0.70710678f * sin_theta, 0.70710678f * cos_theta, 0.70710678f);
+			tex_coords[berm_i] = tex_coords[berm_i + 1] = vec2(0.09375f, 0.8125f);
+		}
 	}
+	for (int i = 0; i < 2; i++)
+	{
+		for (int j = 0; j < n - 1; j++)
+		{
+			indices[i_idx + 6 * j] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 1] = i_vert + 2 * j + 1;
+			indices[i_idx + 6 * j + 2] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 3] = i_vert + 2 * j;
+			indices[i_idx + 6 * j + 4] = i_vert + 2 * j + 3;
+			indices[i_idx + 6 * j + 5] = i_vert + 2 * j + 2;
+		}
+		i_vert += 2 * n;
+		i_idx += 6 * (n - 1);
+	}
+	positions[i_vert] = positions[i_vert - 2];
+	positions[i_vert + 1] = positions[i_vert - 1];
+	positions[i_vert + 2] = vec3(vec2(positions[i_vert - 1]), -1.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = vec3(-cos(theta), -sin(theta), 0);
+	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = vec2(0.09375f, 0.8125f);
+	indices[i_idx] = i_vert;
+	indices[i_idx + 1] = i_vert + 1;
+	indices[i_idx + 2] = i_vert + 2;
+	i_vert += 3;
+	i_idx += 3;
+	for (int i = 0; i < berm_n - 1; i++)
+	{
+		indices[i_idx + 6 * i] = i_vert + 2 * i;
+		indices[i_idx + 6 * i + 1] = i_vert + 2 * i + 1;
+		indices[i_idx + 6 * i + 2] = i_vert + 2 * i + 3;
+		indices[i_idx + 6 * i + 3] = i_vert + 2 * i;
+		indices[i_idx + 6 * i + 4] = i_vert + 2 * i + 3;
+		indices[i_idx + 6 * i + 5] = i_vert + 2 * i + 2;
+	}
+	i_vert += 2 * berm_n;
+	i_idx += 6 * (berm_n - 1);
 
 	glGenVertexArrays(1, &highway_VAO);
 	glBindVertexArray(highway_VAO);
@@ -610,9 +935,9 @@ static void buildBridgeMesh()
 	int n = theta * sqrtf(37220) + 3;
 	float dtheta = theta / n;
 	n++;
-	positions[i_vert] = vec3(-4.0f, 116.0f, 0);
+	positions[i_vert] = vec3(-4.0f, 116.0f, -1.0f);
 	normals[i_vert] = vec3(-1, 0, 0);
-	positions[i_vert + n + 1] = vec3(-4.0f, 103.8f, 0);
+	positions[i_vert + n + 1] = vec3(-4.0f, 103.8f, -1.0f);
 	normals[i_vert + n + 1] = vec3(-1, 0, 0);
 	positions[i_vert + n + 2] = vec3(-3.76f, 116.0f, 0);
 	normals[i_vert + n + 2] = vec3(1, 0, 0);
@@ -622,9 +947,9 @@ static void buildBridgeMesh()
 	normals[i_vert + 2 * n + 4] = vec3(-1, 0, 0);
 	positions[i_vert + 3 * n + 5] = vec3(3.76f, 103.8f, 0);
 	normals[i_vert + 3 * n + 5] = vec3(-1, 0, 0);
-	positions[i_vert + 3 * n + 6] = vec3(4.0f, 116.0f, 0);
+	positions[i_vert + 3 * n + 6] = vec3(4.0f, 116.0f, -1.0f);
 	normals[i_vert + 3 * n + 6] = vec3(1, 0, 0);
-	positions[i_vert + 4 * n + 7] = vec3(4.0f, 103.8f, 0);
+	positions[i_vert + 4 * n + 7] = vec3(4.0f, 103.8f, -1.0f);
 	normals[i_vert + 4 * n + 7] = vec3(1, 0, 0);
 	for (int i = 0; i < n; i++)
 	{
@@ -693,8 +1018,8 @@ static void buildBridgeMesh()
 	i_vert += 2 * n;
 
 	positions[i_vert] = vec3(-4.0f, 103.8f, 0.7f);
-	positions[i_vert + 1] = vec3(-4.0f, 103.8f, -8.0f);
-	positions[i_vert + 2] = vec3(-4.0f, 85.2f, -8.0f);
+	positions[i_vert + 1] = vec3(-4.0f, 103.8f, -3.0f);
+	positions[i_vert + 2] = vec3(-4.0f, 85.2f, -3.0f);
 	positions[i_vert + 3] = vec3(-4.0f, 85.2f, 1.31f);
 	normals[i_vert] = vec3(-1, 0, 0);
 	normals[i_vert + 1] = vec3(-1, 0, 0);
@@ -716,10 +1041,10 @@ static void buildBridgeMesh()
 	normals[i_vert + 9] = vec3(-1, 0, 0);
 	normals[i_vert + 10] = vec3(-1, 0, 0);
 	normals[i_vert + 11] = vec3(-1, 0, 0);
-	positions[i_vert + 12] = vec3(4.0f, 103.8f, -8.0f);
+	positions[i_vert + 12] = vec3(4.0f, 103.8f, -3.0f);
 	positions[i_vert + 13] = vec3(4.0f, 103.8f, 0.7f);
 	positions[i_vert + 14] = vec3(4.0f, 85.2f, 1.31f);
-	positions[i_vert + 15] = vec3(4.0f, 85.2f, -8.0f);
+	positions[i_vert + 15] = vec3(4.0f, 85.2f, -3.0f);
 	normals[i_vert + 12] = vec3(1, 0, 0);
 	normals[i_vert + 13] = vec3(1, 0, 0);
 	normals[i_vert + 14] = vec3(1, 0, 0);
@@ -740,14 +1065,14 @@ static void buildBridgeMesh()
 	normals[i_vert + 21] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
 	normals[i_vert + 22] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
 	normals[i_vert + 23] = vec3(0, 61.0f / 1861, 1860.0f / 1861);
-	positions[i_vert + 24] = vec3(-4.0f, 85.2f, -8.0f);
-	positions[i_vert + 25] = vec3(4.0f, 85.2f, -8.0f);
+	positions[i_vert + 24] = vec3(-4.0f, 85.2f, -3.0f);
+	positions[i_vert + 25] = vec3(4.0f, 85.2f, -3.0f);
 	positions[i_vert + 26] = vec3(4.0f, 85.2f, 0.61f);
 	positions[i_vert + 27] = vec3(-4.0f, 85.2f, 0.61f);
-	normals[i_vert + 24] = vec3(0,-1,0);
-	normals[i_vert + 25] = vec3(0,-1,0);
-	normals[i_vert + 26] = vec3(0,-1,0);
-	normals[i_vert + 27] = vec3(0,-1,0);
+	normals[i_vert + 24] = vec3(0, -1, 0);
+	normals[i_vert + 25] = vec3(0, -1, 0);
+	normals[i_vert + 26] = vec3(0, -1, 0);
+	normals[i_vert + 27] = vec3(0, -1, 0);
 	for (int i = 0; i < 28; i++)
 	{
 		tex_coords[i_vert + i] = vec2(0.09375f, 0.8125f);
@@ -775,7 +1100,7 @@ static void buildBridgeMesh()
 	}
 	i_vert += 32;
 	i_idx += 48;
-	
+
 	positions[i_vert] = vec3(-4.0f, 85.2f, 1.31f);
 	positions[i_vert + 1] = vec3(-4.0f, 85.2f, 0.61f);
 	positions[i_vert + 2] = vec3(-4.0f, 10.8f, 3.05f);
@@ -859,7 +1184,7 @@ static void buildBridgeMesh()
 	}
 	i_vert += 32;
 	i_idx += 48;
-	
+
 	theta = asin(61.0f / 1861);
 	n = 2 * theta * sqrtf(37220) + 3;
 	dtheta = 2 * theta / n;
@@ -1070,7 +1395,7 @@ static void buildBridgeMesh()
 	}
 	i_vert += 16 * n;
 	i_idx += 6 * 8 * (n - 1);
-	
+
 	theta = 18.6f / 30;
 	n = theta * sqrtf(3400) + 3;
 	dtheta = theta / n;
@@ -1079,10 +1404,10 @@ static void buildBridgeMesh()
 		float cos_theta = cos(acos(-12.0f / 13) - (18.6f + 12.2f) / 30);
 		float sin_theta = sin(acos(-12.0f / 13) - (18.6f + 12.2f) / 30);
 		float z = 18.6f * 61 / 1860;
-		vec3 normal = vec3(-sin_theta , cos_theta, 0);
-		positions[i_vert] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -8.0f);
+		vec3 normal = vec3(-sin_theta, cos_theta, 0);
+		positions[i_vert] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -3.0f);
 		positions[i_vert + 1] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, z);
-		positions[i_vert + 2] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -8.0f);
+		positions[i_vert + 2] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -3.0f);
 		positions[i_vert + 3] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, z);
 		for (int i = 0; i < 4; i++)
 		{
@@ -1113,9 +1438,9 @@ static void buildBridgeMesh()
 		normals[i_vert + 3 * n + i] = vec3(61 * sin_theta / 1861, -61 * cos_theta / 1861, 1860.0f / 1861);
 		positions[i_vert + 4 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, z + 0.5f);
 		normals[i_vert + 4 * n + i] = vec3(cos_theta, sin_theta, 0);
-		positions[i_vert + 5 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -8.0f);
+		positions[i_vert + 5 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -3.0f);
 		normals[i_vert + 5 * n + i] = vec3(cos_theta, sin_theta, 0);
-		positions[i_vert + 6 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -8.0f);
+		positions[i_vert + 6 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -3.0f);
 		normals[i_vert + 6 * n + i] = vec3(-cos_theta, -sin_theta, 0);
 		positions[i_vert + 7 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, z + 0.5f);
 		normals[i_vert + 7 * n + i] = vec3(-cos_theta, -sin_theta, 0);
@@ -1152,7 +1477,7 @@ static void buildBridgeMesh()
 	}
 	i_vert += 14 * n;
 	i_idx += 6 * 7 * (n - 1);
-	
+
 	theta = 12.2f / 30;
 	n = theta * sqrtf(3400) + 3;
 	dtheta = theta / n;
@@ -1172,9 +1497,9 @@ static void buildBridgeMesh()
 		normals[i_vert + 3 * n + i] = vec3(float(n - 1 - i) / (n - 1) * 1220 * sin_theta / 37220, -float(n - 1 - i) / (n - 1) * 1220 * cos_theta / 37220, 1 - z / 372.2f);
 		positions[i_vert + 4 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, z + 0.5f);
 		normals[i_vert + 4 * n + i] = vec3(cos_theta, sin_theta, 0);
-		positions[i_vert + 5 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, 0);
+		positions[i_vert + 5 * n + i] = vec3(30.0f - 26.0f * cos_theta, -36.4f - 26.0f * sin_theta, -1.0f);
 		normals[i_vert + 5 * n + i] = vec3(cos_theta, sin_theta, 0);
-		positions[i_vert + 6 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, 0);
+		positions[i_vert + 6 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, -1.0f);
 		normals[i_vert + 6 * n + i] = vec3(-cos_theta, -sin_theta, 0);
 		positions[i_vert + 7 * n + i] = vec3(30.0f - 34.0f * cos_theta, -36.4f - 34.0f * sin_theta, z + 0.5f);
 		normals[i_vert + 7 * n + i] = vec3(-cos_theta, -sin_theta, 0);
@@ -1261,7 +1586,7 @@ static void buildBridgeMesh()
 				float sin_theta = sin(k * dtheta);
 				float x = pillar_pos[j].x + R * cos_theta;
 				float y = pillar_pos[j].y + R * sin_theta;
-				positions[i_vert + 2 * k] = vec3(x, y, -8.0f);
+				positions[i_vert + 2 * k] = vec3(x, y, -3.0f);
 				positions[i_vert + 2 * k + 1] = vec3(x, y, pillar_pos[j].z);
 				normals[i_vert + 2 * k] = vec3(cos_theta, sin_theta, 0);
 				normals[i_vert + 2 * k + 1] = vec3(cos_theta, sin_theta, 0);

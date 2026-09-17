@@ -1,10 +1,23 @@
-#define FOG_DENSITY 0.003f
+#include "camera_defines.h"
 
-float fogFactor(float distance)
+#define FOG_DENSITY 0.001f
+#define FOG_TOP 400.0f
+
+float fogFactor(vec3 position)
 {
 	float fog_factor;
+	vec3 camera_pos = camera.inv_view[3].xyz;
+	if(position.z > FOG_TOP && camera_pos.z > FOG_TOP)
 	{
-		float temp = FOG_DENSITY * max(0.0, distance - 300.0);
+		return 1.0;
+	}
+	float distance = length(position - camera_pos);
+	if(position.z > FOG_TOP || camera_pos.z > FOG_TOP)
+	{
+		distance *= (FOG_TOP - min(position.z, camera_pos.z)) / abs(position.z - camera_pos.z);
+	}
+	{
+		float temp = FOG_DENSITY * distance;
 		fog_factor = exp(-temp * temp);
 	}
 	return fog_factor;
