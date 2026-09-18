@@ -8,7 +8,7 @@ using namespace glm;
 
 GLuint highway_tex;
 
-constexpr vec3 GROUND_COLOR(0.05f, 0.5f, 0.05f);
+constexpr vec3 GROUND_COLOR(0.05f, 0.4f, 0.05f);
 constexpr vec3 CEMENT_COLOR(0.3f, 0.3f, 0.3f);
 constexpr vec3 ROAD_COLOR(0.12f, 0.12f, 0.12f);
 

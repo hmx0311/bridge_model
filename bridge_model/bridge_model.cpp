@@ -1127,7 +1127,7 @@ static void drawGraphics()
 
 	SunData sun;
 	sun.light_dir_and_radius = vec4(logical_data.sun_dir, 1.0f);
-	sun.diffuse_specular = vec3(0.5);
+	sun.diffuse_specular = vec3(0.4);
 	if (-SUN_RADIUS_DIST_RATIO < logical_data.sun_dir.z && logical_data.sun_dir.z < SUN_RADIUS_DIST_RATIO)
 	{
 		float x = -logical_data.sun_dir.z / SUN_RADIUS_DIST_RATIO;
@@ -1158,7 +1158,7 @@ static void drawGraphics()
 	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
-		sun.ambient += vec3((sun.light_dir_and_radius.z + 0.2f) * 0.1f);
+		sun.ambient += vec3((sun.light_dir_and_radius.z + 0.2f) * 0.2f);
 		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
 	}
 

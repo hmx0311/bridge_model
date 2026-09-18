@@ -18,7 +18,7 @@ using namespace glm;
 static constexpr ivec2 CAR_POS_MAP_SIZE = ivec2(131, 105);
 static constexpr float CAR_POS_MAP_GRID_LENGTH = 40.0f;
 
-static constexpr float MAX_LOGICAL_DT = 0.01f;
+static constexpr float MAX_LOGICAL_DT = 0.02f;
 
 std::atomic<float> tick_rate = 60;
 std::atomic<bool> is_paused = false;
