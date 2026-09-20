@@ -1,6 +1,10 @@
 #pragma once
-#include"glad/glad.h"
+#include "StaticQuadTree.h"
 
-extern GLuint highway_tex;
+struct SenceHeight
+{
+	float min;
+	float max;
+};
 
 void initScene();

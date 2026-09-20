@@ -69,6 +69,12 @@
     <ClCompile Include="terrain.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Bound.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Frustum.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Car.h">
@@ -117,6 +123,15 @@
       <Filter>资源文件\shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="terrain.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="StaticQuadTree.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Bound.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Frustum.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

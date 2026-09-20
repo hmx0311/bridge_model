@@ -98,8 +98,10 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Bound.cpp" />
     <ClCompile Include="bridge_model.cpp" />
     <ClCompile Include="Car.cpp" />
+    <ClCompile Include="Frustum.cpp" />
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="Lane.cpp" />
     <ClCompile Include="logical_frame.cpp" />
@@ -109,8 +111,10 @@
     <ClCompile Include="terrain.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Bound.h" />
     <ClInclude Include="Car.h" />
     <ClInclude Include="common.h" />
+    <ClInclude Include="Frustum.h" />
     <ClInclude Include="Lane.h" />
     <ClInclude Include="logical_frame.h" />
     <ClInclude Include="mesh.h" />
@@ -123,6 +127,7 @@
     <ClInclude Include="shader_headers\lighting_day.glslh" />
     <ClInclude Include="shader_headers\lighting_day_defines.h" />
     <ClInclude Include="shader_headers\text_altas_constances.h" />
+    <ClInclude Include="StaticQuadTree.h" />
     <ClInclude Include="Sun.h" />
     <ClInclude Include="terrain.h" />
   </ItemGroup>

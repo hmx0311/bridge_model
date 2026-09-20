@@ -14,6 +14,8 @@
 #include "Sun.h"
 #include "terrain.h"
 #include "logical_frame.h"
+#include "Frustum.h"
+#include "Bound.h"
 
 #include "shader_headers/scene_constances.h"
 #include "shader_headers/camera_defines.h"
@@ -59,8 +61,8 @@ bool need_update_view = true;
 uint64_t last_time_us;
 
 constexpr float HEIGHT_RANGE[2] = { -10.0f, 646.0f };
-constexpr int HEIGHT_MAP_SIZE = 256;
-constexpr vec4 HEIGHT_MAP_AREA = { -102.4f, -76.8f, 102.4f, 128.0f };
+constexpr int HEIGHT_MAP_SIZE = 4096;
+constexpr vec4 HEIGHT_MAP_AREA = { -2048.0f, -2048.0f, 2048.0f, 2048.0f };
 float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
 
 GLuint multisample_render_FBO;
@@ -458,8 +460,8 @@ static void initShader()
 static void buildHeightMap()
 {
 	glEnable(GL_DEPTH_TEST);
-	constexpr int HEIGHT_BORDER = 3;
-	constexpr int FILTER_RADIUS = 3;
+	constexpr int HEIGHT_BORDER = 2;
+	constexpr int FILTER_RADIUS = 2;
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
 	glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -469,6 +471,8 @@ static void buildHeightMap()
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(vec4), &v);
 	glNamedBufferSubData(shadow_UBO, 0, sizeof(mat4), &height_mat);
 	glUseProgram(SP_shadow_highway_day);
+	updateTerrainLOD(1e10, vec3(0, 0, HEIGHT_RANGE[1]));
+	drawTerrainMesh();
 	glBindVertexArray(bridge_VAO);
 	glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(highway_VAO);
@@ -737,6 +741,7 @@ static void init()
 		printf("ERROR: Can't Find Resource Text Altas\n");
 	}
 
+	buildMeshes();
 	initScene();
 	buildHeightMap();
 	last_time_us = getTimestampMicroseconds();
@@ -1071,6 +1076,8 @@ static void drawGraphics()
 			}
 		}
 
+		Frustum camera_frustum(camera.view, camera.projection);
+
 		mat4 proj_and_view_mat = camera.projection * camera.view;
 		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
 		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
@@ -1079,6 +1086,10 @@ static void drawGraphics()
 			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 			{
 				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + j) * LIGHT_MAP_GRID_LENGTH;
+				WorldBound bound(vec3(offset_x - LIGHT_MAP_GRID_LENGTH, offset_y - LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0]),
+					vec3(offset_x + 2 * LIGHT_MAP_GRID_LENGTH, offset_y + 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1]));
+				is_light_grid_visible[i][j] = camera_frustum.viewTest(bound) != Frustum::VIEW_TEST_OUTSIDE;
+				/*
 				constexpr vec4 GRID_AABB[8] =
 				{ vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1),
 					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1),
@@ -1098,6 +1109,7 @@ static void drawGraphics()
 					front += vert.z > vert.w;
 				}
 				is_light_grid_visible[i][j] = left != 8 && right != 8 && bottom != 8 && top != 8 && back != 8 && front != 8;
+				*/
 			}
 		}
 		num_active_car_light_map_grids = 0;
