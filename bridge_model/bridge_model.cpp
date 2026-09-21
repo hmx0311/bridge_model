@@ -16,15 +16,13 @@
 #include "logical_frame.h"
 #include "Frustum.h"
 #include "Bound.h"
+#include "shader.h"
 
 #include "shader_headers/scene_constances.h"
 #include "shader_headers/camera_defines.h"
 #include "shader_headers/lighting_day_defines.h"
 #include "shader_headers/lighting_night_defines.h"
 #include "shader_headers/text_altas_constances.h"
-
-#define STR(x) #x
-#define SHADER_NAME(x) STR(x)
 
 using namespace glm;
 
@@ -45,7 +43,6 @@ GLuint shadow_night_tex;
 constexpr float FOVY = pi<float>() / 4;
 constexpr float VIEW_Z_NEAR = 0.9f;
 constexpr float VIEW_Z_FAR = 18000.0f;
-constexpr float FOCUS_HEIGHT = 2.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
 constexpr float MAX_VIEW_DISTANCE = 1000.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
@@ -61,9 +58,6 @@ bool need_update_view = true;
 uint64_t last_time_us;
 
 constexpr float HEIGHT_RANGE[2] = { -10.0f, 646.0f };
-constexpr int HEIGHT_MAP_SIZE = 4096;
-constexpr vec4 HEIGHT_MAP_AREA = { -2048.0f, -2048.0f, 2048.0f, 2048.0f };
-float height_map[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
 
 GLuint multisample_render_FBO;
 GLuint multisample_render_RBOs[2];
@@ -144,240 +138,6 @@ GLuint SP_gaussian_blur;
 GLuint SP_buffer_to_screen;
 GLuint SP_text;
 
-static GLuint loadShader(const char* shader_name, GLenum type)
-{
-	HRSRC rc_info = FindResourceA(nullptr, shader_name, "SHADER");
-	if (rc_info == nullptr)
-	{
-		printf("\nERROR: Can't Find Resource %s\n", shader_name);
-		return 0;
-	}
-	std::vector<int> sizes;
-	std::vector<const char*> sources;
-	struct ShaderName
-	{
-		const char* name;
-		int len;
-	};
-	std::vector<ShaderName> source_names;
-	sizes.push_back(SizeofResource(nullptr, rc_info));
-	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-	if (rc_data == nullptr)
-	{
-		printf("\nERROR: Can't Load Resource %s\n", shader_name);
-		return 0;
-	}
-	sources.push_back(static_cast<const char*>(LockResource(rc_data)));
-	source_names.push_back({ shader_name, static_cast<int>(strlen(shader_name)) });
-	for (int i = 0; i < sources.size(); i++)
-	{
-		const char* source = sources[i];
-		int len = sizes[i];
-		int j = 0;
-		int comment_type = 0;
-		int line_cnt = 1;
-		while (j < len)
-		{
-			if (source[j] == '\n')
-			{
-				line_cnt++;
-			}
-			if (comment_type > 0)
-			{
-				if (comment_type == 1 && source[j] == '\n')
-				{
-					comment_type = 0;
-				}
-				else if (comment_type == 2 && source[j] == '*' && j + 1 < len && source[j + 1] == '/')
-				{
-					comment_type = 0;
-					j++;
-				}
-			}
-			else
-			{
-				if (source[j] == '#' && j + sizeof("#include") - 2 < len && strncmp(source + j, "#include", sizeof("#include") - 1) == 0)
-				{
-					j += sizeof("#include") - 2;
-					while (true)
-					{
-						j++;
-						if (j == len)
-						{
-							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-						if (source[j] == '\"')
-						{
-							break;
-						}
-						if (!isspace(source[j]) || source[j] == '\n')
-						{
-							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-					}
-					int name_begin = j + 1;
-					do
-					{
-						j++;
-						if (j == len || source[j] == '\n')
-						{
-							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-					} while (source[j] != '\"');
-					int name_len = j - name_begin;
-					for (j++; j < len; j++)
-					{
-						if (source[j] == '\n')
-						{
-							break;
-						}
-						if (!isspace(source[j]))
-						{
-							printf("\nERROR: Invalid include in shader %.*s line %d\n", source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-					}
-					bool included = false;
-					for (int k = i; k < sources.size(); k++)
-					{
-						if (name_len == source_names[k].len && strncmp(source + name_begin, source_names[k].name, name_len) == 0)
-						{
-							included = true;
-							break;
-						}
-					}
-					if (!included)
-					{
-						HRSRC rc_info = FindResourceA(nullptr, std::string(source + name_begin, name_len).c_str(), "SHADER_HEADER");
-						if (rc_info == nullptr)
-						{
-							printf("\nERROR: Can't find include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-						sizes.insert(sizes.begin() + i + 1, SizeofResource(nullptr, rc_info));
-						HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-						if (rc_data == nullptr)
-						{
-							printf("\nERROR: Can't load include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-						sources.insert(sources.begin() + i + 1, static_cast<const char*>(LockResource(rc_data)));
-						source_names.insert(source_names.begin() + i + 1, { source + name_begin, name_len });
-					}
-					len -= j;
-					source = &source[j];
-					sizes[i] = len;
-					sources[i] = source;
-					j = 0;
-					continue;
-				}
-				else if (source[j] == '/' && j + 1 < len)
-				{
-					if (source[j + 1] == '/')
-					{
-						comment_type = 1;
-						j++;
-					}
-					else if (source[j + 1] == '*')
-					{
-						comment_type = 2;
-						j++;
-					}
-					else
-					{
-						break;
-					}
-				}
-				else if (!isspace(source[j]))
-				{
-					break;
-				}
-			}
-			j++;
-		}
-	}
-	const char* version_str = "#version 430 core\n";
-	sources.push_back(version_str);
-	sizes.push_back(-1);
-	std::reverse(sources.begin(), sources.end());
-	std::reverse(sizes.begin(), sizes.end());
-#if 1
-	std::string cource_str;
-	for (int i = 0; i < sources.size(); i++)
-	{
-		if (sizes[i] < 0)
-		{
-			cource_str.append(sources[i]);
-		}
-		else
-		{
-			cource_str.append(sources[i], sizes[i]);
-		}
-	}
-	sources.clear();
-	sources.push_back(cource_str.c_str());
-	sizes.clear();
-	sizes.push_back(-1);
-#endif
-
-	GLint status;
-	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, sources.size(), sources.data(), sizes.data());
-	glCompileShader(shader);
-
-	// check for errors
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-	if (status == GL_FALSE)
-	{
-		printf("\nERROR: Shader \"%s\" Compilation Error\n", shader_name);
-		for (const char* source : sources)
-		{
-			printf("%s", source);
-		}
-		int len;
-		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-		char* log = new char[len];
-		glGetShaderInfoLog(shader, len, nullptr, log);
-		printf("%s", log);
-		delete[] log;
-	}
-	return shader;
-}
-
-static GLuint linkShaderProgram(GLuint vert, GLuint frag, GLuint geom = 0)
-{
-	GLint status;
-	GLuint program = glCreateProgram();
-	glAttachShader(program, vert);
-	glAttachShader(program, frag);
-	if (geom != 0)
-	{
-		glAttachShader(program, geom);
-	}
-	glLinkProgram(program);
-	glGetProgramiv(program, GL_LINK_STATUS, &status);
-	if (status == GL_FALSE)
-	{
-		printf("\nERROR: Shader Program %d Link Error\n", program);
-		int len;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
-		char* log = new char[len];
-		glGetProgramInfoLog(program, len, nullptr, log);
-		printf("%s", log);
-		delete[] log;
-	}
-	glDetachShader(program, vert);
-	glDetachShader(program, frag);
-	if (geom != 0)
-	{
-		glDetachShader(program, geom);
-	}
-	return program;
-}
-
 static void initShader()
 {
 	GLuint VS_highway = loadShader(SHADER_NAME(IDR_VS_HIGHWAY), GL_VERTEX_SHADER);
@@ -455,118 +215,6 @@ static void initShader()
 	glDeleteShader(FS_text);
 
 	glDeleteShader(VS_tex_blit);
-}
-
-static void buildHeightMap()
-{
-	glEnable(GL_DEPTH_TEST);
-	constexpr int HEIGHT_BORDER = 2;
-	constexpr int FILTER_RADIUS = 2;
-	glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
-	glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	mat4 height_mat = ortho(HEIGHT_MAP_AREA.x, HEIGHT_MAP_AREA.z, HEIGHT_MAP_AREA.y, HEIGHT_MAP_AREA.w, 0.0f, HEIGHT_RANGE[1]) *
-		lookAt(vec3(0, 0, HEIGHT_RANGE[1]), vec3(0, 0, 0), vec3(0, 1, 0));
-	vec4 v(FLT_MAX);
-	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(vec4), &v);
-	glNamedBufferSubData(shadow_UBO, 0, sizeof(mat4), &height_mat);
-	glUseProgram(SP_shadow_highway_day);
-	updateTerrainLOD(1e10, vec3(0, 0, HEIGHT_RANGE[1]));
-	drawTerrainMesh();
-	glBindVertexArray(bridge_VAO);
-	glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
-	glBindVertexArray(highway_VAO);
-	glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
-	GLfloat(*depth_data)[SHADOW_DAY_TEX_SIZE][SHADOW_DAY_TEX_SIZE] = new GLfloat[CSM_LEVELS][SHADOW_DAY_TEX_SIZE][SHADOW_DAY_TEX_SIZE];
-	glGetTextureImage(shadow_day_tex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, CSM_LEVELS * SHADOW_DAY_TEX_SIZE * SHADOW_DAY_TEX_SIZE * sizeof(GLfloat), depth_data);
-	float(*height_map_buffer)[HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE] = new float[2][HEIGHT_MAP_SIZE][HEIGHT_MAP_SIZE];
-	constexpr int FILTER_SIZE = 2 * FILTER_RADIUS + 1;
-	int height_filter[FILTER_SIZE][FILTER_SIZE];
-	height_filter[0][0] = 1;
-	for (int i = 1; i < FILTER_SIZE; i++)
-	{
-		height_filter[0][i] = height_filter[0][i - 1] * (FILTER_SIZE - i) / i;
-	}
-	for (int i = 1; i < FILTER_SIZE; i++)
-	{
-		height_filter[i][0] = height_filter[i - 1][0] * (FILTER_SIZE - i) / i;
-		for (int j = 1; j < FILTER_SIZE; j++)
-		{
-			height_filter[i][j] = height_filter[i][0] * height_filter[0][j];
-		}
-	}
-#pragma omp parallel
-	{
-#pragma omp for
-		for (int i = 0; i < HEIGHT_MAP_SIZE; i++)
-		{
-			for (int j = 0; j < HEIGHT_MAP_SIZE; j++)
-			{
-				float min_depth = 1.0f;
-				for (int p = 0; p < SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE; p++)
-				{
-					for (int q = 0; q < SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE; q++)
-					{
-						if (min_depth > depth_data[0][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * i + p][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * j + q])
-						{
-							min_depth = depth_data[0][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * i + p][SHADOW_DAY_TEX_SIZE / HEIGHT_MAP_SIZE * j + q];
-						}
-					}
-				}
-				height_map_buffer[0][i][j] = (1 - min_depth) * HEIGHT_RANGE[1];
-			}
-		}
-#pragma omp for
-		for (int i = 0; i < HEIGHT_MAP_SIZE; i++)
-		{
-			for (int j = 0; j < HEIGHT_MAP_SIZE; j++)
-			{
-				float max_height = 0.0f;
-				for (int p = -HEIGHT_BORDER; p <= HEIGHT_BORDER; p++)
-				{
-					if (0 <= i + p && i + p < HEIGHT_MAP_SIZE)
-					{
-						for (int q = -HEIGHT_BORDER; q <= HEIGHT_BORDER; q++)
-						{
-							if (0 <= j + q && j + q < HEIGHT_MAP_SIZE && max_height < height_map_buffer[0][i + p][j + q])
-							{
-								max_height = height_map_buffer[0][i + p][j + q];
-							}
-						}
-					}
-				}
-				height_map_buffer[1][i][j] = max_height;
-			}
-		}
-#pragma omp for
-		for (int i = 0; i < HEIGHT_MAP_SIZE; i++)
-		{
-			for (int j = 0; j < HEIGHT_MAP_SIZE; j++)
-			{
-				float height = 0;
-				int factor = 0;
-				for (int p = -FILTER_RADIUS; p <= FILTER_RADIUS; p++)
-				{
-					if (0 <= i + p && i + p < HEIGHT_MAP_SIZE)
-					{
-						for (int q = -FILTER_RADIUS; q <= FILTER_RADIUS; q++)
-						{
-							if (0 <= j + q && j + q < HEIGHT_MAP_SIZE)
-							{
-								height += height_filter[p + FILTER_RADIUS][q + FILTER_RADIUS] * height_map_buffer[1][i + p][j + q];
-								factor += height_filter[p + FILTER_RADIUS][q + FILTER_RADIUS];
-							}
-						}
-					}
-				}
-				height /= factor;
-				height_map[i][j] = height;
-			}
-		}
-	}
-	delete[] depth_data;
-	delete[] height_map_buffer;
 }
 
 static void init()
@@ -687,7 +335,6 @@ static void init()
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 
-
 	glGenSamplers(1, &shadow_PCF_sampler);
 	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -743,7 +390,6 @@ static void init()
 
 	buildMeshes();
 	initScene();
-	buildHeightMap();
 	last_time_us = getTimestampMicroseconds();
 }
 
@@ -858,19 +504,20 @@ static void drawGraphics()
 
 		float depression = pi<float>() / 2 * (1 - FLT_EPSILON) * (1 - ((1 - 0.3f * view_distance / MAX_VIEW_DISTANCE) * (1 - relative_depression)));
 		vec3 view_dir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
-		focus.z = FOCUS_HEIGHT;
+		focus.z = 0.0f;
 		vec3 eye = focus - view_distance * view_dir;
-		if (eye.z < FOCUS_HEIGHT + HEIGHT_RANGE[1])
+		vec2 height_map_coord((eye.x - SCENE_GRID_AREA.x) / (SCENE_GRID_AREA.z - SCENE_GRID_AREA.x) * SCENE_GRID_SIZE_X - 0.5f,
+			(eye.y - SCENE_GRID_AREA.y) / (SCENE_GRID_AREA.w - SCENE_GRID_AREA.y) * SCENE_GRID_SIZE_Y - 0.5f);
+		if (0 < height_map_coord.x && height_map_coord.x < SCENE_GRID_SIZE_X - 1 && 0 < height_map_coord.y && height_map_coord.y < SCENE_GRID_SIZE_Y - 1)
 		{
-			vec2 height_map_coord((eye.x - HEIGHT_MAP_AREA.x) / (HEIGHT_MAP_AREA.z - HEIGHT_MAP_AREA.x) * HEIGHT_MAP_SIZE - 0.5f,
-				(eye.y - HEIGHT_MAP_AREA.y) / (HEIGHT_MAP_AREA.w - HEIGHT_MAP_AREA.y) * HEIGHT_MAP_SIZE - 0.5f);
-			if (0 < height_map_coord.x && height_map_coord.x < HEIGHT_MAP_SIZE - 1 && 0 < height_map_coord.y && height_map_coord.y < HEIGHT_MAP_SIZE - 1)
+			auto height_map = g_scene_quad_tree[NUM_SCENE_GRID_LEVELS - 1];
+			float scene_height = height_map[int(height_map_coord.x)][int(height_map_coord.y)].max_height * (int(height_map_coord.x) + 1 - height_map_coord.x) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
+				height_map[int(height_map_coord.x)][int(height_map_coord.y) + 1].max_height * (int(height_map_coord.x) + 1 - height_map_coord.x) * (height_map_coord.y - int(height_map_coord.y)) +
+				height_map[int(height_map_coord.x) + 1][int(height_map_coord.y)].max_height * (height_map_coord.x - int(height_map_coord.x)) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
+				height_map[int(height_map_coord.x) + 1][int(height_map_coord.y) + 1].max_height * (height_map_coord.x - int(height_map_coord.x)) * (height_map_coord.y - int(height_map_coord.y));
+			if (scene_height > 0.0f && eye.z < 2.0f * scene_height)
 			{
-				float height_offset = height_map[int(height_map_coord.y)][int(height_map_coord.x)] * (int(height_map_coord.x) + 1 - height_map_coord.x) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
-					height_map[int(height_map_coord.y)][int(height_map_coord.x) + 1] * (height_map_coord.x - int(height_map_coord.x)) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
-					height_map[int(height_map_coord.y) + 1][int(height_map_coord.x)] * (int(height_map_coord.x) + 1 - height_map_coord.x) * (height_map_coord.y - int(height_map_coord.y)) +
-					height_map[int(height_map_coord.y) + 1][int(height_map_coord.x) + 1] * (height_map_coord.x - int(height_map_coord.x)) * (height_map_coord.y - int(height_map_coord.y));
-				height_offset *= 1 - (eye.z - FOCUS_HEIGHT) / (HEIGHT_RANGE[1]);
+				float height_offset = scene_height - 0.5f * eye.z;
 				eye.z += height_offset;
 				focus.z += height_offset;
 			}
@@ -881,6 +528,8 @@ static void drawGraphics()
 
 		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
 		camera.inv_view = inverse(camera.view);
+
+
 		vec3 top_view(0, tanf(FOVY / 2), -1);
 		vec3 bottom_view(0, -top_view.y, -1);
 		vec3 view_x = vec3(top_view.y / window_height * window_width, 0, 0);
@@ -1077,8 +726,27 @@ static void drawGraphics()
 		}
 
 		Frustum camera_frustum(camera.view, camera.projection);
+		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
+		{
+			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_Y; j++)
+			{
+				[&camera_frustum](this auto && self, int level,int x,int y)->void
+					{
+						float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
+						BoundBox bound(vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
+							vec3(SCENE_GRID_AREA.x + (x + 1) * stride, SCENE_GRID_AREA.y + (y + 1) * stride, g_scene_quad_tree[level][x][y].max_height));
+						auto result = camera_frustum.viewTest(bound);
+						if (result == Frustum::VIEW_TEST_INTERSECT && level < NUM_SCENE_GRID_LEVELS - 1)
+						{
+							self(level + 1, 2 * x, 2 * y);
+							self(level + 1, 2 * x + 1, 2 * y);
+							self(level + 1, 2 * x, 2 * y + 1);
+							self(level + 1, 2 * x + 1, 2 * y + 1);
+						}
+					}(0, i, j);
+			}
+		}
 
-		mat4 proj_and_view_mat = camera.projection * camera.view;
 		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
 		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 		{
@@ -1086,7 +754,7 @@ static void drawGraphics()
 			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
 			{
 				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + j) * LIGHT_MAP_GRID_LENGTH;
-				WorldBound bound(vec3(offset_x - LIGHT_MAP_GRID_LENGTH, offset_y - LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0]),
+				BoundBox bound(vec3(offset_x - LIGHT_MAP_GRID_LENGTH, offset_y - LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0]),
 					vec3(offset_x + 2 * LIGHT_MAP_GRID_LENGTH, offset_y + 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1]));
 				is_light_grid_visible[i][j] = camera_frustum.viewTest(bound) != Frustum::VIEW_TEST_OUTSIDE;
 				/*

@@ -31,7 +31,7 @@ Frustum::Frustum(const glm::mat4& view, const glm::mat4& proj)
     m_planes[5] = MakePlane(row3 - row2); // far
 }
 
-Frustum::VIEW_TEST_RESULT Frustum::viewTest(const WorldBound& bound) const
+Frustum::VIEW_TEST_RESULT Frustum::viewTest(const BoundBox& bound) const
 {
 	bool inside = true;
 	for (int i = 0; i < 6; i++)

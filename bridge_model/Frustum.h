@@ -1,7 +1,7 @@
 #pragma once
 #include "glm.hpp"
 
-struct WorldBound;
+struct BoundBox;
 
 class Frustum
 {
@@ -24,6 +24,6 @@ private:
 public:
 	Frustum(const glm::mat4& view, const glm::mat4& proj);
 
-	VIEW_TEST_RESULT viewTest(const WorldBound& bound) const;
+	VIEW_TEST_RESULT viewTest(const BoundBox& bound) const;
 };
 
