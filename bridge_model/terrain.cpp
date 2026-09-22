@@ -114,7 +114,7 @@ void buildTerrainMesh()
 		}
 	}
 
-	constexpr size_t TOATAL_NUM_VERTICES = tiles.NumElementsBeforeLevel() * NUM_TILE_SIDE_VERTICES * NUM_TILE_SIDE_VERTICES;
+	constexpr size_t TOATAL_NUM_VERTICES = tiles.LevelOffset() * NUM_TILE_SIDE_VERTICES * NUM_TILE_SIDE_VERTICES;
 	constexpr size_t POSITION_SIZE = TOATAL_NUM_VERTICES * sizeof(vec3);
 	constexpr size_t NORMAL_SIZE = TOATAL_NUM_VERTICES * sizeof(vec3);
 
@@ -124,7 +124,7 @@ void buildTerrainMesh()
 	glBindBuffer(GL_ARRAY_BUFFER, terrain_VBO);
 	glBufferData(GL_ARRAY_BUFFER, TOATAL_NUM_VERTICES * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
 
-	size_t data_offset = tiles.NumElementsBeforeLevel() - 1;
+	size_t data_offset = tiles.LevelOffset() - 1;
 	for (int k = NUM_TERRAIN_LOD - 1; k >= 0; k--)
 	{
 		for (int i = tiles.LevelSizeX(k) - 1; i >= 0; i--)

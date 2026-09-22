@@ -1836,7 +1836,7 @@ static void buildBridgeMesh()
 #define Z4 0.2f
 #define Z5 1.4f
 
-constexpr vec3 car_boundray[8] = { { X2, Y0, Z5 }, { -X2, Y0, Z5 }, { X2, -Y0, Z5 }, { -X2, -Y0, Z5 }, { X2, Y0, 0 }, { -X2, Y0, 0 }, { X2, -Y0, 0 }, { -X2, -Y0, 0 } };
+const vec3 car_boundray[8] = { { X2, Y0, Z5 }, { -X2, Y0, Z5 }, { X2, -Y0, Z5 }, { -X2, -Y0, Z5 }, { X2, Y0, 0 }, { -X2, Y0, 0 }, { X2, -Y0, 0 }, { -X2, -Y0, 0 } };
 
 #define POINT0 -X1,Y0,Z0
 #define POINT1 -X2,Y0,Z0

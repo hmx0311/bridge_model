@@ -41,7 +41,7 @@ GLuint shadow_night_FBO;
 GLuint shadow_night_tex;
 
 constexpr float FOVY = pi<float>() / 4;
-constexpr float VIEW_Z_NEAR = 0.9f;
+constexpr float MIN_VIEW_Z_NEAR = 0.6f;
 constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
 constexpr float MAX_VIEW_DISTANCE = 1000.0f;
@@ -51,6 +51,7 @@ GLint window_width, window_height;
 
 float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 150.0f;
 float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
+float view_z_near = MIN_VIEW_Z_NEAR;
 vec3 focus(0);
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
@@ -436,6 +437,7 @@ static void drawGraphics()
 	bool is_view_updated = need_update_view;
 	if (need_update_view)
 	{
+		camera.projection = perspective(FOVY, float(window_width) / window_height, MIN_VIEW_Z_NEAR, VIEW_Z_FAR);
 		need_update_view = false;
 		if (azimuth != aim_azimuth)
 		{
@@ -529,6 +531,45 @@ static void drawGraphics()
 		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
 		camera.inv_view = inverse(camera.view);
 
+		Frustum camera_frustum(camera.view, camera.projection);
+		view_z_near = VIEW_Z_FAR;
+		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
+		{
+			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_Y; j++)
+			{
+				[&camera_frustum](this auto&& self, int level, int x, int y)->void
+					{
+						float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
+						BoundBox bound(vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
+							vec3(SCENE_GRID_AREA.x + (x + 1) * stride, SCENE_GRID_AREA.y + (y + 1) * stride, g_scene_quad_tree[level][x][y].max_height));
+						auto result = camera_frustum.intersectTest(bound);
+						if (result == Frustum::VIEW_TEST_OUTSIDE)
+						{
+							return;
+						}
+						if (result == Frustum::VIEW_TEST_INTERSECT && level < NUM_SCENE_GRID_LEVELS - 1)
+						{
+							self(level + 1, 2 * x, 2 * y);
+							self(level + 1, 2 * x + 1, 2 * y);
+							self(level + 1, 2 * x, 2 * y + 1);
+							self(level + 1, 2 * x + 1, 2 * y + 1);
+						}
+						else
+						{
+							auto p = camera_frustum.getPlane(Frustum::PLANE_NEAR);
+							float m = dot(p.normal, bound.center()) + p.d;
+							vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
+							float r = dot(half_size, abs(p.normal));
+							if (m - r > 0)
+							{
+								view_z_near = std::min(view_z_near, MIN_VIEW_Z_NEAR + m - r);
+							}
+						}
+					}(0, i, j);
+			}
+		}
+		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
+		camera.projection = perspective(FOVY, float(window_width) / window_height, view_z_near, VIEW_Z_FAR);
 
 		vec3 top_view(0, tanf(FOVY / 2), -1);
 		vec3 bottom_view(0, -top_view.y, -1);
@@ -539,7 +580,7 @@ static void drawGraphics()
 
 		if (eye.z > HEIGHT_RANGE[1])
 		{
-			float shadow_near = std::max(-(eye.z - HEIGHT_RANGE[1]) / bottom_view.z, VIEW_Z_NEAR);
+			float shadow_near = std::max(-(eye.z - HEIGHT_RANGE[1]) / bottom_view.z, view_z_near);
 			float shadow_far = std::max(shadow_near, MIN_SHADOW_FAR);
 			float bottom_far = -(eye.z - HEIGHT_RANGE[0]) / bottom_view.z;
 			float top_near = VIEW_Z_FAR;
@@ -609,7 +650,7 @@ static void drawGraphics()
 		}
 		else
 		{
-			float shadow_near = VIEW_Z_NEAR;
+			float shadow_near = view_z_near;
 			float bottom = -(eye.z - HEIGHT_RANGE[0]) / bottom_view.z;
 			float shadow_far = MIN_SHADOW_FAR;
 			if (top_view.z > 0)
@@ -725,28 +766,6 @@ static void drawGraphics()
 			}
 		}
 
-		Frustum camera_frustum(camera.view, camera.projection);
-		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
-		{
-			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_Y; j++)
-			{
-				[&camera_frustum](this auto && self, int level,int x,int y)->void
-					{
-						float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
-						BoundBox bound(vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
-							vec3(SCENE_GRID_AREA.x + (x + 1) * stride, SCENE_GRID_AREA.y + (y + 1) * stride, g_scene_quad_tree[level][x][y].max_height));
-						auto result = camera_frustum.viewTest(bound);
-						if (result == Frustum::VIEW_TEST_INTERSECT && level < NUM_SCENE_GRID_LEVELS - 1)
-						{
-							self(level + 1, 2 * x, 2 * y);
-							self(level + 1, 2 * x + 1, 2 * y);
-							self(level + 1, 2 * x, 2 * y + 1);
-							self(level + 1, 2 * x + 1, 2 * y + 1);
-						}
-					}(0, i, j);
-			}
-		}
-
 		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
 		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
 		{
@@ -756,28 +775,7 @@ static void drawGraphics()
 				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + j) * LIGHT_MAP_GRID_LENGTH;
 				BoundBox bound(vec3(offset_x - LIGHT_MAP_GRID_LENGTH, offset_y - LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0]),
 					vec3(offset_x + 2 * LIGHT_MAP_GRID_LENGTH, offset_y + 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1]));
-				is_light_grid_visible[i][j] = camera_frustum.viewTest(bound) != Frustum::VIEW_TEST_OUTSIDE;
-				/*
-				constexpr vec4 GRID_AABB[8] =
-				{ vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1),
-					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0], 1),
-					vec4(-LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, -LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1),
-					vec4(-LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1), vec4(2 * LIGHT_MAP_GRID_LENGTH, 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1], 1) };
-				int left = 0, right = 0, bottom = 0, top = 0, back = 0, front = 0;
-				for (vec4 vert : GRID_AABB)
-				{
-					vert.x += offset_x;
-					vert.y += offset_y;
-					vert = proj_and_view_mat * vert;
-					left += vert.x < -vert.w;
-					right += vert.x > vert.w;
-					bottom += vert.y < -vert.w;
-					top += vert.y > vert.w;
-					back += vert.z < -vert.w;
-					front += vert.z > vert.w;
-				}
-				is_light_grid_visible[i][j] = left != 8 && right != 8 && bottom != 8 && top != 8 && back != 8 && front != 8;
-				*/
+				is_light_grid_visible[i][j] = camera_frustum.intersectTest(bound) != Frustum::VIEW_TEST_OUTSIDE;
 			}
 		}
 		num_active_car_light_map_grids = 0;
@@ -1042,7 +1040,7 @@ static void drawGraphics()
 
 	if (is_view_updated)
 	{
-		glNamedBufferSubData(scene_UBO, offsetof(CameraData, view), sizeof(camera.view) + sizeof(camera.inv_view), &camera.view);
+		glNamedBufferSubData(scene_UBO, 0, sizeof(camera), &camera);
 		glProgramUniform1f(SP_sun, glGetUniformLocation(SP_sun, "horizonY"), horizon_y);
 	}
 
@@ -1233,7 +1231,16 @@ static void drawGraphics()
 	if (show_fps)
 	{
 		char str[40];
-		sprintf_s(str, 40, "fps: %d|%d", int(round(fps)), int(round(tick_rate)));
+		static int displayed_fps = fps, displayed_tick_rate = tick_rate;
+		if (fps > displayed_fps + 1 || fps < displayed_fps - 1)
+		{
+			displayed_fps = round(fps);
+		}
+		if (tick_rate > displayed_tick_rate + 1 || tick_rate < displayed_tick_rate - 1)
+		{
+			displayed_tick_rate = round(tick_rate);
+		}
+		sprintf_s(str, 40, "fps: %d|%d", displayed_fps, displayed_tick_rate);
 		glBindTextureUnit(0, text_atlas_tex);
 		glEnable(GL_BLEND);
 		glUseProgram(SP_text);
@@ -1263,8 +1270,6 @@ static void onResize(GLFWwindow*, int width, int height)
 	GLint max_tex_size;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
 	bloom_buffer_width = std::min(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
-	camera.projection = perspective(FOVY, float(width) / height, VIEW_Z_NEAR, VIEW_Z_FAR);
-	glNamedBufferSubData(scene_UBO, 0, sizeof(camera.projection), &camera.projection);
 
 	int MSAA_level = 8;
 	for (int i = 0; i < 2; i++)

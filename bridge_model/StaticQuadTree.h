@@ -12,7 +12,7 @@ private:
 		const T* m_level_data;
 
 	public:
-		ConstLevelProxy(uint32_t level, const T* data) :m_level(level), m_level_data(data + NumElementsBeforeLevel(level)) {}
+		ConstLevelProxy(uint32_t level, const T* data) :m_level(level), m_level_data(data + LevelOffset(level)) {}
 
 		const T* operator[](size_t idx) const
 		{
@@ -35,7 +35,7 @@ private:
 	};
 
 public:
-	static constexpr size_t NumElementsBeforeLevel(uint32_t level = NumLevels)
+	static constexpr size_t LevelOffset(uint32_t level = NumLevels)
 	{
 		return RootSizeX * RootSizeY * (((1ULL << (2 * level)) - 1) & 0x5555555555555555ULL);
 	}
@@ -51,7 +51,7 @@ public:
 	}
 
 private:
-	T m_data[NumElementsBeforeLevel()];
+	T m_data[LevelOffset()];
 
 public:
 	ConstLevelProxy operator[](uint32_t level) const
