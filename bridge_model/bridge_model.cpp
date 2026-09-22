@@ -17,6 +17,7 @@
 #include "Frustum.h"
 #include "Bound.h"
 #include "shader.h"
+#include "CircularQueue.h"
 
 #include "shader_headers/scene_constances.h"
 #include "shader_headers/camera_defines.h"
@@ -533,39 +534,53 @@ static void drawGraphics()
 
 		Frustum camera_frustum(camera.view, camera.projection);
 		view_z_near = VIEW_Z_FAR;
+		struct GridIdx
+		{
+			int level;
+			int x;
+			int y;
+		};
+		static CircularQueue<GridIdx> grid_to_calc(5);
 		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
 		{
 			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_Y; j++)
 			{
-				[&camera_frustum](this auto&& self, int level, int x, int y)->void
-					{
-						float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
-						BoundBox bound(vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
-							vec3(SCENE_GRID_AREA.x + (x + 1) * stride, SCENE_GRID_AREA.y + (y + 1) * stride, g_scene_quad_tree[level][x][y].max_height));
-						auto result = camera_frustum.intersectTest(bound);
-						if (result == Frustum::VIEW_TEST_OUTSIDE)
-						{
-							return;
-						}
-						if (result == Frustum::VIEW_TEST_INTERSECT && level < NUM_SCENE_GRID_LEVELS - 1)
-						{
-							self(level + 1, 2 * x, 2 * y);
-							self(level + 1, 2 * x + 1, 2 * y);
-							self(level + 1, 2 * x, 2 * y + 1);
-							self(level + 1, 2 * x + 1, 2 * y + 1);
-						}
-						else
-						{
-							auto p = camera_frustum.getPlane(Frustum::PLANE_NEAR);
-							float m = dot(p.normal, bound.center()) + p.d;
-							vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
-							float r = dot(half_size, abs(p.normal));
-							if (m - r > 0)
-							{
-								view_z_near = std::min(view_z_near, MIN_VIEW_Z_NEAR + m - r);
-							}
-						}
-					}(0, i, j);
+				grid_to_calc.emplace_back(0, i, j);
+			}
+		}
+		while (!grid_to_calc.empty())
+		{
+			int level = grid_to_calc.front().level;
+			int x = grid_to_calc.front().x;
+			int y = grid_to_calc.front().y;
+			grid_to_calc.pop_front();
+			float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
+			BoundBox bound(vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
+				vec3(SCENE_GRID_AREA.x + (x + 1) * stride, SCENE_GRID_AREA.y + (y + 1) * stride, g_scene_quad_tree[level][x][y].max_height));
+			auto result = camera_frustum.intersectTest(bound);
+			if (result == Frustum::VIEW_TEST_OUTSIDE)
+			{
+				continue;
+			}
+			auto p = camera_frustum.getPlane(Frustum::PLANE_NEAR);
+			float m = dot(p.normal, bound.center()) + p.d;
+			vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
+			float r = dot(half_size, abs(p.normal));
+			float z_near = MIN_VIEW_Z_NEAR + m - r;
+			if (z_near > view_z_near)
+			{
+				continue;
+			}
+			if (result == Frustum::VIEW_TEST_INTERSECT && level < NUM_SCENE_GRID_LEVELS - 1)
+			{
+				grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
+				grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
+				grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
+				grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
+			}
+			else
+			{
+				view_z_near = z_near;
 			}
 		}
 		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
