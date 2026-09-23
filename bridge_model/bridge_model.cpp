@@ -52,7 +52,8 @@ GLint window_width, window_height;
 
 float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 150.0f;
 float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
-float view_z_near = MIN_VIEW_Z_NEAR;
+float view_z_near;
+float scene_z_far;
 vec3 focus(0);
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
@@ -533,7 +534,6 @@ static void drawGraphics()
 		camera.inv_view = inverse(camera.view);
 
 		Frustum camera_frustum(camera.view, camera.projection);
-		view_z_near = VIEW_Z_FAR;
 		struct GridIdx
 		{
 			int level;
@@ -541,6 +541,8 @@ static void drawGraphics()
 			int y;
 		};
 		static CircularQueue<GridIdx> grid_to_calc(5);
+		view_z_near = VIEW_Z_FAR;
+		scene_z_far = MIN_VIEW_Z_NEAR;
 		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
 		{
 			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_Y; j++)
@@ -554,36 +556,43 @@ static void drawGraphics()
 			int x = grid_to_calc.front().x;
 			int y = grid_to_calc.front().y;
 			grid_to_calc.pop_front();
-			float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
-			BoundBox bound(vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
-				vec3(SCENE_GRID_AREA.x + (x + 1) * stride, SCENE_GRID_AREA.y + (y + 1) * stride, g_scene_quad_tree[level][x][y].max_height));
-			auto result = camera_frustum.intersectTest(bound);
+			BoundBox bound = sceneGridFrustum(level, x, y);
+			vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
+			auto p_near = camera_frustum.getPlane(Frustum::PLANE_NEAR);
+			auto p_far = camera_frustum.getPlane(Frustum::PLANE_FAR);
+			float r = dot(half_size, abs(p_near.normal));
+			float m_near = dot(p_near.normal, bound.center()) + p_near.d;
+			float m_far = dot(p_far.normal, bound.center()) + p_far.d;
+			float z_near = MIN_VIEW_Z_NEAR + m_near - r;
+			float z_far = VIEW_Z_FAR - m_far + r;
+			if (z_near >= view_z_near && z_far <= scene_z_far)
+			{
+				continue;
+			}
+			auto result = camera_frustum.intersectTestNoNearFar(bound);
 			if (result == Frustum::VIEW_TEST_OUTSIDE)
 			{
 				continue;
 			}
-			auto p = camera_frustum.getPlane(Frustum::PLANE_NEAR);
-			float m = dot(p.normal, bound.center()) + p.d;
-			vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
-			float r = dot(half_size, abs(p.normal));
-			float z_near = MIN_VIEW_Z_NEAR + m - r;
-			if (z_near > view_z_near)
+			if (level == NUM_SCENE_GRID_LEVELS - 1)
 			{
+				view_z_near = std::min(view_z_near, z_near);
+				scene_z_far = std::max(scene_z_far, z_far);
 				continue;
 			}
-			if (result == Frustum::VIEW_TEST_INTERSECT && level < NUM_SCENE_GRID_LEVELS - 1)
+			if (result == Frustum::VIEW_TEST_INSIDE)
 			{
-				grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
-				grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
-				grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
-				grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
+				view_z_near = std::min(view_z_near, z_near + 2 * r);
+				scene_z_far = std::max(scene_z_far, z_far - 2 * r);
 			}
-			else
-			{
-				view_z_near = z_near;
-			}
+			grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
+			grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
+			grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
+			grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
 		}
 		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
+		scene_z_far = std::min(scene_z_far, VIEW_Z_FAR);
+
 		camera.projection = perspective(FOVY, float(window_width) / window_height, view_z_near, VIEW_Z_FAR);
 
 		vec3 top_view(0, tanf(FOVY / 2), -1);

@@ -51,3 +51,25 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundBox& bound) const
 	}
 	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
 }
+
+Frustum::VIEW_TEST_RESULT Frustum::intersectTestNoNearFar(const BoundBox& bound) const
+{
+	bool inside = true;
+	for (int i = 0; i < 4; i++)
+	{
+		auto& p = m_planes[i];
+		float m = dot(p.normal, bound.center()) + p.d;
+		vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
+		float r = dot(half_size, abs(p.normal));
+		if (m + r < 0)
+		{
+			return VIEW_TEST_OUTSIDE;
+		}
+		if (m - r < 0)
+		{
+			inside = false;
+		}
+	}
+	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
+}
+

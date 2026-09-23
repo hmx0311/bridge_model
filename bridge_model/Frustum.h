@@ -37,6 +37,8 @@ public:
 
 	VIEW_TEST_RESULT intersectTest(const BoundBox& bound) const;
 
+	VIEW_TEST_RESULT intersectTestNoNearFar(const BoundBox& bound) const;
+
 	Plane getPlane(PLANE_INDEX plane) const
 	{
 		return m_planes[plane];

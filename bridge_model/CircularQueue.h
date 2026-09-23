@@ -675,13 +675,7 @@ private:
 	struct Element
 	{
 		static_assert(ElementIndex < sizeof...(Args), "提供的元素索引超出范围");
-		using Type = typename Element<ElementIndex - 1, Rest...>::Type;
-	};
-
-	template<class T, class... Rest>
-	struct Element<0, T, Rest...>
-	{
-		using Type = T;
+		using Type = std::conditional_t<ElementIndex == 0, T, typename Element<ElementIndex - 1, Rest...>::Type>;
 	};
 
 	template <size_t ElementIndex>
@@ -702,63 +696,45 @@ private:
 	template<class...>
 	struct ArgPack {};
 
-	template<class...>
+	template<class T, class... Rest>
 	class Allocator
 	{
 	public:
-		template<class...>
-		class Emplacer
-		{
-		public:
-			static void Emplace(CircularQueueSOA* __restrict queue, size_t addr_idx) {}
-		};
-		static void CalcOffsets(size_t count, size_t* __restrict offsets) {}
-		static void Reallocate(CircularQueueSOA* queue, void** dst, size_t insert_idx) {}
-		static void DestructAllElements(CircularQueueSOA* __restrict queue) {}
-		static void CopyQueue(CircularQueueSOA* __restrict dst_queue, const CircularQueueSOA* __restrict src_queue) {}
-		template<class...>
-		static void ConstructElement(CircularQueueSOA* __restrict queue, size_t addr_idx) {}
-		template<class...>
-		static void CopyElement(CircularQueueSOA* __restrict queue, size_t addr_idx) {}
-		static void MoveConstructElement(CircularQueueSOA* __restrict queue, size_t dst_addr_idx, size_t src_addr_idx) {}
-		static void MoveCopyElement(CircularQueueSOA* __restrict queue, size_t dst_addr_idx, size_t src_addr_idx) {}
-		static void DestructElement(CircularQueueSOA* __restrict queue, size_t addr_idx) {}
-		static void MoveForward(CircularQueueSOA* __restrict queue, size_t addr_begin, size_t addr_end) {}
-		static void MoveBackward(CircularQueueSOA* __restrict queue, size_t addr_begin, size_t addr_end) {}
-	};
-
-	template<class T, class... Rest>
-	class Allocator<T, Rest...>
-	{
-	public:
-		static constexpr auto ElementIdx = sizeof...(Args) - sizeof...(Rest) - 1;
+		static constexpr size_t ElementIdx = sizeof...(Args) - sizeof...(Rest) - 1;
 
 		template<class...>
 		class Emplacer;
 
 		template<size_t NumRemainingArgs, size_t... NumRestArgs, class... CurArgs, class NextArg, class... RestArgs>
-		class Emplacer<typename std::enable_if<(NumRemainingArgs > 0), void>::type, NumPack<NumRemainingArgs, NumRestArgs...>, ArgPack<CurArgs...>, NextArg, RestArgs...>
-			: public Emplacer<void, NumPack<NumRemainingArgs - 1, NumRestArgs...>, ArgPack<CurArgs..., NextArg>, RestArgs...>
+			requires (NumRemainingArgs > 0)
+		class Emplacer<NumPack<NumRemainingArgs, NumRestArgs...>, ArgPack<CurArgs...>, NextArg, RestArgs...>
+			: public Emplacer<NumPack<NumRemainingArgs - 1, NumRestArgs...>, ArgPack<CurArgs..., NextArg>, RestArgs...>
 		{
 		};
 
 		template<size_t... NumRestArgs, class... CurArgs, class... RestArgs>
-		class Emplacer<void, NumPack<0, NumRestArgs...>, ArgPack<CurArgs...>, RestArgs...>
+		class Emplacer<NumPack<0, NumRestArgs...>, ArgPack<CurArgs...>, RestArgs...>
 		{
 		public:
 			static void Emplace(CircularQueueSOA* __restrict queue, size_t addr_idx, CurArgs&&... cur, RestArgs&&... rest)
 			{
 				new (static_cast<T*>(queue->m_data[ElementIdx]) + addr_idx) T(std::forward<CurArgs>(cur)...);
-				Allocator<Rest...>::template Emplacer<void, NumPack<NumRestArgs...>, ArgPack<>, RestArgs...>::Emplace(queue, addr_idx, std::forward<RestArgs>(rest)...);
+				if constexpr (sizeof...(Rest) > 0)
+				{
+					Allocator<Rest...>::template Emplacer<NumPack<NumRestArgs...>, ArgPack<>, RestArgs...>::Emplace(queue, addr_idx, std::forward<RestArgs>(rest)...);
+				}
 			}
 		};
 
 		static void CalcOffsets(size_t count, size_t* __restrict offsets)
 		{
-			static_assert(alignof(T) <= 16, "暂不支持超过16字节的对齐");
+			static_assert(alignof(T) <= 16, "不支持超过16字节的对齐");
 			offsets[0] = (offsets[0] + alignof(T) - 1) & ~(alignof(T) - 1);
 			offsets[1] = offsets[0] + count * sizeof(T);
-			Allocator<Rest...>::CalcOffsets(count, offsets + 1);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::CalcOffsets(count, offsets + 1);
+			}
 		}
 
 		static void Reallocate(CircularQueueSOA* __restrict queue, void** __restrict dst, size_t insert_idx)
@@ -778,7 +754,10 @@ private:
 				new (temp + i) T(std::move(old));
 				old.~T();
 			}
-			Allocator<Rest...>::Reallocate(queue, dst, insert_idx);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::Reallocate(queue, dst, insert_idx);
+			}
 		}
 
 		static void DestructAllElements(CircularQueueSOA* __restrict queue)
@@ -806,7 +785,10 @@ private:
 				p->~T();
 				p++;
 			}
-			Allocator<Rest...>::DestructAllElements(queue);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::DestructAllElements(queue);
+			}
 		}
 
 		static void CopyQueue(CircularQueueSOA* __restrict dst_queue, const CircularQueueSOA* __restrict src_queue)
@@ -817,39 +799,57 @@ private:
 			{
 				new (dst + i) T(src[(src_queue->m_begin + i) & src_queue->m_idx_mask]);
 			}
-			Allocator<Rest...>::CopyQueue(dst_queue, src_queue);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::CopyQueue(dst_queue, src_queue);
+			}
 		}
 
 		template<class RefT, class... RefRest>
 		static void ConstructElement(CircularQueueSOA* __restrict queue, size_t addr_idx, RefT&& value, RefRest&&... rest_values)
 		{
 			new (static_cast<T*>(queue->m_data[ElementIdx]) + addr_idx) T(std::forward<RefT>(value));
-			Allocator<Rest...>::ConstructElement(queue, addr_idx, std::forward<RefRest>(rest_values)...);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::ConstructElement(queue, addr_idx, std::forward<RefRest>(rest_values)...);
+			}
 		}
 
 		template<class RefT, class... RefRest>
 		static void CopyElement(CircularQueueSOA* __restrict queue, size_t addr_idx, RefT&& value, RefRest&&... rest_values)
 		{
 			static_cast<T*>(queue->m_data[ElementIdx])[addr_idx] = std::forward<RefT>(value);
-			Allocator<Rest...>::CopyElement(queue, addr_idx, std::forward<RefRest>(rest_values)...);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::CopyElement(queue, addr_idx, std::forward<RefRest>(rest_values)...);
+			}
 		}
 
 		static void MoveConstructElement(CircularQueueSOA* __restrict queue, size_t dst_addr_idx, size_t src_addr_idx)
 		{
 			new (static_cast<T*>(queue->m_data[ElementIdx]) + dst_addr_idx) T(std::move(static_cast<T*>(queue->m_data[ElementIdx])[src_addr_idx]));
-			Allocator<Rest...>::MoveConstructElement(queue, dst_addr_idx, src_addr_idx);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::MoveConstructElement(queue, dst_addr_idx, src_addr_idx);
+			}
 		}
 
 		static void MoveCopyElement(CircularQueueSOA* __restrict queue, size_t dst_addr_idx, size_t src_addr_idx)
 		{
 			static_cast<T*>(queue->m_data[ElementIdx])[dst_addr_idx] = std::move(static_cast<T*>(queue->m_data[ElementIdx])[src_addr_idx]);
-			Allocator<Rest...>::MoveCopyElement(queue, dst_addr_idx, src_addr_idx);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::MoveCopyElement(queue, dst_addr_idx, src_addr_idx);
+			}
 		}
 
 		static void DestructElement(CircularQueueSOA* __restrict queue, size_t addr_idx)
 		{
 			static_cast<T*>(queue->m_data[ElementIdx])[addr_idx].~T();
-			Allocator<Rest...>::DestructElement(queue, addr_idx);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::DestructElement(queue, addr_idx);
+			}
 		}
 
 		static void MoveForward(CircularQueueSOA* __restrict queue, size_t addr_begin, size_t addr_end)
@@ -874,7 +874,10 @@ private:
 					data[i] = std::move(data[i + 1]);
 				}
 			}
-			Allocator<Rest...>::MoveForward(queue, addr_begin, addr_end);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::MoveForward(queue, addr_begin, addr_end);
+			}
 		}
 
 		static void MoveBackward(CircularQueueSOA* __restrict queue, size_t addr_begin, size_t addr_end)
@@ -899,7 +902,10 @@ private:
 					data[i] = std::move(data[i - 1]);
 				}
 			}
-			Allocator<Rest...>::MoveBackward(queue, addr_begin, addr_end);
+			if constexpr (sizeof...(Rest) > 0)
+			{
+				Allocator<Rest...>::MoveBackward(queue, addr_begin, addr_end);
+			}
 		}
 	};
 
@@ -1412,7 +1418,7 @@ public:
 		{
 			m_begin = (m_begin - 1) & m_idx_mask;
 		}
-		Allocator<Args...>::template Emplacer<void, NumPack<NumArgs...>, ArgPack<>, EmplaceArgs...>::Emplace(this, m_begin, std::forward<EmplaceArgs>(emplace_args)...);
+		Allocator<Args...>::template Emplacer<NumPack<NumArgs...>, ArgPack<>, EmplaceArgs...>::Emplace(this, m_begin, std::forward<EmplaceArgs>(emplace_args)...);
 		m_size++;
 	}
 
@@ -1436,7 +1442,7 @@ public:
 		{
 			inc_capacity(m_size);
 		}
-		Allocator<Args...>::template Emplacer<void, NumPack<NumArgs...>, ArgPack<>, EmplaceArgs...>::Emplace(this, (m_begin + m_size) & m_idx_mask, std::forward<EmplaceArgs>(emplace_args)...);
+		Allocator<Args...>::template Emplacer<NumPack<NumArgs...>, ArgPack<>, EmplaceArgs...>::Emplace(this, (m_begin + m_size) & m_idx_mask, std::forward<EmplaceArgs>(emplace_args)...);
 		m_size++;
 	}
 
@@ -1492,7 +1498,7 @@ public:
 			}
 			Allocator<Args...>::DestructElement(this, addr_idx);
 		}
-		Allocator<Args...>::template Emplacer<void, NumPack<NumArgs...>, ArgPack<>, EmplaceArgs...>::Emplace(this, addr_idx, std::forward<EmplaceArgs>(emplace_args)...);
+		Allocator<Args...>::template Emplacer<NumPack<NumArgs...>, ArgPack<>, EmplaceArgs...>::Emplace(this, addr_idx, std::forward<EmplaceArgs>(emplace_args)...);
 		m_size++;
 	}
 
@@ -1697,7 +1703,6 @@ protected:
 		offsets[0] = 0;
 		Allocator<Args...>::CalcOffsets(capacity(), offsets);
 		m_data[0] = malloc(offsets[sizeof...(Args)]);
-		ASSERT_ALIGNED16(m_data[0]);
 		for (size_t i = 1; i < sizeof...(Args); i++)
 		{
 			m_data[i] = static_cast<char*>(m_data[0]) + offsets[i];
