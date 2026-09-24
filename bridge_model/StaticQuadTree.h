@@ -1,5 +1,13 @@
 #pragma once
 #include <stdint.h>
+#include <utility>
+
+struct QuadTreeIdx
+{
+	uint32_t level;
+	size_t x;
+	size_t y;
+};
 
 template<class T, uint32_t NumLevels, size_t RootSizeX, size_t RootSizeY>
 class StaticQuadTree
@@ -62,5 +70,15 @@ public:
 	LevelProxy operator[](uint32_t level)
 	{
 		return LevelProxy(level, m_data);
+	}
+
+	const T& operator[](const QuadTreeIdx& idx) const
+	{
+		return m_data[LevelOffset(idx.level) + idx.x * LevelSizeY(idx.level) + idx.y];
+	}
+
+	T& operator[](const QuadTreeIdx& idx)
+	{
+		return const_cast<T&>(std::as_const(*this)[idx]);
 	}
 };

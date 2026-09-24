@@ -1,7 +1,16 @@
 #pragma once
 #include "glm.hpp"
 
+#undef NEAR
+#undef FAR
+
 struct BoundBox;
+
+struct Plane
+{
+	glm::vec3 normal;
+	float d;
+};
 
 class Frustum
 {
@@ -15,25 +24,19 @@ public:
 
 	enum PLANE_INDEX
 	{
-		PLANE_LEFT = 0,
-		PLANE_RIGHT = 1,
-		PLANE_BOTTOM = 2,
-		PLANE_TOP = 3,
-		PLANE_NEAR = 4,
-		PLANE_FAR = 5,
-	};
-
-	struct Plane
-	{
-		glm::vec3 normal;
-		float d;
+		LEFT = 0,
+		RIGHT = 1,
+		BOTTOM = 2,
+		TOP = 3,
+		NEAR = 4,
+		FAR = 5,
 	};
 
 private:
 	Plane m_planes[6];
 
 public:
-	Frustum(const glm::mat4& view, const glm::mat4& proj);
+	Frustum(const glm::mat4& vp);
 
 	VIEW_TEST_RESULT intersectTest(const BoundBox& bound) const;
 

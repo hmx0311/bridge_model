@@ -10,7 +10,12 @@ struct BoundBox
 
 	glm::vec3 center() const
 	{
-		return (m_min + m_max) * 0.5f;
+		return 0.5f * (m_min + m_max);
+	}
+
+	glm::vec3 size() const
+	{
+		return m_max - m_min;
 	}
 };
 

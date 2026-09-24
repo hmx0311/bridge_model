@@ -437,7 +437,7 @@ static void drawGraphics()
 		}
 	}
 	bool is_view_updated = need_update_view;
-	if (need_update_view)
+	if (need_update_view || 1)
 	{
 		camera.projection = perspective(FOVY, float(window_width) / window_height, MIN_VIEW_Z_NEAR, VIEW_Z_FAR);
 		need_update_view = false;
@@ -533,33 +533,27 @@ static void drawGraphics()
 		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
 		camera.inv_view = inverse(camera.view);
 
-		Frustum camera_frustum(camera.view, camera.projection);
-		struct GridIdx
-		{
-			int level;
-			int x;
-			int y;
-		};
-		static CircularQueue<GridIdx> grid_to_calc(5);
+		Frustum camera_frustum(camera.projection * camera.view);
+		static CircularQueue<QuadTreeIdx> grids_to_calc(5);
 		view_z_near = VIEW_Z_FAR;
 		scene_z_far = MIN_VIEW_Z_NEAR;
 		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
 		{
 			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_Y; j++)
 			{
-				grid_to_calc.emplace_back(0, i, j);
+				grids_to_calc.emplace_back(0, i, j);
 			}
 		}
-		while (!grid_to_calc.empty())
+		while (!grids_to_calc.empty())
 		{
-			int level = grid_to_calc.front().level;
-			int x = grid_to_calc.front().x;
-			int y = grid_to_calc.front().y;
-			grid_to_calc.pop_front();
-			BoundBox bound = sceneGridFrustum(level, x, y);
-			vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
-			auto p_near = camera_frustum.getPlane(Frustum::PLANE_NEAR);
-			auto p_far = camera_frustum.getPlane(Frustum::PLANE_FAR);
+			uint32_t level = grids_to_calc.front().level;
+			size_t x = grids_to_calc.front().x;
+			size_t y = grids_to_calc.front().y;
+			grids_to_calc.pop_front();
+			BoundBox bound = sceneGridBound(level, x, y);
+			vec3 half_size = 0.5f * bound.size();
+			auto p_near = camera_frustum.getPlane(Frustum::NEAR);
+			auto p_far = camera_frustum.getPlane(Frustum::FAR);
 			float r = dot(half_size, abs(p_near.normal));
 			float m_near = dot(p_near.normal, bound.center()) + p_near.d;
 			float m_far = dot(p_far.normal, bound.center()) + p_far.d;
@@ -582,13 +576,13 @@ static void drawGraphics()
 			}
 			if (result == Frustum::VIEW_TEST_INSIDE)
 			{
-				view_z_near = std::min(view_z_near, z_near + 2 * r);
-				scene_z_far = std::max(scene_z_far, z_far - 2 * r);
+				view_z_near = std::min(view_z_near, z_near + 4.0f / 3.0f * r);
+				scene_z_far = std::max(scene_z_far, z_far - 4.0f / 3.0f * r);
 			}
-			grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
-			grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
-			grid_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
-			grid_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
+			grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
+			grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
+			grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
+			grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
 		}
 		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
 		scene_z_far = std::min(scene_z_far, VIEW_Z_FAR);
@@ -871,24 +865,72 @@ static void drawGraphics()
 	if (sun.light_dir_and_radius.z > 0)
 	{
 		num_visible_cars = logical_data.num_cars;
-		mat4 sun_mat = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
+		mat4 sun_shadow_mat = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
+		Plane shadow_plane_x{ vec3(sun_shadow_mat[0][0], sun_shadow_mat[1][0], sun_shadow_mat[2][0]), 0.0f };
+		Plane shadow_plane_y{ vec3(sun_shadow_mat[0][1], sun_shadow_mat[1][1], sun_shadow_mat[2][1]), 0.0f };
+		Plane shadow_plane_z{ vec3(sun_shadow_mat[0][2], sun_shadow_mat[1][2], sun_shadow_mat[2][2]), 0.0f };
 		float z_far = FLT_MAX;
 		float slope = sqrt(1.0f / (sun.light_dir_and_radius.z * sun.light_dir_and_radius.z) - 1.0f);
 		float x_max[CSM_LEVELS], x_min[CSM_LEVELS], y_max[CSM_LEVELS], y_min[CSM_LEVELS], z_fars[CSM_LEVELS];
+		float CSM_ratio = pow(scene_z_far / view_z_near, 1.0f / CSM_LEVELS);
+		float camera_z_far = scene_z_far;
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
 			x_min[i] = FLT_MAX, x_max[i] = -FLT_MAX, y_min[i] = FLT_MAX, y_max[i] = -FLT_MAX;
+			/*
 			for (int j = 0; j < 12; j++)
 			{
-				vec3 point = vec3(sun_mat * vec4(CSM_areas[i][j], 1.0f));
+				vec3 point = vec3(sun_shadow_mat * vec4(CSM_areas[i][j], 1.0f));
 				z_far = min(z_far, point.z);
 				x_min[i] = min(x_min[i], point.x);
 				x_max[i] = max(x_max[i], point.x);
 				y_min[i] = min(y_min[i], point.y);
 				y_max[i] = max(y_max[i], point.y);
 			}
+			*/
+			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
+			float camera_z_near = camera_z_far / CSM_ratio;
+			Frustum camera_frustum_level(perspective(FOVY, float(window_width) / window_height, camera_z_near, camera_z_far) * camera.view);
+			camera_z_far = camera_z_near;
+			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_X; j++)
+			{
+				for (int k = 0; k < NUM_SCENE_GRID_ROOTS_Y; k++)
+				{
+					grids_to_calc.emplace_back(0, j, k);
+				}
+			}
+			while (!grids_to_calc.empty())
+			{
+				uint32_t level = grids_to_calc.front().level;
+				size_t x = grids_to_calc.front().x;
+				size_t y = grids_to_calc.front().y;
+				grids_to_calc.pop_front();
+				BoundBox bound = sceneGridBound(level, x, y);
+				auto result = camera_frustum_level.intersectTest(bound);
+				if (result == Frustum::VIEW_TEST_OUTSIDE)
+				{
+					continue;
+				}
+				if (level == NUM_SCENE_GRID_LEVELS - 1)
+				{
+					vec3 half_size = 0.5f * bound.size();
+					vec3 center = mat3(sun_shadow_mat) * bound.center();
+					z_far = std::min(z_far, center.z - dot(abs(shadow_plane_z.normal), half_size));
+					x_min[i] = std::min(x_min[i], center.x - dot(abs(shadow_plane_x.normal), half_size));
+					x_max[i] = std::max(x_max[i], center.x + dot(abs(shadow_plane_x.normal), half_size));
+					y_min[i] = std::min(y_min[i], center.y - dot(abs(shadow_plane_y.normal), half_size));
+					y_max[i] = std::max(y_max[i], center.y + dot(abs(shadow_plane_y.normal), half_size));
+					continue;
+				}
+				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
+				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
+				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
+				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
+			}
+
 			z_far = std::max(HEIGHT_RANGE[0] / sun.light_dir_and_radius.z - y_max[i] * slope, z_far);
 			z_fars[i] = z_far;
+
 		}
 		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
 		{
@@ -933,7 +975,7 @@ static void drawGraphics()
 			float z_near = std::min(HEIGHT_RANGE[1] / sun.light_dir_and_radius.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
 			float z_padding = std::max(x_padding / (x_max[i] - x_min[i]), y_padding / (y_max[i] - y_min[i])) * (z_near - z_fars[i]);
 			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding, y_min[i] - y_padding, y_max[i] + y_padding, -z_near, -z_fars[i] + z_padding);
-			shadow_mat = shadow_mat * sun_mat;
+			shadow_mat = shadow_mat * sun_shadow_mat;
 			sun_shadow.view_proj[i] = shadow_mat;
 			sun_shadow.tex[i] = mat4(
 				0.5f, 0.0f, 0.0f, 0.0f,
@@ -1287,6 +1329,10 @@ static void drawGraphics()
 
 static void onResize(GLFWwindow*, int width, int height)
 {
+	if (width <= 0 || height <= 0 || window_width == width && window_height == height)
+	{
+		return;
+	}
 	window_width = width;
 	window_height = height;
 	need_update_view = true;
@@ -1454,8 +1500,8 @@ int main(int argc, char** argv)
 {
 	ImmDisableIME(GetCurrentThreadId());
 
-	window_width = 2400;
-	window_height = 1350;
+	int width = 2400;
+	int height = 1350;
 
 	if (!glfwInit())
 	{
@@ -1470,7 +1516,7 @@ int main(int argc, char** argv)
 	glfwWindowHint(GLFW_BLUE_BITS, 10);
 	glfwWindowHint(GLFW_ALPHA_BITS, 2);
 
-	GLFWwindow* window = glfwCreateWindow(window_width, window_height, "", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(width, height, "", nullptr, nullptr);
 	if (!window)
 	{
 		glfwTerminate();
@@ -1509,7 +1555,7 @@ int main(int argc, char** argv)
 	glfwSetScrollCallback(window, onMouseWheel);
 
 	init();
-	onResize(window, window_width, window_height);
+	onResize(window, width, height);
 
 	initLogic();
 	std::thread logical_thread(logicalFrame);

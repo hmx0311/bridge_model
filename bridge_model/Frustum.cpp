@@ -4,9 +4,9 @@
 
 using namespace glm;
 
-static Frustum::Plane MakePlane(const vec4& v)
+static Plane MakePlane(const vec4& v)
 {
-	Frustum::Plane p;
+	Plane p;
 	vec3 n(v.x, v.y, v.z);
 	float len = length(n);
 	p.normal = n / len;
@@ -14,10 +14,8 @@ static Frustum::Plane MakePlane(const vec4& v)
 	return p;
 }
 
-Frustum::Frustum(const glm::mat4& view, const glm::mat4& proj)
+Frustum::Frustum(const mat4& vp)
 {
-    glm::mat4 vp = proj * view;
-
    vec4 row0(vp[0][0], vp[1][0], vp[2][0], vp[3][0]);
    vec4 row1(vp[0][1], vp[1][1], vp[2][1], vp[3][1]);
    vec4 row2(vp[0][2], vp[1][2], vp[2][2], vp[3][2]);
@@ -38,7 +36,7 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundBox& bound) const
 	{
 		auto& p = m_planes[i];
 		float m = dot(p.normal, bound.center()) + p.d;
-		vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
+		vec3 half_size = 0.5f * bound.size();
 		float r = dot(half_size, abs(p.normal));
 		if (m + r < 0)
 		{
@@ -59,7 +57,7 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTestNoNearFar(const BoundBox& bound)
 	{
 		auto& p = m_planes[i];
 		float m = dot(p.normal, bound.center()) + p.d;
-		vec3 half_size = (bound.m_max - bound.m_min) * 0.5f;
+		vec3 half_size = 0.5f * bound.size();
 		float r = dot(half_size, abs(p.normal));
 		if (m + r < 0)
 		{

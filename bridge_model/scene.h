@@ -22,7 +22,7 @@ extern StaticQuadTree<SenceHeight, NUM_SCENE_GRID_LEVELS, NUM_SCENE_GRID_ROOTS_X
 
 void initScene();
 
-inline BoundBox sceneGridFrustum(uint32_t level, size_t x, size_t y)
+inline BoundBox sceneGridBound(uint32_t level, size_t x, size_t y)
 {
 	float stride = (1 << (NUM_SCENE_GRID_LEVELS - 1 - level)) * SCENE_GRID_UNIT;
 	return BoundBox(glm::vec3(SCENE_GRID_AREA.x + x * stride, SCENE_GRID_AREA.y + y * stride, g_scene_quad_tree[level][x][y].min_height),
