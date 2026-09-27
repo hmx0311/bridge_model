@@ -8,6 +8,7 @@
 #include "terrain.h"
 #include "mesh.h"
 #include "shader.h"
+#include "Frustum.h"
 
 #include "shader_headers/camera_defines.h"
 
@@ -48,11 +49,12 @@ void initScene()
 	camera.inv_view = inverse(camera.view);
 	mat4 height_mat = ortho(SCENE_GRID_AREA.x, SCENE_GRID_AREA.z, SCENE_GRID_AREA.y, SCENE_GRID_AREA.w, 0.0f, HEIGHT_RANGE[1] - HEIGHT_RANGE[0]) *
 		lookAt(vec3(0, 0, HEIGHT_RANGE[1]), vec3(0, 0, 0), vec3(0, 1, 0));
+	Frustum camera_frustum(camera.projection * camera.view);
 	glNamedBufferSubData(scene_UBO, 0, sizeof(CameraData), &camera);
 	glUseProgram(SP_height_map);
 	updateTerrainLOD(1e10, vec3(0, 0, HEIGHT_RANGE[1]));
 	glClear(GL_DEPTH_BUFFER_BIT);
-	drawTerrainMesh();
+	drawTerrainMesh(camera_frustum);
 	glBindVertexArray(bridge_VAO);
 	glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(highway_VAO);
@@ -63,7 +65,7 @@ void initScene()
 	glDepthFunc(GL_GREATER);
 	glClearDepth(0.0);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	drawTerrainMesh();
+	drawTerrainMesh(camera_frustum);
 	glBindVertexArray(bridge_VAO);
 	glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(highway_VAO);

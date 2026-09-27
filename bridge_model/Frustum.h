@@ -10,6 +10,7 @@ struct Plane
 {
 	glm::vec3 normal;
 	float d;
+	// n * v + d = 0
 };
 
 class Frustum
@@ -37,12 +38,13 @@ private:
 
 public:
 	Frustum(const glm::mat4& vp);
+	Frustum(const glm::mat4& view, float fov_y, float aspect, float z_near, float z_far);
+	Frustum(const glm::mat4& view, float left, float right, float bottom, float top, float z_near, float z_far);
 
 	VIEW_TEST_RESULT intersectTest(const BoundBox& bound) const;
-
 	VIEW_TEST_RESULT intersectTestNoNearFar(const BoundBox& bound) const;
 
-	Plane getPlane(PLANE_INDEX plane) const
+	const Plane& getPlane(PLANE_INDEX plane) const
 	{
 		return m_planes[plane];
 	}

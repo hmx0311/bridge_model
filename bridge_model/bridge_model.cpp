@@ -6,6 +6,7 @@
 #include "glad/glad.h"
 #include "glfw3.h"
 #include "gtx/transform.hpp"
+#include "ext/matrix_common.hpp"
 
 #include "resource.h"
 #include "scene.h"
@@ -27,7 +28,7 @@
 
 using namespace glm;
 
-constexpr float TERRAIN_LOD_FACTOR = 1000.0f;
+constexpr float TERRAIN_LOD_FACTOR = 2000.0f;
 
 constexpr float MAX_CSM_RATIO = 3.6f;
 GLuint shadow_day_FBO;
@@ -41,7 +42,7 @@ constexpr int SHADOW_NIGHT_TEX_SIZE = 4096;
 GLuint shadow_night_FBO;
 GLuint shadow_night_tex;
 
-constexpr float FOVY = pi<float>() / 4;
+constexpr float FOV_Y = pi<float>() / 4;
 constexpr float MIN_VIEW_Z_NEAR = 0.6f;
 constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
@@ -111,7 +112,6 @@ GLuint car_lighting_SSBO;
 
 CameraData camera;
 float horizon_y;
-vec3 CSM_areas[CSM_LEVELS][12];
 ShadowTransformData sun_shadow;
 const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE), CAR_LIGHT_ASPECT, 0.5f, 0.5f + 2 * LIGHT_MAP_GRID_LENGTH);
 
@@ -178,22 +178,19 @@ static void initShader()
 	GLuint VS_shadow_car_day = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_DAY), GL_VERTEX_SHADER);
 	GLuint VS_shadow_car_night = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_NIGHT), GL_VERTEX_SHADER);
 	GLuint FS_shadow = loadShader(SHADER_NAME(IDR_FS_SHADOW), GL_FRAGMENT_SHADER);
-	GLuint GS_shadow_day = loadShader(SHADER_NAME(IDR_GS_SHADOW_DAY), GL_GEOMETRY_SHADER);
 	GLuint GS_shadow_highway_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_HIGHWAY_NIGHT), GL_GEOMETRY_SHADER);
 	GLuint GS_shadow_car_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_CAR_NIGHT), GL_GEOMETRY_SHADER);
-	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow, GS_shadow_day);
+	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow);
 	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
-	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow, GS_shadow_day);
+	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow);
 	SP_shadow_car_night = linkShaderProgram(VS_shadow_car_night, FS_shadow, GS_shadow_car_night);
 	glDeleteShader(VS_shadow_highway_day);
 	glDeleteShader(VS_shadow_highway_night);
 	glDeleteShader(GS_shadow_highway_night);
 	glDeleteShader(VS_shadow_car_day);
-	glDeleteShader(GS_shadow_day);
 	glDeleteShader(VS_shadow_car_night);
 	glDeleteShader(GS_shadow_car_night);
 	glDeleteShader(FS_shadow);
-
 
 	GLuint VS_tex_blit = loadShader(SHADER_NAME(IDR_VS_TEX_BLIT), GL_VERTEX_SHADER);
 
@@ -232,7 +229,7 @@ static void init()
 		}
 	}
 
-	glPolygonOffset(1.0f, 1.4f);
+	glPolygonOffset(1.0f, 1.0f);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	int UBO_offset_alignment;
@@ -331,7 +328,6 @@ static void init()
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1 + PCSS_MIP_LEVELS, GL_DEPTH_COMPONENT24, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE, CSM_LEVELS);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
 
 	glGenFramebuffers(1, &shadow_mip_gen_FBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_mip_gen_FBO);
@@ -437,9 +433,8 @@ static void drawGraphics()
 		}
 	}
 	bool is_view_updated = need_update_view;
-	if (need_update_view || 1)
+	if (need_update_view)
 	{
-		camera.projection = perspective(FOVY, float(window_width) / window_height, MIN_VIEW_Z_NEAR, VIEW_Z_FAR);
 		need_update_view = false;
 		if (azimuth != aim_azimuth)
 		{
@@ -526,14 +521,13 @@ static void drawGraphics()
 				focus.z += height_offset;
 			}
 		}
-		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOVY / 2) + 1) * window_height / 2;
+		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
+		camera.inv_view = inverse(camera.view);
+		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOV_Y / 2) + 1) * window_height / 2;
 
 		updateTerrainLOD(TERRAIN_LOD_FACTOR, eye);
 
-		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
-		camera.inv_view = inverse(camera.view);
-
-		Frustum camera_frustum(camera.projection * camera.view);
+		Frustum camera_frustum(camera.view, FOV_Y, float(window_width) / window_height, MIN_VIEW_Z_NEAR, VIEW_Z_FAR);
 		static CircularQueue<QuadTreeIdx> grids_to_calc(5);
 		view_z_near = VIEW_Z_FAR;
 		scene_z_far = MIN_VIEW_Z_NEAR;
@@ -552,8 +546,8 @@ static void drawGraphics()
 			grids_to_calc.pop_front();
 			BoundBox bound = sceneGridBound(level, x, y);
 			vec3 half_size = 0.5f * bound.size();
-			auto p_near = camera_frustum.getPlane(Frustum::NEAR);
-			auto p_far = camera_frustum.getPlane(Frustum::FAR);
+			auto& p_near = camera_frustum.getPlane(Frustum::NEAR);
+			auto& p_far = camera_frustum.getPlane(Frustum::FAR);
 			float r = dot(half_size, abs(p_near.normal));
 			float m_near = dot(p_near.normal, bound.center()) + p_near.d;
 			float m_far = dot(p_far.normal, bound.center()) + p_far.d;
@@ -586,203 +580,7 @@ static void drawGraphics()
 		}
 		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
 		scene_z_far = std::min(scene_z_far, VIEW_Z_FAR);
-
-		camera.projection = perspective(FOVY, float(window_width) / window_height, view_z_near, VIEW_Z_FAR);
-
-		vec3 top_view(0, tanf(FOVY / 2), -1);
-		vec3 bottom_view(0, -top_view.y, -1);
-		vec3 view_x = vec3(top_view.y / window_height * window_width, 0, 0);
-		top_view = mat3(camera.inv_view) * top_view;
-		bottom_view = mat3(camera.inv_view) * bottom_view;
-		view_x = mat3(camera.inv_view) * view_x;
-
-		if (eye.z > HEIGHT_RANGE[1])
-		{
-			float shadow_near = std::max(-(eye.z - HEIGHT_RANGE[1]) / bottom_view.z, view_z_near);
-			float shadow_far = std::max(shadow_near, MIN_SHADOW_FAR);
-			float bottom_far = -(eye.z - HEIGHT_RANGE[0]) / bottom_view.z;
-			float top_near = VIEW_Z_FAR;
-			float top_far = VIEW_Z_FAR;
-			if (top_view.z < 0)
-			{
-				top_near = std::min(-(eye.z - HEIGHT_RANGE[1]) / top_view.z, VIEW_Z_FAR);
-				top_far = std::min(-(eye.z - HEIGHT_RANGE[0]) / top_view.z, VIEW_Z_FAR);
-			}
-			float CSM_ratio = std::min(pow(top_far / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
-			vec3 shadow_hexa[6];
-			shadow_hexa[4] = shadow_near * bottom_view;
-			shadow_hexa[5] = shadow_hexa[4];
-			for (int i = 0; i < CSM_LEVELS; i++)
-			{
-				shadow_far *= CSM_ratio;
-				shadow_hexa[0] = shadow_hexa[4];
-				shadow_hexa[1] = shadow_hexa[5];
-				if (shadow_near < bottom_far && bottom_far < shadow_far)
-				{
-					shadow_hexa[2] = bottom_far * bottom_view;
-				}
-				else
-				{
-					shadow_hexa[2] = shadow_hexa[0];
-				}
-				if (shadow_near < top_near && top_near < shadow_far)
-				{
-					shadow_hexa[3] = top_near * top_view;
-				}
-				else
-				{
-					shadow_hexa[3] = shadow_hexa[0];
-				}
-				if (top_far < shadow_far)
-				{
-					shadow_hexa[4] = top_view * top_far;
-					shadow_hexa[5] = shadow_hexa[4];
-				}
-				else
-				{
-					if (bottom_far * (1 + FLT_EPSILON) < shadow_far)
-					{
-						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z - HEIGHT_RANGE[0]) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
-					}
-					else
-					{
-						shadow_hexa[4] = shadow_far * bottom_view;
-					}
-					if (top_near > shadow_far)
-					{
-						shadow_hexa[5] = shadow_far * top_view + (eye.z + shadow_far * top_view.z - HEIGHT_RANGE[1]) / (top_view.z - view_dir.z) * (view_dir - top_view);
-					}
-					else
-					{
-						shadow_hexa[5] = shadow_far * top_view;
-					}
-				}
-				shadow_near = shadow_far;
-				for (int j = 0; j < 6; j++)
-				{
-					float distance = dot(shadow_hexa[j], view_dir);
-					CSM_areas[i][2 * j] = eye + shadow_hexa[j] + distance * view_x;
-					CSM_areas[i][2 * j + 1] = eye + shadow_hexa[j] - distance * view_x;
-				}
-			}
-		}
-		else
-		{
-			float shadow_near = view_z_near;
-			float bottom = -(eye.z - HEIGHT_RANGE[0]) / bottom_view.z;
-			float shadow_far = MIN_SHADOW_FAR;
-			if (top_view.z > 0)
-			{
-				float top = std::min((HEIGHT_RANGE[1] - eye.z) / top_view.z, VIEW_Z_FAR);
-				float CSM_ratio = std::min(pow(VIEW_Z_FAR / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
-				vec3 shadow_hexa[6];
-				shadow_hexa[4] = shadow_near * bottom_view;
-				if (top < shadow_near)
-				{
-					shadow_hexa[5] = shadow_near * top_view - (eye.z + shadow_near * top_view.z - HEIGHT_RANGE[1]) / (view_dir.z - top_view.z) * (view_dir - top_view);
-				}
-				else
-				{
-					shadow_hexa[5] = shadow_near * top_view;
-				}
-				for (int i = 0; i < CSM_LEVELS; i++)
-				{
-					shadow_far *= CSM_ratio;
-					shadow_hexa[0] = shadow_hexa[4];
-					shadow_hexa[1] = shadow_hexa[5];
-					if (shadow_near < bottom && bottom < shadow_far)
-					{
-						shadow_hexa[2] = bottom * bottom_view;
-					}
-					else
-					{
-						shadow_hexa[2] = shadow_hexa[0];
-					}
-					if (shadow_near < top && top < shadow_far)
-					{
-						shadow_hexa[3] = top * top_view;
-					}
-					else
-					{
-						shadow_hexa[3] = shadow_hexa[0];
-					}
-					if (bottom < shadow_far)
-					{
-						shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z - HEIGHT_RANGE[0]) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
-					}
-					else
-					{
-						shadow_hexa[4] = shadow_far * bottom_view;
-					}
-					if (top < shadow_far)
-					{
-						shadow_hexa[5] = shadow_far * top_view - (eye.z + shadow_far * top_view.z - HEIGHT_RANGE[1]) / (view_dir.z - top_view.z) * (view_dir - top_view);
-					}
-					else
-					{
-						shadow_hexa[5] = shadow_far * top_view;
-					}
-					shadow_near = shadow_far;
-					for (int j = 0; j < 6; j++)
-					{
-						float distance = dot(shadow_hexa[j], view_dir);
-						CSM_areas[i][2 * j] = eye + shadow_hexa[j] + distance * view_x;
-						CSM_areas[i][2 * j + 1] = eye + shadow_hexa[j] - distance * view_x;
-					}
-				}
-			}
-			else
-			{
-				float top = VIEW_Z_FAR;
-				if (top_view.z < 0)
-				{
-					top = std::min(-(eye.z - HEIGHT_RANGE[0]) / top_view.z, VIEW_Z_FAR);
-				}
-				float CSM_ratio = std::min(pow(top / shadow_far, 1.0f / CSM_LEVELS), MAX_CSM_RATIO);
-				vec3 shadow_hexa[6];
-				shadow_hexa[4] = shadow_near * bottom_view;
-				shadow_hexa[5] = shadow_near * top_view;
-				for (int i = 0; i < CSM_LEVELS; i++)
-				{
-					shadow_far *= CSM_ratio;
-					shadow_hexa[0] = shadow_hexa[4];
-					shadow_hexa[1] = shadow_hexa[5];
-					if (shadow_near < bottom && bottom < shadow_far)
-					{
-						shadow_hexa[2] = bottom * bottom_view;
-					}
-					else
-					{
-						shadow_hexa[2] = shadow_hexa[0];
-					}
-					shadow_hexa[3] = shadow_hexa[0];
-					if (top < shadow_far)
-					{
-						shadow_hexa[4] = top_view * top;
-						shadow_hexa[5] = shadow_hexa[4];
-					}
-					else
-					{
-						if (bottom * (1 + FLT_EPSILON) < shadow_far)
-						{
-							shadow_hexa[4] = shadow_far * bottom_view - (eye.z + shadow_far * bottom_view.z - HEIGHT_RANGE[0]) / (view_dir.z - bottom_view.z) * (view_dir - bottom_view);
-						}
-						else
-						{
-							shadow_hexa[4] = shadow_far * bottom_view;
-						}
-						shadow_hexa[5] = shadow_far * top_view;
-					}
-					shadow_near = shadow_far;
-					for (int j = 0; j < 6; j++)
-					{
-						float distance = dot(shadow_hexa[j], view_dir);
-						CSM_areas[i][2 * j] = eye + shadow_hexa[j] + distance * view_x;
-						CSM_areas[i][2 * j + 1] = eye + shadow_hexa[j] - distance * view_x;
-					}
-				}
-			}
-		}
+		camera.projection = perspective(FOV_Y, float(window_width) / window_height, view_z_near, VIEW_Z_FAR);
 
 		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
 		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
@@ -865,32 +663,45 @@ static void drawGraphics()
 	if (sun.light_dir_and_radius.z > 0)
 	{
 		num_visible_cars = logical_data.num_cars;
-		mat4 sun_shadow_mat = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
-		Plane shadow_plane_x{ vec3(sun_shadow_mat[0][0], sun_shadow_mat[1][0], sun_shadow_mat[2][0]), 0.0f };
-		Plane shadow_plane_y{ vec3(sun_shadow_mat[0][1], sun_shadow_mat[1][1], sun_shadow_mat[2][1]), 0.0f };
-		Plane shadow_plane_z{ vec3(sun_shadow_mat[0][2], sun_shadow_mat[1][2], sun_shadow_mat[2][2]), 0.0f };
-		float z_far = FLT_MAX;
+
+		mat4 sun_shadow_view = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
+		mat3 abs_sun_shadow_rot = abs(mat3(sun_shadow_view));
+		vec3 view_top(0.0f, tanf(FOV_Y / 2), 0.0f);
+		vec3 view_left = vec3(view_top.y / window_height * window_width, 0.0f, 0.0f);
+		view_top = mat3(camera.inv_view) * view_top;
+		view_left = mat3(camera.inv_view) * view_left;
+		float z_min = FLT_MAX;
 		float slope = sqrt(1.0f / (sun.light_dir_and_radius.z * sun.light_dir_and_radius.z) - 1.0f);
-		float x_max[CSM_LEVELS], x_min[CSM_LEVELS], y_max[CSM_LEVELS], y_min[CSM_LEVELS], z_fars[CSM_LEVELS];
+		float x_maxs[CSM_LEVELS], x_mins[CSM_LEVELS], y_maxs[CSM_LEVELS], y_mins[CSM_LEVELS], z_mins[CSM_LEVELS];
 		float CSM_ratio = pow(scene_z_far / view_z_near, 1.0f / CSM_LEVELS);
 		float camera_z_far = scene_z_far;
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
-			x_min[i] = FLT_MAX, x_max[i] = -FLT_MAX, y_min[i] = FLT_MAX, y_max[i] = -FLT_MAX;
-			/*
-			for (int j = 0; j < 12; j++)
-			{
-				vec3 point = vec3(sun_shadow_mat * vec4(CSM_areas[i][j], 1.0f));
-				z_far = min(z_far, point.z);
-				x_min[i] = min(x_min[i], point.x);
-				x_max[i] = max(x_max[i], point.x);
-				y_min[i] = min(y_min[i], point.y);
-				y_max[i] = max(y_max[i], point.y);
-			}
-			*/
+			x_mins[i] = FLT_MAX, x_maxs[i] = FLT_MIN, y_mins[i] = FLT_MAX, y_maxs[i] = FLT_MIN;
 			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
 			float camera_z_near = camera_z_far / CSM_ratio;
-			Frustum camera_frustum_level(perspective(FOVY, float(window_width) / window_height, camera_z_near, camera_z_far) * camera.view);
+			Frustum camera_frustum_level(camera.view, FOV_Y, float(window_width) / window_height, camera_z_near, camera_z_far);
+			vec4 frustum_corners[8] = {
+				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((view_top + view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((-view_top + view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((view_top - view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((-view_top - view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((view_top + view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((-view_top + view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((view_top - view_left), 0.0f)),
+				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((-view_top - view_left), 0.0f)),
+			};
+			float frustum_x_min = FLT_MAX, frustum_x_max = FLT_MIN, frustum_y_min = FLT_MAX, frustum_y_max = FLT_MIN, frustum_z_far = FLT_MAX;
+			for (int i = 0; i < 8; i++)
+			{
+				vec3 corner_in_shadow = sun_shadow_view * frustum_corners[i];
+				frustum_z_far = std::min(frustum_z_far, corner_in_shadow.z);
+				frustum_x_min = std::min(frustum_x_min, corner_in_shadow.x);
+				frustum_x_max = std::max(frustum_x_max, corner_in_shadow.x);
+				frustum_y_min = std::min(frustum_y_min, corner_in_shadow.y);
+				frustum_y_max = std::max(frustum_y_max, corner_in_shadow.y);
+			}
+
 			camera_z_far = camera_z_near;
 			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_X; j++)
 			{
@@ -911,15 +722,113 @@ static void drawGraphics()
 				{
 					continue;
 				}
+				vec3 half_size = 0.5f * bound.size();
+				vec3 center = sun_shadow_view * vec4(bound.center(), 1.0f);
+				vec3 r = abs_sun_shadow_rot * half_size;
+				if ((center.x - r.x >= x_mins[i] || x_mins[i] <= frustum_x_min)
+					&& (center.x + r.x <= x_maxs[i] || x_maxs[i] >= frustum_x_max)
+					&& (center.y - r.y >= y_mins[i] || y_mins[i] <= frustum_y_min)
+					&& (center.y + r.y <= y_maxs[i] || y_maxs[i] >= frustum_y_max))
+				{
+					z_min = std::min(z_min, center.z - r.z);
+					continue;
+				}
 				if (level == NUM_SCENE_GRID_LEVELS - 1)
 				{
-					vec3 half_size = 0.5f * bound.size();
-					vec3 center = mat3(sun_shadow_mat) * bound.center();
-					z_far = std::min(z_far, center.z - dot(abs(shadow_plane_z.normal), half_size));
-					x_min[i] = std::min(x_min[i], center.x - dot(abs(shadow_plane_x.normal), half_size));
-					x_max[i] = std::max(x_max[i], center.x + dot(abs(shadow_plane_x.normal), half_size));
-					y_min[i] = std::min(y_min[i], center.y - dot(abs(shadow_plane_y.normal), half_size));
-					y_max[i] = std::max(y_max[i], center.y + dot(abs(shadow_plane_y.normal), half_size));
+					z_min = std::min(z_min, center.z - r.z);
+					x_mins[i] = std::min(x_mins[i], center.x - r.x);
+					x_maxs[i] = std::max(x_maxs[i], center.x + r.x);
+					y_mins[i] = std::min(y_mins[i], center.y - r.y);
+					y_maxs[i] = std::max(y_maxs[i], center.y + r.y);
+					continue;
+				}
+				if (result == Frustum::VIEW_TEST_INSIDE)
+				{
+					x_mins[i] = std::min(x_mins[i], center.x + 1.0f / 3.0f * r.x);
+					x_maxs[i] = std::max(x_maxs[i], center.x - 1.0f / 3.0f * r.x);
+					y_mins[i] = std::min(y_mins[i], center.y + 1.0f / 3.0f * r.y);
+					y_maxs[i] = std::max(y_maxs[i], center.y - 1.0f / 3.0f * r.y);
+				}
+				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
+				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
+				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
+				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
+			}
+			z_min = std::max(z_min, frustum_z_far);
+			x_mins[i] = std::max(x_mins[i], frustum_x_min);
+			x_maxs[i] = std::min(x_maxs[i], frustum_x_max);
+			y_mins[i] = std::max(y_mins[i], frustum_y_min);
+			y_maxs[i] = std::min(y_maxs[i], frustum_y_max);
+			z_mins[i] = z_min;
+		}
+
+		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
+		{
+			float group_x_min = FLT_MAX, group_x_max = FLT_MIN, group_y_min = FLT_MAX, group_y_max = FLT_MIN, group_z_min = FLT_MAX;
+			for (int j = 0; j < 4; j++)
+			{
+				group_z_min = std::min(group_z_min, z_mins[i + j]);
+				group_x_min = std::min(group_x_min, x_mins[i + j]);
+				group_x_max = std::max(group_x_max, x_maxs[i + j]);
+				group_y_min = std::min(group_y_min, y_mins[i + j]);
+				group_y_max = std::max(group_y_max, y_maxs[i + j]);
+			}
+			if (2 * (x_maxs[i] - x_mins[i]) >= group_x_max - group_x_min && 2 * (y_maxs[i] - y_mins[i]) >= group_y_max - group_y_min)
+			{
+				x_mins[i] = group_x_min;
+				x_maxs[i] = (group_x_min + group_x_max) / 2;
+				y_mins[i] = group_y_min;
+				y_maxs[i] = (group_y_min + group_y_max) / 2;
+				x_mins[i + 1] = (group_x_min + group_x_max) / 2;
+				x_maxs[i + 1] = group_x_max;
+				y_mins[i + 1] = group_y_min;
+				y_maxs[i + 1] = (group_y_min + group_y_max) / 2;
+				x_mins[i + 2] = group_x_min;
+				x_maxs[i + 2] = (group_x_min + group_x_max) / 2;
+				y_mins[i + 2] = (group_y_min + group_y_max) / 2;
+				y_maxs[i + 2] = group_y_max;
+				x_mins[i + 3] = (group_x_min + group_x_max) / 2;
+				x_maxs[i + 3] = group_x_max;
+				y_mins[i + 3] = (group_y_min + group_y_max) / 2;
+				y_maxs[i + 3] = group_y_max;
+				z_mins[i] = z_mins[i + 1] = z_mins[i + 2] = z_mins[i + 3] = group_z_min;
+			}
+		}
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			Frustum shadow_frustum(sun_shadow_view, x_mins[i], x_maxs[i], y_mins[i], y_maxs[i], 0.0f, 1.0f);
+			float z_max = FLT_MIN;
+			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
+			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_X; j++)
+			{
+				for (int k = 0; k < NUM_SCENE_GRID_ROOTS_Y; k++)
+				{
+					grids_to_calc.emplace_back(0, j, k);
+				}
+			}
+			int test_cnt = 0;
+			while (!grids_to_calc.empty())
+			{
+				test_cnt++;
+				uint32_t level = grids_to_calc.front().level;
+				size_t x = grids_to_calc.front().x;
+				size_t y = grids_to_calc.front().y;
+				grids_to_calc.pop_front();
+				BoundBox bound = sceneGridBound(level, x, y);
+				auto& p = shadow_frustum.getPlane(Frustum::NEAR);
+				float bound_z_max = -dot(p.normal, bound.center()) + dot(abs(p.normal), 0.5f * bound.size());
+				if (bound_z_max <= z_max)
+				{
+					continue;
+				}
+				auto result = shadow_frustum.intersectTestNoNearFar(bound);
+				if (result == Frustum::VIEW_TEST_OUTSIDE)
+				{
+					continue;
+				}
+				if (result == Frustum::VIEW_TEST_INSIDE || level == NUM_SCENE_GRID_LEVELS - 1)
+				{
+					z_max = std::max(z_max, bound_z_max);
 					continue;
 				}
 				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
@@ -927,62 +836,21 @@ static void drawGraphics()
 				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
 				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
 			}
-
-			z_far = std::max(HEIGHT_RANGE[0] / sun.light_dir_and_radius.z - y_max[i] * slope, z_far);
-			z_fars[i] = z_far;
-
-		}
-		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
-		{
-			float x_group_min = FLT_MAX, x_group_max = -FLT_MAX, y_group_min = FLT_MAX, y_group_max = -FLT_MAX, furthest_z_far = FLT_MAX;
-			for (int j = 0; j < 4; j++)
-			{
-				furthest_z_far = min(furthest_z_far, z_fars[i + j]);
-				x_group_min = min(x_group_min, x_min[i + j]);
-				x_group_max = max(x_group_max, x_max[i + j]);
-				y_group_min = min(y_group_min, y_min[i + j]);
-				y_group_max = max(y_group_max, y_max[i + j]);
-			}
-			if (4 * (x_max[i] - x_min[i]) * (y_max[i] - y_min[i]) > (x_group_max - x_group_min) * (y_group_max - y_group_min))
-			{
-				x_min[i] = x_group_min;
-				x_max[i] = (x_group_min + x_group_max) / 2;
-				y_min[i] = y_group_min;
-				y_max[i] = (y_group_min + y_group_max) / 2;
-				z_fars[i] = furthest_z_far;
-				x_min[i + 1] = (x_group_min + x_group_max) / 2;
-				x_max[i + 1] = x_group_max;
-				y_min[i + 1] = y_group_min;
-				y_max[i + 1] = (y_group_min + y_group_max) / 2;
-				z_fars[i + 1] = furthest_z_far;
-				x_min[i + 2] = x_group_min;
-				x_max[i + 2] = (x_group_min + x_group_max) / 2;
-				y_min[i + 2] = (y_group_min + y_group_max) / 2;
-				y_max[i + 2] = y_group_max;
-				z_fars[i + 2] = furthest_z_far;
-				x_min[i + 3] = (x_group_min + x_group_max) / 2;
-				x_max[i + 3] = x_group_max;
-				y_min[i + 3] = (y_group_min + y_group_max) / 2;
-				y_max[i + 3] = y_group_max;
-				z_fars[i + 3] = furthest_z_far;
-			}
-		}
-		for (int i = 0; i < CSM_LEVELS; i++)
-		{
 			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
-			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_max[i] - x_min[i]));
-			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_max[i] - y_min[i]));
-			float z_near = std::min(HEIGHT_RANGE[1] / sun.light_dir_and_radius.z - (y_min[i] - y_padding) * slope, 5 * VIEW_Z_FAR + z_fars[i]);
-			float z_padding = std::max(x_padding / (x_max[i] - x_min[i]), y_padding / (y_max[i] - y_min[i])) * (z_near - z_fars[i]);
-			mat4 shadow_mat = ortho(x_min[i] - x_padding, x_max[i] + x_padding, y_min[i] - y_padding, y_max[i] + y_padding, -z_near, -z_fars[i] + z_padding);
-			shadow_mat = shadow_mat * sun_shadow_mat;
+			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_maxs[i] - x_mins[i]));
+			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_maxs[i] - y_mins[i]));
+			float z_padding = std::max(x_padding / (x_maxs[i] - x_mins[i]), y_padding / (y_maxs[i] - y_mins[i])) * (z_max - z_mins[i]);
+			mat4 shadow_mat = ortho(x_mins[i] - x_padding, x_maxs[i] + x_padding, y_mins[i] - y_padding, y_maxs[i] + y_padding, -z_max, -z_mins[i] + z_padding) * sun_shadow_view;
 			sun_shadow.view_proj[i] = shadow_mat;
 			sun_shadow.tex[i] = mat4(
 				0.5f, 0.0f, 0.0f, 0.0f,
 				0.0f, 0.5f, 0.0f, 0.0f,
 				0.0f, 0.0f, 0.5f, 0.0f,
 				0.5f, 0.5f, 0.5f, 1.0f) * shadow_mat;
+			printf("%d\n", test_cnt);
+			printf("%f\n", z_max - z_mins[i] + z_padding);
 		}
+		printf("\n");
 	}
 	else
 	{
@@ -1146,18 +1014,36 @@ static void drawGraphics()
 		glBindSampler(1, shadow_PCF_sampler);
 		glBindSampler(2, shadow_depth_sampler);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_day);
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glDisable(GL_CULL_FACE);
-		drawTerrainMesh();
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
+			glProgramUniform1i(SP_shadow_highway_day, glGetUniformLocation(SP_shadow_highway_day, "csm_level"), i);
+			Frustum shadow_frustum(sun_shadow.view_proj[i]);
+			drawTerrainMesh(shadow_frustum);
+		}
 		glEnable(GL_CULL_FACE);
 		glBindVertexArray(bridge_VAO);
-		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
+			glProgramUniform1i(SP_shadow_highway_day, glGetUniformLocation(SP_shadow_highway_day, "csm_level"), i);
+			glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		}
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
 		glUseProgram(SP_shadow_car_day);
 		glBindVertexArray(car_shadow_VAO);
-		glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
+			glProgramUniform1i(SP_shadow_car_day, glGetUniformLocation(SP_shadow_car_day, "csm_level"), i);
+			glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+		}
 		glDisable(GL_POLYGON_OFFSET_FILL);
 
 		glUseProgram(SP_gen_PCSS_mips);
@@ -1185,7 +1071,7 @@ static void drawGraphics()
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glUseProgram(SP_terrain_day);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		drawTerrainMesh();
+		drawTerrainMesh(camera.projection * camera.view);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glUseProgram(SP_highway_day);
 		glBindVertexArray(highway_VAO);
@@ -1229,7 +1115,7 @@ static void drawGraphics()
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glUseProgram(SP_terrain_night);
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		drawTerrainMesh();
+		drawTerrainMesh(camera.projection * camera.view);
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glUseProgram(SP_highway_night);
 		glBindVertexArray(highway_VAO);
@@ -1385,7 +1271,8 @@ static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 		case '3':
 		case '4':
 		case '5':
-			simulate_speed = key - '0';
+		case '6':
+			simulate_speed = 1 << (key - '1');
 			return;
 		case 'F':
 			show_fps = !show_fps;

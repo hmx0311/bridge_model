@@ -168,9 +168,6 @@
     <Text Include="shaders\shadow.frag">
       <Filter>资源文件\shaders\shadow</Filter>
     </Text>
-    <Text Include="shaders\shadow_day.geom">
-      <Filter>资源文件\shaders\shadow\day</Filter>
-    </Text>
     <Text Include="shaders\shadow_car_day.vert">
       <Filter>资源文件\shaders\shadow\day</Filter>
     </Text>

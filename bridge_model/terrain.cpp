@@ -5,6 +5,8 @@
 #include <memory>
 
 #include "StaticQuadTree.h"
+#include "Frustum.h"
+#include "Bound.h"
 #include "resource.h"
 
 using namespace glm;
@@ -540,7 +542,7 @@ GLsizei count[MAX_DRAW_TILES];
 void* indicies[MAX_DRAW_TILES];
 GLint basevertex[MAX_DRAW_TILES];
 
-void drawTerrainMesh()
+void drawTerrainMesh(const Frustum& frustum)
 {
 	glBindVertexArray(terrain_VAO);
 	GLsizei tile_cnt = 0;
@@ -548,9 +550,17 @@ void drawTerrainMesh()
 	{
 		for (int j = 0; j < NUM_TERRAIN_TILE_ROOTS_Y; j++)
 		{
-			[&tile_cnt](this auto&& self, int lod, int tile_x, int tile_y) -> void
+			[&frustum, &tile_cnt](this auto&& self, int lod, int tile_x, int tile_y) -> void
 				{
 					Tile& tile = tiles[lod][tile_x][tile_y];
+					constexpr vec2 root_offset = TERRAIN_TILE_ROOT_SIZE * TERRAIN_FINEST_VERTEX_SPACING * vec2(-0.5f * NUM_TERRAIN_TILE_ROOTS_X, -0.5f * NUM_TERRAIN_TILE_ROOTS_Y);
+					float tile_side_lenght = TERRAIN_TILE_SIZE * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod));
+					BoundBox bound(vec3(root_offset + vec2(tile_side_lenght * tile_x, tile_side_lenght * tile_y), tile.min_height),
+						vec3(root_offset + vec2(tile_side_lenght * (tile_x + 1), tile_side_lenght * (tile_y + 1)), tile.max_height));
+					if (frustum.intersectTest(bound) == Frustum::VIEW_TEST_OUTSIDE)
+					{
+						return;
+					}					
 					if (tile.active || lod == NUM_TERRAIN_LOD - 1)
 					{
 						count[tile_cnt] = NUM_INDICES(tile.stitching);
