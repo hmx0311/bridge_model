@@ -847,10 +847,7 @@ static void drawGraphics()
 				0.0f, 0.5f, 0.0f, 0.0f,
 				0.0f, 0.0f, 0.5f, 0.0f,
 				0.5f, 0.5f, 0.5f, 1.0f) * shadow_mat;
-			printf("%d\n", test_cnt);
-			printf("%f\n", z_max - z_mins[i] + z_padding);
 		}
-		printf("\n");
 	}
 	else
 	{
