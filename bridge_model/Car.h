@@ -6,7 +6,7 @@
 
 constexpr float REACT_TIME = 0.8f;
 constexpr float CAR_LENGTH = 4.0f;
-constexpr float CAR_LIGHT_V_COS_ANGLE = 0.971f;
+constexpr float CAR_LIGHT_V_COS_ANGLE = 0.968f;
 constexpr float CAR_LIGHT_ASPECT = 2.0f;
 constexpr float CAR_LIGHT_RANGE = 2 * LIGHT_MAP_GRID_LENGTH;
 

@@ -5,6 +5,7 @@
 #undef FAR
 
 struct BoundBox;
+struct BoundSphere;
 
 struct Plane
 {
@@ -43,6 +44,8 @@ public:
 
 	VIEW_TEST_RESULT intersectTest(const BoundBox& bound) const;
 	VIEW_TEST_RESULT intersectTestNoNearFar(const BoundBox& bound) const;
+
+	VIEW_TEST_RESULT intersectTest(const BoundSphere& bound) const;
 
 	const Plane& getPlane(PLANE_INDEX plane) const
 	{

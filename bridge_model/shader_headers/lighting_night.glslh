@@ -5,9 +5,9 @@ const vec3 CAR_LIGHT_INTENSITY = 15 * vec3(1.0, 1.0, 0.9);
 float lightSmooth(float radius2)
 {
 	float r = sqrt(radius2);
-	if(r > 0.49)
+	if(r > 0.59)
 	{
-		float t = (0.99 - r) / 0.5;
+		float t = (0.99 - r) / 0.4;
 		return (3 - 2 * t) * t * t;
 	}
 	else

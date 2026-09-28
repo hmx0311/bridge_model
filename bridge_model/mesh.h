@@ -1,6 +1,7 @@
 #pragma once
 #include "glad/glad.h"
-#include "glm.hpp"
+
+#include "Bound.h"
 
 constexpr int HIGHWAY_EBO_SIZE = 13953;
 constexpr int BRIDGE_EBO_SIZE = 16914;
@@ -14,6 +15,6 @@ extern GLuint highway_VAO, bridge_VAO;
 extern GLuint car_VAO, car_shadow_VAO, car_transform_VBO, car_color_VBO;
 extern GLuint sun_VAO;
 
-extern const glm::vec3 car_boundray[8];
+extern const BoundBox car_bound;
 
 void buildMeshes();

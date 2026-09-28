@@ -656,6 +656,8 @@ static void drawGraphics()
 		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
 	}
 
+	Frustum camera_frustum{ camera.projection * camera.view };
+
 	int num_visible_cars;
 	int num_visible_light_on_cars;
 	int num_visible_car_lights;
@@ -865,14 +867,14 @@ static void drawGraphics()
 		for (int i = 0, j = logical_data.num_light_on_cars; i < j; i++)
 		{
 			mat4& transform = logical_data.car_transform[i];
-			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] == FLT_MAX)
+			BoundSphere bound(transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
+			if (!camera_frustum.intersectTest(bound))
 			{
 				for (j--; i < j; j--)
 				{
 					mat4& back_transform = logical_data.car_transform[j];
-					ivec2 back_light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(back_transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-					if (car_light_map_grid_distance2_to_view[back_light_map_idx.x][back_light_map_idx.y] < FLT_MAX)
+					BoundSphere back_bound(back_transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
+					if (camera_frustum.intersectTest(back_bound))
 					{
 						std::swap(transform, back_transform);
 						std::swap(logical_data.car_color[i], logical_data.car_color[j]);
@@ -890,14 +892,14 @@ static void drawGraphics()
 		for (int i = logical_data.num_light_on_cars, j = logical_data.num_cars; i < j; i++)
 		{
 			mat4& transform = logical_data.car_transform[i];
-			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] == FLT_MAX)
+			BoundSphere bound(transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
+			if (!camera_frustum.intersectTest(bound))
 			{
 				for (j--; i < j; j--)
 				{
 					mat4& back_transform = logical_data.car_transform[j];
-					ivec2 back_light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(back_transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-					if (car_light_map_grid_distance2_to_view[back_light_map_idx.x][back_light_map_idx.y] < FLT_MAX)
+					BoundSphere back_bound(back_transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
+					if (camera_frustum.intersectTest(back_bound))
 					{
 						std::swap(transform, back_transform);
 						std::swap(logical_data.car_color[i], logical_data.car_color[j]);
@@ -949,18 +951,12 @@ static void drawGraphics()
 					ivec2 idx = pos_idx + ivec2(j, k);
 					for (int p = car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x; p < car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y; p++)
 					{
-						mat4& car_light_mat = car_light_mats.view_proj[p];
-						for (const vec3& vertex : car_boundray)
+						Frustum light_frustum(car_light_mats.view_proj[p]);
+						BoundBox bound(car_bound, transform);
+						if (light_frustum.intersectTest(bound))
 						{
-							vec4 v = car_light_mat * transform * vec4(vertex, 1.0f);
-							v.x /= v.w;
-							v.y /= v.w;
-							if (-v.w < v.z && v.z < v.w && v.x * v.x + v.y * v.y < 1.0f)
-							{
-								num_lighting++;
-								car_lightings.light_indices[i * MAX_LIGHT_PER_CAR + num_lighting] = p;
-								break;
-							}
+							num_lighting++;
+							car_lightings.light_indices[i * MAX_LIGHT_PER_CAR + num_lighting] = p;
 						}
 					}
 				}
@@ -1075,7 +1071,7 @@ static void drawGraphics()
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glUseProgram(SP_terrain_day);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		drawTerrainMesh(camera.projection * camera.view);
+		drawTerrainMesh(camera_frustum);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glUseProgram(SP_highway_day);
 		glBindVertexArray(highway_VAO);
@@ -1453,7 +1449,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.2 * DAY_PERIOD)
+	while (logical_time < 0.6 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

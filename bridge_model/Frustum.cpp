@@ -114,3 +114,22 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTestNoNearFar(const BoundBox& bound)
 	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
 }
 
+Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundSphere& bound) const
+{
+	bool inside = true;
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		float m = dot(p.normal, bound.center) + p.d;
+		if (m + bound.r < 0)
+		{
+			return VIEW_TEST_OUTSIDE;
+		}
+		if (m - bound.r < 0)
+		{
+			inside = false;
+		}
+	}
+	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
+}
+
