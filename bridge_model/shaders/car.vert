@@ -18,8 +18,8 @@ out flat int instanceId;
 
 void main()
 {
-	modelPos = mat4x3(modelMat) * vec4(vertex, 1.0);
-	modelPosView = mat4x3(camera.view) * vec4(modelPos, 1.0);
+	modelPos = (modelMat * vec4(vertex, 1.0)).xyz;
+	modelPosView = (camera.view * vec4(modelPos, 1.0)).xyz;
 	viewRay = camera.inv_view[3].xyz - modelPos;
 	aNormal = mat3(modelMat) * normal;
 	aMaterialIdx = materialIdx;

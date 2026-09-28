@@ -7,5 +7,5 @@ uniform int csm_level;
 
 void main()
 {
-	gl_Position = sun_shadow.view_proj[csm_level] * (transform * vec4(vertex, 1.0));
+	gl_Position = sun_shadow.view_proj[csm_level] * transform * vec4(vertex, 1.0);
 }

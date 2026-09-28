@@ -996,9 +996,9 @@ static void drawGraphics()
 	}
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
-		mat4x3 transform = rotate(acos(sun.light_dir_and_radius.z), vec3(-sun.light_dir_and_radius.y, sun.light_dir_and_radius.x, 0));
-		transform[3] = 20.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir;
-		glProgramUniformMatrix4x3fv(SP_sun, glGetUniformLocation(SP_sun, "transform"), 1, GL_FALSE, (GLfloat*)&transform);
+		mat4 transform = rotate(acos(sun.light_dir_and_radius.z), vec3(-sun.light_dir_and_radius.y, sun.light_dir_and_radius.x, 0));
+		transform[3] = vec4(20.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir, 1.0f);
+		glProgramUniformMatrix4fv(SP_sun, glGetUniformLocation(SP_sun, "transform"), 1, GL_FALSE, (GLfloat*)&transform);
 	}
 
 	glBindTextureUnit(0, highway_tex);
@@ -1098,7 +1098,7 @@ static void drawGraphics()
 			glEnable(GL_CLIP_DISTANCE0 + i);
 		}
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
+		glViewport(0, 0, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_night);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);

@@ -12,9 +12,9 @@ out vec2 aTexCoord;
 void main()
 {
 	modelPos = vertex;
-	modelPosView = mat4x3(camera.view) * vec4(vertex, 1.0);
+	modelPosView = ((camera.view) * vec4(vertex, 1.0)).xyz;
 	aNormal = normal;
-	aTexCoord = vec2(texCoord);
+	aTexCoord = texCoord;
 	vec3 viewRay = camera.inv_view[3].xyz - modelPos;
 	gl_Position = camera.projection * vec4(modelPosView, 1.0);
 }
