@@ -70,7 +70,7 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 		float r = blocker_search_r * (i + 0.5) / NUM_BLOCKER_SAMPLE;
 		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed);
 		vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
-		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.1 * r);
+		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * r);
 		float dist = shadow_coord.z - texture(shadow_tex_depth, vec3(shadow_coord.xy + coord_offset, level)).x;
 		if (dist > -offset_z)
 		{
@@ -141,7 +141,7 @@ float shadowPCSS(vec3 modelPos, vec3 dpdx, vec3 dpdy, vec3 surface_normal, float
 		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(idx) ^ pixel_seed);
 		vec2 coord_offset = (r * cos(angle) * offset_i + r * sin(angle) * offset_j) * vec2(shadow_scale_u, shadow_scale_v);
 		vec2 coord = shadow_coord.xy + coord_offset;
-		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.1 * penumbra_radius * r);
+		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * penumbra_radius * r);
 		shadow += texture(shadowTex, vec4(coord.xy, level, shadow_coord.z + offset_z)).x;
 	}
 	shadow /= sample_cnt;

@@ -1025,6 +1025,13 @@ static void drawGraphics()
 			drawTerrainMesh(shadow_frustum);
 		}
 		glEnable(GL_CULL_FACE);
+		glBindVertexArray(highway_VAO);
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
+			glProgramUniform1i(SP_shadow_highway_day, glGetUniformLocation(SP_shadow_highway_day, "csm_level"), i);
+			glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		}
 		glBindVertexArray(bridge_VAO);
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
@@ -1093,6 +1100,8 @@ static void drawGraphics()
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glUseProgram(SP_shadow_highway_night);
+		glBindVertexArray(highway_VAO);
+		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_night);
