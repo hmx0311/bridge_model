@@ -15,6 +15,6 @@ extern GLuint highway_VAO, bridge_VAO;
 extern GLuint car_VAO, car_shadow_VAO, car_transform_VBO, car_color_VBO;
 extern GLuint sun_VAO;
 
-extern const BoundBox car_bound;
+extern const BoundBox car_local_bound;
 
 void buildMeshes();

@@ -57,11 +57,11 @@ void main()
 			float intensity = -dot(offsetToLight, aNormal) / (lightDistance * lightDistance);
 			vec4 coord = modelPosLight + offsets[k].x * OffsetXLight + offsets[k].y * OffsetYLight;
 			coord.xy /= coord.w;
-			float r2 = dot(coord.xy, coord.xy);
-			if(intensity > 0 && -coord.w < coord.z && coord.z < coord.w && r2 < 0.99)
+			float r = length(coord.xy);
+			if(intensity > 0 && -coord.w < coord.z && coord.z < coord.w && r < 0.99)
 			{
-				intensity *= lightSmooth(r2);
-				if(layer <= NUM_TILE_LIGHT_SHADOW_LAYERS)
+				intensity *= lightSmooth(r);
+				if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 				{
 					coord.xy = (coord.xy + 1.0) / (2 * shadowMapSize) + shadowMapPos;
 					coord.w = 0.5 * (coord.z / coord.w + 1.0);

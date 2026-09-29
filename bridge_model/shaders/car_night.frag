@@ -52,8 +52,8 @@ void main()
 			float intensity = -dot(modelToLight, aNormal) / (lightDistance * lightDistance);
 			vec4 modelPosLight = car_light_shadow.view_proj[idx] * vec4(modelPos, 1.0);
 			modelPosLight.xy /= modelPosLight.w;
-			float r2 = dot(modelPosLight.xy, modelPosLight.xy);
-			if(lightDistance > 0.45 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r2 < 0.99)
+			float r = length(modelPosLight.xy);
+			if(lightDistance > 0.5 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r < 0.99)
 			{
 				if(material.shininess > 0)
 				{
@@ -64,9 +64,9 @@ void main()
 						intensity += pow(HdotN, material.shininess);
 					}
 				}
-				intensity *= lightSmooth(r2);
+				intensity *= lightSmooth(r);
 				int layer = findMSB((idx >> 3) * 3 + 1) >> 1;
-				if(layer <= NUM_TILE_LIGHT_SHADOW_LAYERS)
+				if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 				{
 					ivec2 cnt = ivec2(2 << layer, 4 << layer);
 					idx -= ((8 << (2 * layer)) - 8) / 3 ;

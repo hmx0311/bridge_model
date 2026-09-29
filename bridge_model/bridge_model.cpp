@@ -863,67 +863,26 @@ static void drawGraphics()
 			vec4 dir;
 			ivec2* light_map_grid;
 		};
-		std::vector<CarLightInfo>car_light_infos;
-		for (int i = 0, j = logical_data.num_light_on_cars; i < j; i++)
-		{
-			mat4& transform = logical_data.car_transform[i];
-			BoundSphere bound(transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
-			if (!camera_frustum.intersectTest(bound))
-			{
-				for (j--; i < j; j--)
-				{
-					mat4& back_transform = logical_data.car_transform[j];
-					BoundSphere back_bound(back_transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
-					if (camera_frustum.intersectTest(back_bound))
-					{
-						std::swap(transform, back_transform);
-						std::swap(logical_data.car_color[i], logical_data.car_color[j]);
-						break;
-					}
-				}
-				if (i == j)
-				{
-					break;
-				}
-			}
-			num_visible_cars++;
-			num_visible_light_on_cars++;
-		}
-		for (int i = logical_data.num_light_on_cars, j = logical_data.num_cars; i < j; i++)
-		{
-			mat4& transform = logical_data.car_transform[i];
-			BoundSphere bound(transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
-			if (!camera_frustum.intersectTest(bound))
-			{
-				for (j--; i < j; j--)
-				{
-					mat4& back_transform = logical_data.car_transform[j];
-					BoundSphere back_bound(back_transform[3], 2 * LIGHT_MAP_GRID_LENGTH - 0.5f * car_bound.size().y);
-					if (camera_frustum.intersectTest(back_bound))
-					{
-						std::swap(transform, back_transform);
-						std::swap(logical_data.car_color[i], logical_data.car_color[j]);
-						break;
-					}
-				}
-				if (i == j)
-				{
-					break;
-				}
-			}
-			num_visible_cars++;
-		}
+		static std::vector<CarLightInfo>car_light_infos;
+		car_light_infos.clear();
 		int num_car_lights = 2 * logical_data.num_light_on_cars;
+		int cnt = 0;
 		for (int i = 0; i < num_car_lights; i++)
 		{
 			constexpr float POS_OFFSET = 0.5f / LIGHT_MAP_GRID_LENGTH + 1.0f;
-			vec4 light_pos = logical_data.car_light_pos[i];
-			vec4 light_dir = logical_data.car_light_dir[i];
+			const vec4& light_pos = logical_data.car_light_pos[i];
+			const vec4& light_dir = logical_data.car_light_dir[i];
 			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(light_pos) + POS_OFFSET * vec2(light_dir) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] < FLT_MAX)
+			vec3 light_y = light_dir;
+			vec3 light_x = normalize(vec3{ light_y.y, -light_y.x, 0.0f });
+			vec3 light_z = cross(light_x, light_y);
+			mat4 light_transform{ vec4(light_x, 0.0f), vec4(light_y, 0.0f), vec4(light_z, 0.0f), light_pos + 0.5f * light_dir };
+			BoundBox light_bound{ car_light_bound, light_transform };
+			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] < FLT_MAX && camera_frustum.intersectTest(light_bound))
 			{
-				car_light_infos.push_back({ light_pos, light_dir, &car_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y] });
-				car_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y].x++;
+				ivec2* light_map_grid = &car_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y];
+				car_light_infos.push_back({ light_pos, light_dir, light_map_grid });
+				light_map_grid->x++;
 			}
 		}
 		for (int i = 0; i < num_active_car_light_map_grids; i++)
@@ -939,30 +898,51 @@ static void drawGraphics()
 			car_light_pos.positions[idx] = car_light_info.pos;
 			car_light_mats.view_proj[idx] = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
 		}
-		for (int i = 0; i < num_visible_cars; i++)
-		{
-			mat4& transform = logical_data.car_transform[i < num_visible_light_on_cars ? i : i + logical_data.num_light_on_cars - num_visible_light_on_cars];
-			ivec2 pos_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-			int num_lighting = 0;
-			for (int j = -1; j < 2; j++)
+		auto cullCars = [&camera_frustum](mat4* transforms, vec3* colors, int* light_indices, int size)->int
 			{
-				for (int k = -1; k < 2; k++)
+				int i = 0, j = size;
+				while (i < j)
 				{
-					ivec2 idx = pos_idx + ivec2(j, k);
-					for (int p = car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x; p < car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y; p++)
+					mat4& transform = transforms[i];
+					ivec2 pos_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
+					int num_lighting = 0;
+					for (int m = -1; m < 2; m++)
 					{
-						Frustum light_frustum(car_light_mats.view_proj[p]);
-						BoundBox bound(car_bound, transform);
-						if (light_frustum.intersectTest(bound))
+						for (int n = -1; n < 2; n++)
 						{
-							num_lighting++;
-							car_lightings.light_indices[i * MAX_LIGHT_PER_CAR + num_lighting] = p;
+							ivec2 idx = pos_idx + ivec2(m, n);
+							for (int p = car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x; p < car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y; p++)
+							{
+								Frustum light_frustum(car_light_mats.view_proj[p]);
+								BoundBox bound(car_local_bound, transform);
+								if (light_frustum.intersectTest(bound))
+								{
+									num_lighting++;
+									light_indices[i * MAX_LIGHT_PER_CAR + num_lighting] = p;
+								}
+							}
 						}
 					}
+					light_indices[i * MAX_LIGHT_PER_CAR] = num_lighting;
+					if (num_lighting > 0 || camera_frustum.intersectTest(BoundBox{ car_local_bound, transform }))
+					{
+						i++;
+					}
+					else
+					{
+						j--;
+						std::swap(transform, transforms[j]);
+						std::swap(colors[i], colors[j]);
+					}
 				}
-			}
-			car_lightings.light_indices[i * MAX_LIGHT_PER_CAR] = num_lighting;
-		}
+				return i;
+			};
+		num_visible_light_on_cars += cullCars(logical_data.car_transform, logical_data.car_color, car_lightings.light_indices, logical_data.num_light_on_cars);
+		num_visible_cars += num_visible_light_on_cars;
+		num_visible_cars += cullCars(&logical_data.car_transform[logical_data.num_light_on_cars],
+			&logical_data.car_color[logical_data.num_light_on_cars],
+			&car_lightings.light_indices[num_visible_light_on_cars * MAX_LIGHT_PER_CAR],
+			logical_data.num_cars - logical_data.num_light_on_cars);
 	}
 
 	if (is_view_updated)
@@ -1117,7 +1097,7 @@ static void drawGraphics()
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		glUseProgram(SP_terrain_night);
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		drawTerrainMesh(camera.projection * camera.view);
+		drawTerrainMesh(camera_frustum);
 		glDisable(GL_POLYGON_OFFSET_FILL);
 		glUseProgram(SP_highway_night);
 		glBindVertexArray(highway_VAO);
