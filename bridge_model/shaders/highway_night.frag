@@ -58,7 +58,7 @@ void main()
 			vec4 coord = modelPosLight + offsets[k].x * OffsetXLight + offsets[k].y * OffsetYLight;
 			coord.xy /= coord.w;
 			float r = length(coord.xy);
-			if(intensity > 0 && -coord.w < coord.z && coord.z < coord.w && r < 0.99)
+			if(intensity > 0 && -coord.w < coord.z && coord.z < coord.w && r < 1.0)
 			{
 				intensity *= lightSmooth(r);
 				if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)

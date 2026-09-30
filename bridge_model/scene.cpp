@@ -47,9 +47,10 @@ void initScene()
 	camera.projection = ortho(SCENE_GRID_AREA.x, SCENE_GRID_AREA.z, SCENE_GRID_AREA.y, SCENE_GRID_AREA.w, 0.0f, HEIGHT_RANGE[1] - HEIGHT_RANGE[0]);
 	camera.view = lookAt(vec3(0, 0, HEIGHT_RANGE[1]), vec3(0, 0, 0), vec3(0, 1, 0));
 	camera.inv_view = inverse(camera.view);
+	camera.view_proj = camera.projection * camera.view;
 	mat4 height_mat = ortho(SCENE_GRID_AREA.x, SCENE_GRID_AREA.z, SCENE_GRID_AREA.y, SCENE_GRID_AREA.w, 0.0f, HEIGHT_RANGE[1] - HEIGHT_RANGE[0]) *
 		lookAt(vec3(0, 0, HEIGHT_RANGE[1]), vec3(0, 0, 0), vec3(0, 1, 0));
-	Frustum camera_frustum(camera.projection * camera.view);
+	Frustum camera_frustum(camera.view_proj);
 	glNamedBufferSubData(scene_UBO, 0, sizeof(CameraData), &camera);
 	glUseProgram(SP_height_map);
 	updateTerrainLOD(1e10, vec3(0, 0, HEIGHT_RANGE[1]));

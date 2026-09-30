@@ -52,10 +52,6 @@ constexpr float MIN_SHADOW_FAR = 3.695f;
 GLint window_width, window_height;
 
 float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 150.0f;
-float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
-float view_z_near;
-float scene_z_far;
-vec3 focus(0);
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
 bool need_update_view = true;
@@ -70,7 +66,7 @@ GLuint depth_RBO;
 GLuint render_FBO;
 GLuint render_tex;
 
-constexpr int BLOOM_BUFFER_HEIGHT = 512;
+constexpr int BLOOM_BUFFER_HEIGHT = 540;
 int bloom_buffer_width;
 GLuint bloom_FBOs[2];
 GLuint bloom_texs[2];
@@ -111,13 +107,8 @@ GLuint car_lighting_SSBO;
 
 
 CameraData camera;
-float horizon_y;
 ShadowTransformData sun_shadow;
 const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE), CAR_LIGHT_ASPECT, 0.5f, 0.5f + 2 * LIGHT_MAP_GRID_LENGTH);
-
-int num_active_car_light_map_grids = 0;
-float car_light_map_grid_distance2_to_view[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
-ivec2 car_light_map_grid_distance_order[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
 
 CarLightMapData car_light_map;
 CarLightData car_light_pos;
@@ -220,14 +211,6 @@ static void initShader()
 static void init()
 {
 	initShader();
-
-	for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
-	{
-		for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
-		{
-			car_light_map_grid_distance_order[i * LIGHT_MAP_SIZE_Y + j] = ivec2(i, j);
-		}
-	}
 
 	glPolygonOffset(1.0f, 1.0f);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -394,6 +377,12 @@ static void init()
 
 static void drawGraphics()
 {
+	static float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
+	static float view_z_near;
+	static float scene_z_far;
+	static vec3 focus(0);
+	static float horizon_y;
+
 	uint64_t time_us = getTimestampMicroseconds();
 	uint64_t dt_us = time_us - last_time_us;
 	last_time_us = time_us;
@@ -581,42 +570,7 @@ static void drawGraphics()
 		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
 		scene_z_far = std::min(scene_z_far, VIEW_Z_FAR);
 		camera.projection = perspective(FOV_Y, float(window_width) / window_height, view_z_near, VIEW_Z_FAR);
-
-		bool is_light_grid_visible[LIGHT_MAP_SIZE_X][LIGHT_MAP_SIZE_Y];
-		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
-		{
-			float offset_x = (-0.5f * LIGHT_MAP_SIZE_X + i) * LIGHT_MAP_GRID_LENGTH;
-			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
-			{
-				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + j) * LIGHT_MAP_GRID_LENGTH;
-				BoundBox bound(vec3(offset_x - LIGHT_MAP_GRID_LENGTH, offset_y - LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[0]),
-					vec3(offset_x + 2 * LIGHT_MAP_GRID_LENGTH, offset_y + 2 * LIGHT_MAP_GRID_LENGTH, HEIGHT_RANGE[1]));
-				is_light_grid_visible[i][j] = camera_frustum.intersectTest(bound) != Frustum::VIEW_TEST_OUTSIDE;
-			}
-		}
-		num_active_car_light_map_grids = 0;
-		for (int i = 0; i < LIGHT_MAP_SIZE_X; i++)
-		{
-			float offset_x = (-0.5f * LIGHT_MAP_SIZE_X + 0.5f + i) * LIGHT_MAP_GRID_LENGTH;
-			for (int j = 0; j < LIGHT_MAP_SIZE_Y; j++)
-			{
-				float offset_y = (-0.5f * LIGHT_MAP_SIZE_Y + 0.5f + j) * LIGHT_MAP_GRID_LENGTH;
-				if (is_light_grid_visible[i][j])
-				{
-					vec2 distance = vec2(eye) - vec2(offset_x, offset_y);
-					car_light_map_grid_distance2_to_view[i][j] = dot(distance, distance);
-					num_active_car_light_map_grids++;
-				}
-				else
-				{
-					car_light_map_grid_distance2_to_view[i][j] = FLT_MAX;
-				}
-			}
-		}
-		std::sort(car_light_map_grid_distance_order, &car_light_map_grid_distance_order[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y], [](ivec2 a, ivec2 b)->bool
-			{
-				return car_light_map_grid_distance2_to_view[a.x][a.y] < car_light_map_grid_distance2_to_view[b.x][b.y];
-			});
+		camera.view_proj = camera.projection * camera.view;
 	}
 
 	SunData sun;
@@ -636,7 +590,7 @@ static void drawGraphics()
 			area_unit = pi<float>() - sqrt_one_minus_x2 * (x + 1);
 		}
 		float area_percent = area_unit / pi<float>();
-		float center = 2.f / 3.f * sqrt_one_minus_x2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 / area_unit;
+		float center = 2.0f / 3.0f * sqrt_one_minus_x2 * sqrt_one_minus_x2 * sqrt_one_minus_x2 / area_unit;
 		if (center < x + (1 - x) / 3)
 		{
 			center = x + (1 - x) / 3;
@@ -656,7 +610,7 @@ static void drawGraphics()
 		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
 	}
 
-	Frustum camera_frustum{ camera.projection * camera.view };
+	Frustum camera_frustum{ camera.view_proj };
 
 	int num_visible_cars;
 	int num_visible_light_on_cars;
@@ -668,7 +622,7 @@ static void drawGraphics()
 
 		mat4 sun_shadow_view = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
 		mat3 abs_sun_shadow_rot = abs(mat3(sun_shadow_view));
-		vec3 view_top(0.0f, tanf(FOV_Y / 2), 0.0f);
+		vec3 view_top(0.0f, tan(FOV_Y / 2), 0.0f);
 		vec3 view_left = vec3(view_top.y / window_height * window_width, 0.0f, 0.0f);
 		view_top = mat3(camera.inv_view) * view_top;
 		view_left = mat3(camera.inv_view) * view_left;
@@ -861,6 +815,7 @@ static void drawGraphics()
 		{
 			vec4 pos;
 			vec4 dir;
+			float distance_to_camera;
 			ivec2* light_map_grid;
 		};
 		static std::vector<CarLightInfo>car_light_infos;
@@ -869,31 +824,52 @@ static void drawGraphics()
 		int cnt = 0;
 		for (int i = 0; i < num_car_lights; i++)
 		{
-			constexpr float POS_OFFSET = 0.5f / LIGHT_MAP_GRID_LENGTH + 1.0f;
 			const vec4& light_pos = logical_data.car_light_pos[i];
 			const vec4& light_dir = logical_data.car_light_dir[i];
-			ivec2 light_map_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(light_pos) + POS_OFFSET * vec2(light_dir) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
-			vec3 light_y = light_dir;
-			vec3 light_x = normalize(vec3{ light_y.y, -light_y.x, 0.0f });
-			vec3 light_z = cross(light_x, light_y);
-			mat4 light_transform{ vec4(light_x, 0.0f), vec4(light_y, 0.0f), vec4(light_z, 0.0f), light_pos + 0.5f * light_dir };
-			BoundBox light_bound{ car_light_bound, light_transform };
-			if (car_light_map_grid_distance2_to_view[light_map_idx.x][light_map_idx.y] < FLT_MAX && camera_frustum.intersectTest(light_bound))
+			vec3 light_left = sqrt(1.0f / (CAR_LIGHT_V_COS_ANGLE * CAR_LIGHT_V_COS_ANGLE) - 1.0f) * normalize(vec3{ light_dir.y, -light_dir.x, 0.0f });
+			vec3 light_top = cross(light_left, vec3{ light_dir });
+			light_left *= CAR_LIGHT_ASPECT;
+			vec4 bound_corners[8] = {
+				light_pos + 0.5f * (light_dir + vec4((light_top + light_left), 0.0f)),
+				light_pos + 0.5f * (light_dir + vec4((-light_top + light_left), 0.0f)),
+				light_pos + 0.5f * (light_dir + vec4((light_top - light_left), 0.0f)),
+				light_pos + 0.5f * (light_dir + vec4((-light_top - light_left), 0.0f)),
+				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((light_top + light_left), 0.0f)),
+				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((-light_top + light_left), 0.0f)),
+				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((light_top - light_left), 0.0f)),
+				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((-light_top - light_left), 0.0f)),
+			};
+			bool out[6] = { true, true, true, true, true, true };
+			bool intersect = false;
+			for (vec4& bound_vert : bound_corners)
 			{
+				vec4 p = camera.view_proj * bound_vert;
+				if (p.x > -p.w) out[0] = false;
+				if (p.x < p.w)out[1] = false;
+				if (p.y > -p.w) out[2] = false;
+				if (p.y < p.w)out[3] = false;
+				if (p.z > -p.w) out[4] = false;
+				if (p.z < p.w)out[5] = false;
+			}
+			if (!(out[0] || out[1] || out[2] || out[3] || out[4] || out[5]))
+			{
+				constexpr float POS_OFFSET = 0.5f + LIGHT_MAP_GRID_LENGTH;
+				vec3 center_pos = light_pos + POS_OFFSET * light_dir;
+				ivec2 light_map_idx = ivec2{ 1.0f / LIGHT_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y) };
 				ivec2* light_map_grid = &car_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y];
-				car_light_infos.push_back({ light_pos, light_dir, light_map_grid });
+				car_light_infos.push_back({ light_pos, light_dir, length(center_pos - vec3(camera.inv_view[3])), light_map_grid });
 				light_map_grid->x++;
 			}
 		}
-		for (int i = 0; i < num_active_car_light_map_grids; i++)
-		{
-			ivec2& idx = car_light_map_grid_distance_order[i];
-			car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y = num_visible_car_lights;
-			num_visible_car_lights += car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x;
-			car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x = car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y;
-		}
+		std::sort(car_light_infos.begin(), car_light_infos.end(), [](const CarLightInfo& a, const CarLightInfo& b) { return a.distance_to_camera < b.distance_to_camera; });
 		for (CarLightInfo& car_light_info : car_light_infos)
 		{
+			if (car_light_info.light_map_grid->y == 0)
+			{
+				car_light_info.light_map_grid->y = num_visible_car_lights;
+				num_visible_car_lights += car_light_info.light_map_grid->x;
+				car_light_info.light_map_grid->x = car_light_info.light_map_grid->y;
+			}
 			int idx = car_light_info.light_map_grid->y++;
 			car_light_pos.positions[idx] = car_light_info.pos;
 			car_light_mats.view_proj[idx] = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
@@ -944,7 +920,7 @@ static void drawGraphics()
 			&car_lightings.light_indices[num_visible_light_on_cars * MAX_LIGHT_PER_CAR],
 			logical_data.num_cars - logical_data.num_light_on_cars);
 	}
-
+	printf("%d\n", num_visible_car_lights);
 	if (is_view_updated)
 	{
 		glNamedBufferSubData(scene_UBO, 0, sizeof(camera), &camera);

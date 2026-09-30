@@ -7,7 +7,7 @@
 
 constexpr float REACT_TIME = 0.8f;
 constexpr float CAR_LENGTH = 4.0f;
-constexpr float CAR_LIGHT_V_COS_ANGLE = 0.967f;
+constexpr float CAR_LIGHT_V_COS_ANGLE = 0.968f;
 constexpr float CAR_LIGHT_ASPECT = 2.0f;
 constexpr float CAR_LIGHT_RANGE = 2 * LIGHT_MAP_GRID_LENGTH;
 
@@ -15,8 +15,6 @@ constexpr glm::vec4 CAR_LEFT_LIGHT_POS(-0.56f, 1.5f, 0.81f, 1);
 constexpr glm::vec4 CAR_RIGHT_LIGHT_POS(0.56f, 1.5f, 0.81f, 1);
 constexpr glm::vec4 CAR_LEFT_LIGHT_DIR(-0.096f, 0.9584f, -0.2688f, 0);
 constexpr glm::vec4 CAR_RIGHT_LIGHT_DIR(0.096f, 0.9584f, -0.2688f, 0);
-
-const extern BoundBox car_light_bound;
 
 class Lane;
 

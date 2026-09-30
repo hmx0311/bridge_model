@@ -27,3 +27,10 @@ struct BoundSphere
 
 	BoundSphere(const glm::vec3& center, float r) :center(center), r(r) {}
 };
+
+struct BoundFrustum
+{
+	glm::vec3 points[8];
+
+	BoundFrustum(const glm::mat4& transform, float fov_y, float aspect, float z_near, float z_far);
+};

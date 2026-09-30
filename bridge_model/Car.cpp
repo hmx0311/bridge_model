@@ -11,11 +11,6 @@ static constexpr float ACCELERATION = 2.0f;
 static constexpr float BREAK_INTENSITY = 4.0f;
 static constexpr float BREAK_DISTANCE = 120.0f;
 
-const BoundBox car_light_bound{
-	-LIGHT_MAP_GRID_LENGTH * vec3{ CAR_LIGHT_ASPECT * sqrt(1.0f / (CAR_LIGHT_V_COS_ANGLE * CAR_LIGHT_V_COS_ANGLE) - 1.0f), 0.0f, sqrt(1.0f / (CAR_LIGHT_V_COS_ANGLE * CAR_LIGHT_V_COS_ANGLE) - 1.0f) },
-	LIGHT_MAP_GRID_LENGTH * vec3{ CAR_LIGHT_ASPECT * sqrt(1.0f / (CAR_LIGHT_V_COS_ANGLE * CAR_LIGHT_V_COS_ANGLE) - 1.0f), 2.0f, sqrt(1.0f / (CAR_LIGHT_V_COS_ANGLE * CAR_LIGHT_V_COS_ANGLE) - 1.0f) }
-};
-
 Car::Car(Lane* lane, float sun_height)
 {
 	std::uniform_real_distribution<float> distb(0.1f, 0.95f);

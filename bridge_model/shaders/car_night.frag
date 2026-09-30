@@ -53,7 +53,7 @@ void main()
 			vec4 modelPosLight = car_light_shadow.view_proj[idx] * vec4(modelPos, 1.0);
 			modelPosLight.xy /= modelPosLight.w;
 			float r = length(modelPosLight.xy);
-			if(lightDistance > 0.5 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r < 0.99)
+			if(lightDistance > 0.5 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r < 1.0)
 			{
 				if(material.shininess > 0)
 				{

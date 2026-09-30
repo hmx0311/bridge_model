@@ -6,6 +6,7 @@ struct CameraData
 {
 	mat4 projection;
 	mat4 view;
+	mat4 view_proj;
 	mat4 inv_view;
 };
 
