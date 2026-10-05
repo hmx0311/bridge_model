@@ -32,5 +32,5 @@ void main()
 	}
 	color *= lighting;
 	float fog_factor = fogFactor(modelPos);
-	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
+	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
 }

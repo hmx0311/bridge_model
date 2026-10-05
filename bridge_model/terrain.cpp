@@ -550,17 +550,17 @@ void drawTerrainMesh(const Frustum& frustum)
 	{
 		for (int j = 0; j < NUM_TERRAIN_TILE_ROOTS_Y; j++)
 		{
-			[&frustum, &tile_cnt](this auto&& self, int lod, int tile_x, int tile_y) -> void
+			[&frustum, &tile_cnt](this auto&& self, int lod, int tile_x, int tile_y)->void
 				{
 					Tile& tile = tiles[lod][tile_x][tile_y];
 					constexpr vec2 root_offset = TERRAIN_TILE_ROOT_SIZE * TERRAIN_FINEST_VERTEX_SPACING * vec2(-0.5f * NUM_TERRAIN_TILE_ROOTS_X, -0.5f * NUM_TERRAIN_TILE_ROOTS_Y);
 					float tile_side_lenght = TERRAIN_TILE_SIZE * TERRAIN_FINEST_VERTEX_SPACING * (1 << (NUM_TERRAIN_LOD - 1 - lod));
-					BoundBox bound(vec3(root_offset + vec2(tile_side_lenght * tile_x, tile_side_lenght * tile_y), tile.min_height),
+					BoundAABB bound(vec3(root_offset + vec2(tile_side_lenght * tile_x, tile_side_lenght * tile_y), tile.min_height),
 						vec3(root_offset + vec2(tile_side_lenght * (tile_x + 1), tile_side_lenght * (tile_y + 1)), tile.max_height));
-					if (frustum.intersectTest(bound) == Frustum::VIEW_TEST_OUTSIDE)
+					if (!frustum.cullingTest(bound))
 					{
 						return;
-					}					
+					}
 					if (tile.active || lod == NUM_TERRAIN_LOD - 1)
 					{
 						count[tile_cnt] = NUM_INDICES(tile.stitching);

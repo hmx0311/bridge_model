@@ -41,16 +41,16 @@ void main()
 	if(maxColor <= 1.0)
 	{
 		vec3 lighting = sun.ambient;
-		int lightingOffset = instanceId * MAX_LIGHT_PER_CAR;
+		int lightingOffset = instanceId * LIGHTING_SIZE_PER_CAR;
 		int end = lightingOffset + 1 + car_lighting.light_indices[lightingOffset];
 		for(int i = lightingOffset + 1; i < end; i++)
 		{
 			int idx = car_lighting.light_indices[i];
-			vec3 modelToLight = modelPos - vec3(car_light.positions[idx]);
+			vec3 modelToLight = modelPos - vec3(tile_light.positions[idx]);
 			float lightDistance = length(modelToLight);
 			modelToLight /= lightDistance;
 			float intensity = -dot(modelToLight, aNormal) / (lightDistance * lightDistance);
-			vec4 modelPosLight = car_light_shadow.view_proj[idx] * vec4(modelPos, 1.0);
+			vec4 modelPosLight = tile_light_transform.view_proj[idx] * vec4(modelPos, 1.0);
 			modelPosLight.xy /= modelPosLight.w;
 			float r = length(modelPosLight.xy);
 			if(lightDistance > 0.5 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r < 1.0)
@@ -65,11 +65,11 @@ void main()
 					}
 				}
 				intensity *= lightSmooth(r);
-				int layer = findMSB((idx >> 3) * 3 + 1) >> 1;
+				int layer = findTileLightShadowLayer(idx);
 				if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 				{
-					ivec2 cnt = ivec2(2 << layer, 4 << layer);
-					idx -= ((8 << (2 * layer)) - 8) / 3 ;
+					ivec2 cnt = tileLightShadowLayerSize(layer);
+					idx -= tileLightShadowLayerOffset(layer);
 					vec2 shadowMapPos = vec2(idx % cnt.x, idx / cnt.x) / cnt;
 					modelPosLight.xy = (modelPosLight.xy + 1.0) / (2 * cnt) + shadowMapPos;
 					modelPosLight.w = 0.5 * (modelPosLight.z / modelPosLight.w + 1.0);
@@ -83,7 +83,7 @@ void main()
 	}
 
 	float fog_factor = fogFactor(modelPos);
-	color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
+	color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
 	fragColor = color;
 	bloomColor = maxColor > 1 ? color : vec3(0.0);
 }

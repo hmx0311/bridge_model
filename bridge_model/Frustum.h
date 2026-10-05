@@ -1,11 +1,8 @@
 #pragma once
-#include "glm.hpp"
+#include "Bound.h"
 
 #undef NEAR
 #undef FAR
-
-struct BoundBox;
-struct BoundSphere;
 
 struct Plane
 {
@@ -17,13 +14,6 @@ struct Plane
 class Frustum
 {
 public:
-	enum VIEW_TEST_RESULT
-	{
-		VIEW_TEST_OUTSIDE = 0,
-		VIEW_TEST_INSIDE = 1,
-		VIEW_TEST_INTERSECT = 2,
-	};
-
 	enum PLANE_INDEX
 	{
 		LEFT = 0,
@@ -42,10 +32,19 @@ public:
 	Frustum(const glm::mat4& view, float fov_y, float aspect, float z_near, float z_far);
 	Frustum(const glm::mat4& view, float left, float right, float bottom, float top, float z_near, float z_far);
 
-	VIEW_TEST_RESULT intersectTest(const BoundBox& bound) const;
-	VIEW_TEST_RESULT intersectTestNoNearFar(const BoundBox& bound) const;
+	bool cullingTest(const BoundAABB& bound) const;
+	INTERSECTION_TEST_RESULT intersectionTest(const BoundAABB& bound) const;
+	bool cullingTestNoNearFar(const BoundAABB& bound) const;
+	INTERSECTION_TEST_RESULT intersectionTestNoNearFar(const BoundAABB& bound) const;
 
-	VIEW_TEST_RESULT intersectTest(const BoundSphere& bound) const;
+	bool cullingTest(const BoundOBB& bound) const;
+	INTERSECTION_TEST_RESULT intersectionTest(const BoundOBB& bound) const;
+
+	bool cullingTest(const BoundSphere& bound) const;
+	INTERSECTION_TEST_RESULT intersectionTest(const BoundSphere& bound) const;
+
+	bool cullingTest(const BoundEllipticFrustum& bound) const;
+	INTERSECTION_TEST_RESULT intersectionTest(const BoundEllipticFrustum& bound) const;
 
 	const Plane& getPlane(PLANE_INDEX plane) const
 	{

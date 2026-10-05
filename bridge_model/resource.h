@@ -17,7 +17,6 @@
 #define IDR_VS_SHADOW_HIGHWAY_NIGHT     shadow_highway_night.vert
 #define IDR_GS_SHADOW_HIGHWAY_NIGHT     shadow_highway_night.geom
 #define IDR_VS_SHADOW_CAR_NIGHT         shadow_car_night.vert
-#define IDR_GS_SHADOW_CAR_NIGHT         shadow_car_night.geom
 #define IDR_FS_SHADOW                   shadow.frag
 #define IDR_FS_GEN_PCSS_MIPS			gen_PCSS_mips.frag
 #define IDR_VS_TEX_BLIT                 tex_blit.vert

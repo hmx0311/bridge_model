@@ -6,20 +6,21 @@
 #include "terrain.h"
 
 #include "shader_headers/scene_constances.h"
+#include "shader_headers/lighting_night_defines.h"
 
-GLuint highway_VAO, highway_VBO, highway_EBO;
-GLuint bridge_VAO, bridge_VBO, bridge_EBO;
-GLuint car_VAO, car_VBO, car_EBO, car_transform_VBO, car_color_VBO;
-GLuint car_shadow_VAO, car_shadow_VBO, car_shadow_EBO;
-GLuint sun_VAO, sun_VBO;
-
-using namespace glm; 
-
-GLuint highway_tex;
+using namespace glm;
 
 constexpr vec3 GROUND_COLOR(0.05f, 0.4f, 0.05f);
 constexpr vec3 CEMENT_COLOR(0.3f, 0.3f, 0.3f);
 constexpr vec3 ROAD_COLOR(0.12f, 0.12f, 0.12f);
+
+GLuint highway_VAO, highway_VBO, highway_EBO;
+GLuint bridge_VAO, bridge_VBO, bridge_EBO;
+GLuint car_VAO, car_VBO, car_EBO, car_transform_VBO, car_color_VBO;
+GLuint car_shadow_day_VAO, car_shadow_night_VAO, car_shadow_VBO, car_shadow_EBO, car_tile_light_shadow_transform_VBO, car_tile_light_shadow_idx_VBO;
+GLuint sun_VAO, sun_VBO;
+
+GLuint highway_tex;
 
 static void initTex()
 {
@@ -972,7 +973,7 @@ static void buildHighwayMesh()
 	positions[i_vert] = positions[i_vert - 2];
 	positions[i_vert + 1] = positions[i_vert - 1];
 	positions[i_vert + 2] = vec3(vec2(positions[i_vert - 2]), -1.0f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = vec3(cos(theta), - sin(theta), 0);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = vec3(cos(theta), -sin(theta), 0);
 	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = vec2(0.09375f, 0.8125f);
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 1;
@@ -1022,7 +1023,7 @@ static void buildHighwayMesh()
 		tex_coords[i_vert + 2 * i + 1] = vec2(0.3125f + (R - 65.5f) / 40.96f, 65.5f * theta / (20.48f * (n - 1)) * i);
 		normals[i_vert + 2 * i] = normals[i_vert + 2 * i + 1] = vec3(0, 0, 1);
 
-		positions[i_vert + 2 * n + 2 * i] = vec3(berm_x, berm_y, -1.0f); 
+		positions[i_vert + 2 * n + 2 * i] = vec3(berm_x, berm_y, -1.0f);
 		positions[i_vert + 2 * n + 2 * i + 1] = vec3(x, y, 0);
 		normals[i_vert + 2 * n + 2 * i] = normals[i_vert + 2 * n + 2 * i + 1] = vec3(0.70710678f * sin_theta, -0.70710678f * cos_theta, 0.70710678f);
 		tex_coords[i_vert + 2 * n + 2 * i] = tex_coords[i_vert + 2 * n + 2 * i + 1] = vec2(0.09375f, 0.8125f);
@@ -1836,7 +1837,7 @@ static void buildBridgeMesh()
 #define Z4 0.2f
 #define Z5 1.4f
 
-const BoundBox car_local_bound{ { -X2, -Y0, 0.0f }, { X2, Y0, Z5 }};
+const BoundAABB car_local_bound{ { -X2, -Y0, 0.0f }, { X2, Y0, Z5 } };
 
 #define POINT0 -X1,Y0,Z0
 #define POINT1 -X2,Y0,Z0
@@ -2125,23 +2126,7 @@ static void buildCarShadowMesh()
 										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
 										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
 										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
-	vec3 normals[VERTICES_SIZE]{};
 	GLuint indices[CAR_SHADOW_EBO_SIZE]{};
-
-	for (int i = 0; i < 4; i++)
-	{
-		normals[i] = vec3(0, 1, 0);
-		normals[4 + i] = vec3(0, 0, -1);
-		normals[8 + i] = vec3(0, -1, 0);
-		normals[12 + i] = vec3(-1, 0, 0);
-		normals[16 + i] = vec3(1, 0, 0);
-		normals[20 + i] = vec3(0, 0, 1);
-		normals[24 + i] = vec3(0, 0, 1);
-		normals[28 + i] = normalize(vec3(0, 2, 3));
-		normals[32 + i] = normalize(vec3(0, -5, 2));
-		normals[36 + i] = normalize(vec3(-5, 0, 1));
-		normals[40 + i] = normalize(vec3(5, 0, 1));
-	}
 
 	for (int i = 0; i < 11; i++)
 	{
@@ -2164,13 +2149,8 @@ static void buildCarShadowMesh()
 		for (int j = 0; j < 4; j++)
 		{
 			positions[i_vert + j * 3 * n + i] = vec3(0.82f * WHEEL_POS[j][0], 1.3f * WHEEL_POS[j][1] + 0.3f * WHEEL_POS[j][0] * cos_theta, 0.3f + 0.3f * sin_theta);
-			normals[i_vert + j * 3 * n + i] = vec3(WHEEL_POS[j][0], 0, 0);
-
 			positions[i_vert + (j * 3 + 1) * n + 2 * i] = vec3(0.82f * WHEEL_POS[j][0], 1.3f * WHEEL_POS[j][1] + 0.3f * WHEEL_POS[j][0] * cos_theta, 0.3f + 0.3f * sin_theta);
-			normals[i_vert + (j * 3 + 1) * n + 2 * i] = vec3(0, WHEEL_POS[j][0] * cos_theta, sin_theta);
-
 			positions[i_vert + (j * 3 + 1) * n + 2 * i + 1] = vec3(0.6f * WHEEL_POS[j][0], 1.3f * WHEEL_POS[j][1] + 0.3f * WHEEL_POS[j][0] * cos_theta, 0.3f + 0.3f * sin_theta);
-			normals[i_vert + (j * 3 + 1) * n + 2 * i + 1] = vec3(0, WHEEL_POS[j][0] * cos_theta, sin_theta);
 		}
 	}
 	for (int i = 0; i < 4; i++)
@@ -2205,7 +2185,6 @@ static void buildCarShadowMesh()
 		for (int j = 0; j < 4; j++)
 		{
 			positions[i_vert + j * n + i] = vec3(0.6f * WHEEL_POS[j][0], 1.3f * WHEEL_POS[j][1] + 0.3f * WHEEL_POS[j][0] * sin_theta, 0.3f - 0.3f * cos_theta);
-			normals[i_vert + j * n + i] = vec3(-WHEEL_POS[j][0], 0, 0);
 		}
 	}
 	for (int i = 0; i < 4; i++)
@@ -2220,22 +2199,54 @@ static void buildCarShadowMesh()
 	i_vert += 4 * n;
 	i_idx += 4 * 3 * (n - 2);
 
-	glGenVertexArrays(1, &car_shadow_VAO);
-	glBindVertexArray(car_shadow_VAO);
-	glGenBuffers(1, &car_shadow_VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, car_shadow_VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(positions) + sizeof(normals), nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(positions), positions);
-	glBufferSubData(GL_ARRAY_BUFFER, sizeof(positions), sizeof(normals), normals);
+	glGenVertexArrays(1, &car_shadow_day_VAO);
+	glBindVertexArray(car_shadow_day_VAO);
+
 	glGenBuffers(1, &car_shadow_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_shadow_EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	glGenBuffers(1, &car_shadow_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, car_shadow_VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), nullptr, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(positions), positions);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(sizeof(positions)));
-	glEnableVertexAttribArray(1);
 
 	glBindBuffer(GL_ARRAY_BUFFER, car_transform_VBO);
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
+	glVertexAttribDivisor(3, 1);
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(sizeof(vec4)));
+	glVertexAttribDivisor(4, 1);
+	glEnableVertexAttribArray(5);
+	glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(2 * sizeof(vec4)));
+	glVertexAttribDivisor(5, 1);
+	glEnableVertexAttribArray(6);
+	glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(3 * sizeof(vec4)));
+	glVertexAttribDivisor(6, 1);
+
+	glGenVertexArrays(1, &car_shadow_night_VAO);
+	glBindVertexArray(car_shadow_night_VAO);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_shadow_EBO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, car_shadow_VBO);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
+	glEnableVertexAttribArray(0);
+
+	constexpr int MAX_CAR_TILE_LIGHT_SHADOW_SIZE = 32 * NUM_TILE_LIGHT_SHADOW_LAYERS + 4 * tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS);
+	glGenBuffers(1, &car_tile_light_shadow_idx_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, car_tile_light_shadow_idx_VBO);
+	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_TILE_LIGHT_SHADOW_SIZE * sizeof(int), nullptr, GL_DYNAMIC_DRAW);
+	glVertexAttribIPointer(2, 1, GL_INT, sizeof(int), reinterpret_cast<void*>(0));
+	glVertexAttribDivisor(2, 1);
+	glEnableVertexAttribArray(2);
+
+	glGenBuffers(1, &car_tile_light_shadow_transform_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, car_tile_light_shadow_transform_VBO);
+	glBufferData(GL_ARRAY_BUFFER, MAX_CAR_TILE_LIGHT_SHADOW_SIZE * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(3);
 	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
 	glVertexAttribDivisor(3, 1);

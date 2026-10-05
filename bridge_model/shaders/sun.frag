@@ -19,7 +19,7 @@ void main()
 			discard;
 		}
 		sun_color *= sunPercentage;
-		fragColor = sun_color + (1 - sunPercentage) * sun.sky_color;
+		fragColor = sun_color + (1 - sunPercentage) * sun.sky_color.rgb;
 	}
 	else
 	{

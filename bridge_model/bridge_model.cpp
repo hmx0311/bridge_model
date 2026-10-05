@@ -51,7 +51,7 @@ constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
 
-float aim_azimuth = 0.3f, aim_relative_depression = 0.1f, aim_view_distance = 150.0f;
+float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 150.0f;
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
 bool need_update_view = true;
@@ -97,22 +97,22 @@ GLintptr scene_UBO_offset1;
 GLuint shadow_UBO;
 
 // binding = 3
-GLuint car_light_map_SSBO;
+GLuint tile_light_map_SSBO;
 // binding = 4
-GLuint car_light_pos_UBO;
+GLuint tile_light_pos_UBO;
 // binding = 5
-GLuint car_light_shadow_mat_SSBO;
+GLuint tile_light_transform_SSBO;
 // binding = 6
 GLuint car_lighting_SSBO;
 
 
 CameraData camera;
 ShadowTransformData sun_shadow;
-const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(2 * acos(CAR_LIGHT_V_COS_ANGLE), CAR_LIGHT_ASPECT, 0.5f, 0.5f + 2 * LIGHT_MAP_GRID_LENGTH);
+const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(CAR_LIGHT_V_RAD, CAR_LIGHT_ASPECT, CAR_LIGHT_NEAR, CAR_LIGHT_NEAR + CAR_LIGHT_RANGE);
 
-CarLightMapData car_light_map;
-CarLightData car_light_pos;
-CarLightShadowTransformData car_light_mats;
+TileLightMapData tile_light_map;
+TileLightData tile_light_pos;
+TileLightTransformData tile_light_transforms;
 CarLightingData car_lightings;
 
 GLuint SP_highway_day;
@@ -170,17 +170,15 @@ static void initShader()
 	GLuint VS_shadow_car_night = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_NIGHT), GL_VERTEX_SHADER);
 	GLuint FS_shadow = loadShader(SHADER_NAME(IDR_FS_SHADOW), GL_FRAGMENT_SHADER);
 	GLuint GS_shadow_highway_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_HIGHWAY_NIGHT), GL_GEOMETRY_SHADER);
-	GLuint GS_shadow_car_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_CAR_NIGHT), GL_GEOMETRY_SHADER);
 	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow);
 	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
 	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow);
-	SP_shadow_car_night = linkShaderProgram(VS_shadow_car_night, FS_shadow, GS_shadow_car_night);
+	SP_shadow_car_night = linkShaderProgram(VS_shadow_car_night, FS_shadow);
 	glDeleteShader(VS_shadow_highway_day);
 	glDeleteShader(VS_shadow_highway_night);
 	glDeleteShader(GS_shadow_highway_night);
 	glDeleteShader(VS_shadow_car_day);
 	glDeleteShader(VS_shadow_car_night);
-	glDeleteShader(GS_shadow_car_night);
 	glDeleteShader(FS_shadow);
 
 	GLuint VS_tex_blit = loadShader(SHADER_NAME(IDR_VS_TEX_BLIT), GL_VERTEX_SHADER);
@@ -231,18 +229,18 @@ static void init()
 	glBindBufferRange(GL_UNIFORM_BUFFER, sun_shadow_binding, shadow_UBO, 0, sizeof(sun_shadow));
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-	glGenBuffers(1, &car_light_map_SSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_light_map_SSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_light_map), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, car_light_map_binding, car_light_map_SSBO, 0, sizeof(car_light_map));
-	glGenBuffers(1, &car_light_pos_UBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, car_light_pos_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(car_light_pos), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, car_light_binding, car_light_pos_UBO, 0, sizeof(car_light_pos));
-	glGenBuffers(1, &car_light_shadow_mat_SSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_light_shadow_mat_SSBO);
+	glGenBuffers(1, &tile_light_map_SSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, tile_light_map_SSBO);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(tile_light_map), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, tile_light_map_binding, tile_light_map_SSBO, 0, sizeof(tile_light_map));
+	glGenBuffers(1, &tile_light_pos_UBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, tile_light_pos_UBO);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(tile_light_pos), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_UNIFORM_BUFFER, tile_light_binding, tile_light_pos_UBO, 0, sizeof(tile_light_pos));
+	glGenBuffers(1, &tile_light_transform_SSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, tile_light_transform_SSBO);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, car_light_shadow_binding, car_light_shadow_mat_SSBO, 0, sizeof(CarLightShadowTransformData));
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, tile_light_transform_binding, tile_light_transform_SSBO, 0, sizeof(TileLightTransformData));
 	glGenBuffers(1, &car_lighting_SSBO);
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_lighting_SSBO);
 	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
@@ -343,7 +341,6 @@ static void init()
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_DEPTH_COMPONENT24, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE, NUM_TILE_LIGHT_SHADOW_LAYERS);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0);
 
 	glGenTextures(1, &text_atlas_tex);
 	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TEXT_ATLAS), L"TEXTURE");
@@ -382,6 +379,8 @@ static void drawGraphics()
 	static float scene_z_far;
 	static vec3 focus(0);
 	static float horizon_y;
+	static std::vector<mat4> car_tile_light_shadow_transform[NUM_TILE_LIGHT_SHADOW_LAYERS];
+	static std::vector<int> car_tile_light_shadow_idx[NUM_TILE_LIGHT_SHADOW_LAYERS];
 
 	uint64_t time_us = getTimestampMicroseconds();
 	uint64_t dt_us = time_us - last_time_us;
@@ -533,7 +532,7 @@ static void drawGraphics()
 			size_t x = grids_to_calc.front().x;
 			size_t y = grids_to_calc.front().y;
 			grids_to_calc.pop_front();
-			BoundBox bound = sceneGridBound(level, x, y);
+			BoundAABB bound = sceneGridBound(level, x, y);
 			vec3 half_size = 0.5f * bound.size();
 			auto& p_near = camera_frustum.getPlane(Frustum::NEAR);
 			auto& p_far = camera_frustum.getPlane(Frustum::FAR);
@@ -546,8 +545,8 @@ static void drawGraphics()
 			{
 				continue;
 			}
-			auto result = camera_frustum.intersectTestNoNearFar(bound);
-			if (result == Frustum::VIEW_TEST_OUTSIDE)
+			INTERSECTION_TEST_RESULT result = camera_frustum.intersectionTestNoNearFar(bound);
+			if (result == INTERSECTION_TEST_OUTSIDE)
 			{
 				continue;
 			}
@@ -557,7 +556,7 @@ static void drawGraphics()
 				scene_z_far = std::max(scene_z_far, z_far);
 				continue;
 			}
-			if (result == Frustum::VIEW_TEST_INSIDE)
+			if (result == INTERSECTION_TEST_INSIDE)
 			{
 				view_z_near = std::min(view_z_near, z_near + 4.0f / 3.0f * r);
 				scene_z_far = std::max(scene_z_far, z_far - 4.0f / 3.0f * r);
@@ -603,11 +602,11 @@ static void drawGraphics()
 	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.light_dir_and_radius.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.light_dir_and_radius.z * sun.light_dir_and_radius.z)));
 	sun.diffuse_specular *= vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
 	sun.ambient = vec3(0.01f);
-	sun.sky_color = vec3(0.01f, 0.015f, 0.055f);
+	sun.sky_color = vec4(0.01f, 0.015f, 0.055f, 1.0f);
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
 		sun.ambient += vec3((sun.light_dir_and_radius.z + 0.2f) * 0.2f);
-		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec3(0.2f, 0.3f, 1.1f);
+		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec4(0.2f, 0.3f, 1.1f, 0.0f);
 	}
 
 	Frustum camera_frustum{ camera.view_proj };
@@ -636,21 +635,12 @@ static void drawGraphics()
 			x_mins[i] = FLT_MAX, x_maxs[i] = FLT_MIN, y_mins[i] = FLT_MAX, y_maxs[i] = FLT_MIN;
 			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
 			float camera_z_near = camera_z_far / CSM_ratio;
-			Frustum camera_frustum_level(camera.view, FOV_Y, float(window_width) / window_height, camera_z_near, camera_z_far);
-			vec4 frustum_corners[8] = {
-				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((view_top + view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((-view_top + view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((view_top - view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_near * (-camera.inv_view[2] + vec4((-view_top - view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((view_top + view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((-view_top + view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((view_top - view_left), 0.0f)),
-				camera.inv_view[3] + camera_z_far * (-camera.inv_view[2] + vec4((-view_top - view_left), 0.0f)),
-			};
+			Frustum camera_level_frustum{ camera.view, FOV_Y, float(window_width) / window_height, camera_z_near, camera_z_far };
+			BoundFrustum camera_level_bound{ camera.inv_view, FOV_Y, float(window_width) / window_height, camera_z_near, camera_z_far };
 			float frustum_x_min = FLT_MAX, frustum_x_max = FLT_MIN, frustum_y_min = FLT_MAX, frustum_y_max = FLT_MIN, frustum_z_far = FLT_MAX;
 			for (int i = 0; i < 8; i++)
 			{
-				vec3 corner_in_shadow = sun_shadow_view * frustum_corners[i];
+				vec3 corner_in_shadow = sun_shadow_view * vec4{ camera_level_bound.points[i], 1.0f };
 				frustum_z_far = std::min(frustum_z_far, corner_in_shadow.z);
 				frustum_x_min = std::min(frustum_x_min, corner_in_shadow.x);
 				frustum_x_max = std::max(frustum_x_max, corner_in_shadow.x);
@@ -672,9 +662,9 @@ static void drawGraphics()
 				size_t x = grids_to_calc.front().x;
 				size_t y = grids_to_calc.front().y;
 				grids_to_calc.pop_front();
-				BoundBox bound = sceneGridBound(level, x, y);
-				auto result = camera_frustum_level.intersectTest(bound);
-				if (result == Frustum::VIEW_TEST_OUTSIDE)
+				BoundAABB bound = sceneGridBound(level, x, y);
+				INTERSECTION_TEST_RESULT result = camera_level_frustum.intersectionTest(bound);
+				if (result == INTERSECTION_TEST_OUTSIDE)
 				{
 					continue;
 				}
@@ -698,7 +688,7 @@ static void drawGraphics()
 					y_maxs[i] = std::max(y_maxs[i], center.y + r.y);
 					continue;
 				}
-				if (result == Frustum::VIEW_TEST_INSIDE)
+				if (result == INTERSECTION_TEST_INSIDE)
 				{
 					x_mins[i] = std::min(x_mins[i], center.x + 1.0f / 3.0f * r.x);
 					x_maxs[i] = std::max(x_maxs[i], center.x - 1.0f / 3.0f * r.x);
@@ -770,19 +760,19 @@ static void drawGraphics()
 				size_t x = grids_to_calc.front().x;
 				size_t y = grids_to_calc.front().y;
 				grids_to_calc.pop_front();
-				BoundBox bound = sceneGridBound(level, x, y);
+				BoundAABB bound = sceneGridBound(level, x, y);
 				auto& p = shadow_frustum.getPlane(Frustum::NEAR);
 				float bound_z_max = -dot(p.normal, bound.center()) + dot(abs(p.normal), 0.5f * bound.size());
 				if (bound_z_max <= z_max)
 				{
 					continue;
 				}
-				auto result = shadow_frustum.intersectTestNoNearFar(bound);
-				if (result == Frustum::VIEW_TEST_OUTSIDE)
+				INTERSECTION_TEST_RESULT result = shadow_frustum.intersectionTestNoNearFar(bound);
+				if (result == INTERSECTION_TEST_OUTSIDE)
 				{
 					continue;
 				}
-				if (result == Frustum::VIEW_TEST_INSIDE || level == NUM_SCENE_GRID_LEVELS - 1)
+				if (result == INTERSECTION_TEST_INSIDE || level == NUM_SCENE_GRID_LEVELS - 1)
 				{
 					z_max = std::max(z_max, bound_z_max);
 					continue;
@@ -810,54 +800,36 @@ static void drawGraphics()
 		num_visible_cars = 0;
 		num_visible_light_on_cars = 0;
 		num_visible_car_lights = 0;
-		memset(&car_light_map, 0, sizeof(car_light_map));
+		memset(&tile_light_map, 0, sizeof(tile_light_map));
 		struct CarLightInfo
 		{
 			vec4 pos;
 			vec4 dir;
+			BoundEllipticFrustum bound;
 			float distance_to_camera;
 			ivec2* light_map_grid;
 		};
 		static std::vector<CarLightInfo>car_light_infos;
+		static BoundEllipticFrustum tile_light_bounds[2 * MAX_CAR_CNT];
 		car_light_infos.clear();
 		int num_car_lights = 2 * logical_data.num_light_on_cars;
 		int cnt = 0;
+		BoundFrustum camera_bound{ camera.inv_view, FOV_Y, float(window_width) / window_height, view_z_near, VIEW_Z_FAR };
 		for (int i = 0; i < num_car_lights; i++)
 		{
 			const vec4& light_pos = logical_data.car_light_pos[i];
 			const vec4& light_dir = logical_data.car_light_dir[i];
-			vec3 light_left = sqrt(1.0f / (CAR_LIGHT_V_COS_ANGLE * CAR_LIGHT_V_COS_ANGLE) - 1.0f) * normalize(vec3{ light_dir.y, -light_dir.x, 0.0f });
-			vec3 light_top = cross(light_left, vec3{ light_dir });
-			light_left *= CAR_LIGHT_ASPECT;
-			vec4 bound_corners[8] = {
-				light_pos + 0.5f * (light_dir + vec4((light_top + light_left), 0.0f)),
-				light_pos + 0.5f * (light_dir + vec4((-light_top + light_left), 0.0f)),
-				light_pos + 0.5f * (light_dir + vec4((light_top - light_left), 0.0f)),
-				light_pos + 0.5f * (light_dir + vec4((-light_top - light_left), 0.0f)),
-				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((light_top + light_left), 0.0f)),
-				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((-light_top + light_left), 0.0f)),
-				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((light_top - light_left), 0.0f)),
-				light_pos + (0.5f + CAR_LIGHT_RANGE) * (light_dir + vec4((-light_top - light_left), 0.0f)),
-			};
-			bool out[6] = { true, true, true, true, true, true };
-			bool intersect = false;
-			for (vec4& bound_vert : bound_corners)
+			vec4 light_x = normalize(vec4{ light_dir.y, -light_dir.x, 0.0f, 0.0f });
+			vec4 light_y = vec4{ cross(vec3{ light_x }, vec3{ light_dir }), 0.0f };
+
+			BoundEllipticFrustum bound{ mat4{ light_x, light_y, -light_dir, light_pos }, CAR_LIGHT_V_RAD, CAR_LIGHT_ASPECT , CAR_LIGHT_NEAR, CAR_LIGHT_NEAR + CAR_LIGHT_RANGE };
+			if (camera_frustum.cullingTest(bound))
 			{
-				vec4 p = camera.view_proj * bound_vert;
-				if (p.x > -p.w) out[0] = false;
-				if (p.x < p.w)out[1] = false;
-				if (p.y > -p.w) out[2] = false;
-				if (p.y < p.w)out[3] = false;
-				if (p.z > -p.w) out[4] = false;
-				if (p.z < p.w)out[5] = false;
-			}
-			if (!(out[0] || out[1] || out[2] || out[3] || out[4] || out[5]))
-			{
-				constexpr float POS_OFFSET = 0.5f + LIGHT_MAP_GRID_LENGTH;
+				constexpr float POS_OFFSET = CAR_LIGHT_NEAR + LIGHT_MAP_GRID_LENGTH;
 				vec3 center_pos = light_pos + POS_OFFSET * light_dir;
 				ivec2 light_map_idx = ivec2{ 1.0f / LIGHT_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y) };
-				ivec2* light_map_grid = &car_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y];
-				car_light_infos.push_back({ light_pos, light_dir, length(center_pos - vec3(camera.inv_view[3])), light_map_grid });
+				ivec2* light_map_grid = &tile_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y];
+				car_light_infos.push_back({ light_pos, light_dir, bound, length(center_pos - vec3(camera.inv_view[3])), light_map_grid });
 				light_map_grid->x++;
 			}
 		}
@@ -871,8 +843,14 @@ static void drawGraphics()
 				car_light_info.light_map_grid->x = car_light_info.light_map_grid->y;
 			}
 			int idx = car_light_info.light_map_grid->y++;
-			car_light_pos.positions[idx] = car_light_info.pos;
-			car_light_mats.view_proj[idx] = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
+			tile_light_pos.positions[idx] = car_light_info.pos;
+			tile_light_transforms.view_proj[idx] = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
+			tile_light_bounds[idx] = car_light_info.bound;
+		}
+		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
+		{
+			car_tile_light_shadow_idx[i].clear();
+			car_tile_light_shadow_transform[i].clear();
 		}
 		auto cullCars = [&camera_frustum](mat4* transforms, vec3* colors, int* light_indices, int size)->int
 			{
@@ -881,26 +859,31 @@ static void drawGraphics()
 				{
 					mat4& transform = transforms[i];
 					ivec2 pos_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
+					BoundOBB car_bound{ car_local_bound, transform };
 					int num_lighting = 0;
 					for (int m = -1; m < 2; m++)
 					{
 						for (int n = -1; n < 2; n++)
 						{
 							ivec2 idx = pos_idx + ivec2(m, n);
-							for (int p = car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x; p < car_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y; p++)
+							for (int k = tile_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x; k < tile_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y; k++)
 							{
-								Frustum light_frustum(car_light_mats.view_proj[p]);
-								BoundBox bound(car_local_bound, transform);
-								if (light_frustum.intersectTest(bound))
+								if (intersectionTest(tile_light_bounds[k], car_bound))
 								{
 									num_lighting++;
-									light_indices[i * MAX_LIGHT_PER_CAR + num_lighting] = p;
+									int layer = findTileLightShadowLayer(k);
+									if (layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
+									{
+										car_tile_light_shadow_idx[layer].push_back(k);
+										car_tile_light_shadow_transform[layer].push_back(tile_light_transforms.view_proj[k] * transform);
+									}
+									light_indices[i * LIGHTING_SIZE_PER_CAR + num_lighting] = k;
 								}
 							}
 						}
 					}
-					light_indices[i * MAX_LIGHT_PER_CAR] = num_lighting;
-					if (num_lighting > 0 || camera_frustum.intersectTest(BoundBox{ car_local_bound, transform }))
+					light_indices[i * LIGHTING_SIZE_PER_CAR] = num_lighting;
+					if (num_lighting > 0 || camera_frustum.cullingTest(BoundAABB{ car_local_bound, transform }))
 					{
 						i++;
 					}
@@ -917,10 +900,10 @@ static void drawGraphics()
 		num_visible_cars += num_visible_light_on_cars;
 		num_visible_cars += cullCars(&logical_data.car_transform[logical_data.num_light_on_cars],
 			&logical_data.car_color[logical_data.num_light_on_cars],
-			&car_lightings.light_indices[num_visible_light_on_cars * MAX_LIGHT_PER_CAR],
+			&car_lightings.light_indices[num_visible_light_on_cars * LIGHTING_SIZE_PER_CAR],
 			logical_data.num_cars - logical_data.num_light_on_cars);
 	}
-	printf("%d\n", num_visible_car_lights);
+
 	if (is_view_updated)
 	{
 		glNamedBufferSubData(scene_UBO, 0, sizeof(camera), &camera);
@@ -936,15 +919,23 @@ static void drawGraphics()
 	}
 	else
 	{
-		glNamedBufferSubData(car_light_map_SSBO, 0, sizeof(car_light_map), &car_light_map);
-		glNamedBufferSubData(car_light_pos_UBO, 0, num_visible_car_lights * sizeof(vec4), &car_light_pos);
-		glNamedBufferSubData(car_light_shadow_mat_SSBO, 0, num_visible_car_lights * sizeof(mat4), &car_light_mats);
-		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_cars * MAX_LIGHT_PER_CAR * sizeof(int), &car_lightings);
+		glNamedBufferSubData(tile_light_map_SSBO, 0, sizeof(tile_light_map), &tile_light_map);
+		glNamedBufferSubData(tile_light_pos_UBO, 0, num_visible_car_lights * sizeof(vec4), &tile_light_pos);
+		glNamedBufferSubData(tile_light_transform_SSBO, 0, num_visible_car_lights * sizeof(mat4), &tile_light_transforms);
+		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_light_on_cars * sizeof(mat4), logical_data.car_transform);
 		glNamedBufferSubData(car_color_VBO, 0, num_visible_light_on_cars * sizeof(vec3), logical_data.car_color);
 		glNamedBufferSubData(car_transform_VBO, num_visible_light_on_cars * sizeof(mat4), (num_visible_cars - num_visible_light_on_cars) * sizeof(mat4), &logical_data.car_transform[logical_data.num_light_on_cars]);
 		glNamedBufferSubData(car_color_VBO, num_visible_light_on_cars * sizeof(vec3), (num_visible_cars - num_visible_light_on_cars) * sizeof(vec3), &logical_data.car_color[logical_data.num_light_on_cars]);
 		glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "numLightOnCars"), num_visible_light_on_cars);
+		int car_tile_light_shadow_offset = 0;
+		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
+		{
+			int count = car_tile_light_shadow_transform[i].size();
+			glNamedBufferSubData(car_tile_light_shadow_transform_VBO, car_tile_light_shadow_offset * sizeof(mat4), count * sizeof(mat4), car_tile_light_shadow_transform[i].data());
+			glNamedBufferSubData(car_tile_light_shadow_idx_VBO, car_tile_light_shadow_offset * sizeof(int), count * sizeof(int), car_tile_light_shadow_idx[i].data());
+			car_tile_light_shadow_offset += count;
+		}
 	}
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
@@ -993,7 +984,7 @@ static void drawGraphics()
 		}
 		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
 		glUseProgram(SP_shadow_car_day);
-		glBindVertexArray(car_shadow_VAO);
+		glBindVertexArray(car_shadow_day_VAO);
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
@@ -1021,19 +1012,21 @@ static void drawGraphics()
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
+		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+		glDrawBuffers(2, attachments);
 		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
 		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glUseProgram(SP_highway_day);
+		glBindVertexArray(bridge_VAO);
+		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(highway_VAO);
+		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_terrain_day);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		drawTerrainMesh(camera_frustum);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glUseProgram(SP_highway_day);
-		glBindVertexArray(highway_VAO);
-		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		glBindVertexArray(bridge_VAO);
-		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_car_day);
 		glBindVertexArray(car_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
@@ -1044,6 +1037,7 @@ static void drawGraphics()
 	{
 		glBindTextureUnit(1, shadow_night_tex);
 		glBindFramebuffer(GL_FRAMEBUFFER, shadow_night_FBO);
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		for (int i = 0; i < 4; i++)
 		{
@@ -1057,8 +1051,15 @@ static void drawGraphics()
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glUseProgram(SP_shadow_car_night);
-		glBindVertexArray(car_shadow_VAO);
-		glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+		glBindVertexArray(car_shadow_night_VAO);
+		int car_tile_light_shadow_offset = 0;
+		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
+		{
+			int count = car_tile_light_shadow_transform[i].size();
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
+			glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_tile_light_shadow_offset);
+			car_tile_light_shadow_offset += count;
+		}
 		for (int i = 0; i < 4; i++)
 		{
 			glDisable(GL_CLIP_DISTANCE0 + i);
@@ -1067,21 +1068,20 @@ static void drawGraphics()
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		glClearBufferfv(GL_COLOR, 0, (GLfloat*)&sun.sky_color);
-		glClearBufferfv(GL_COLOR, 1, (GLfloat*)&COLOR_BLACK);
+		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+		glDrawBuffers(2, attachments);
+		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
+		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
-		glUseProgram(SP_terrain_night);
-		glEnable(GL_POLYGON_OFFSET_FILL);
-		drawTerrainMesh(camera_frustum);
-		glDisable(GL_POLYGON_OFFSET_FILL);
 		glUseProgram(SP_highway_night);
-		glBindVertexArray(highway_VAO);
-		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(highway_VAO);
+		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		glUseProgram(SP_terrain_night);
+		drawTerrainMesh(camera_frustum);
 		glUseProgram(SP_car_night);
-		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 		glDrawBuffers(2, attachments);
 		glBindVertexArray(car_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);

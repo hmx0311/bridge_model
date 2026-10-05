@@ -14,7 +14,7 @@ struct SunData
 	vec4 light_dir_and_radius;
 	alignas(16) vec3 ambient;
 	alignas(16) vec3 diffuse_specular;
-	alignas(16) vec3 sky_color;
+	alignas(16) vec4 sky_color;
 };
 
 DECLARE_UNIFORM(SunData, sun, 1);

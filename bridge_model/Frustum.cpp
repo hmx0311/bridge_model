@@ -72,7 +72,23 @@ Frustum::Frustum(const mat4& view, float left, float right, float bottom, float 
 	}
 }
 
-Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundBox& bound) const
+bool Frustum::cullingTest(const BoundAABB& bound) const
+{
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		float m = dot(p.normal, bound.center()) + p.d;
+		vec3 half_size = 0.5f * bound.size();
+		float r = dot(half_size, abs(p.normal));
+		if (m + r < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+INTERSECTION_TEST_RESULT Frustum::intersectionTest(const BoundAABB& bound) const
 {
 	bool inside = true;
 	for (int i = 0; i < 6; i++)
@@ -83,17 +99,33 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundBox& bound) const
 		float r = dot(half_size, abs(p.normal));
 		if (m + r < 0)
 		{
-			return VIEW_TEST_OUTSIDE;
+			return INTERSECTION_TEST_OUTSIDE;
 		}
 		if (m - r < 0)
 		{
 			inside = false;
 		}
 	}
-	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
+	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
 }
 
-Frustum::VIEW_TEST_RESULT Frustum::intersectTestNoNearFar(const BoundBox& bound) const
+bool Frustum::cullingTestNoNearFar(const BoundAABB& bound) const
+{
+	for (int i = 0; i < 4; i++)
+	{
+		auto& p = m_planes[i];
+		float m = dot(p.normal, bound.center()) + p.d;
+		vec3 half_size = 0.5f * bound.size();
+		float r = dot(half_size, abs(p.normal));
+		if (m + r < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+INTERSECTION_TEST_RESULT Frustum::intersectionTestNoNearFar(const BoundAABB& bound) const
 {
 	bool inside = true;
 	for (int i = 0; i < 4; i++)
@@ -104,17 +136,61 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTestNoNearFar(const BoundBox& bound)
 		float r = dot(half_size, abs(p.normal));
 		if (m + r < 0)
 		{
-			return VIEW_TEST_OUTSIDE;
+			return INTERSECTION_TEST_OUTSIDE;
 		}
 		if (m - r < 0)
 		{
 			inside = false;
 		}
 	}
-	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
+	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
 }
 
-Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundSphere& bound) const
+bool Frustum::cullingTest(const BoundOBB& bound) const
+{
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		if (dot(bound.support(p.normal), p.normal) + p.d < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+INTERSECTION_TEST_RESULT Frustum::intersectionTest(const BoundOBB& bound) const
+{
+	bool inside = true;
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		vec3 support, rsupport;
+		bound.biSupport(p.normal, support, rsupport);
+		if (dot(support, p.normal) + p.d < 0)
+		{
+			return INTERSECTION_TEST_OUTSIDE;
+		}
+		inside = inside && dot(rsupport, p.normal) + p.d > 0;
+	}
+	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
+}
+
+bool Frustum::cullingTest(const BoundSphere& bound) const
+{
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		float m = dot(p.normal, bound.center) + p.d;
+		if (m + bound.r < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+INTERSECTION_TEST_RESULT Frustum::intersectionTest(const BoundSphere& bound) const
 {
 	bool inside = true;
 	for (int i = 0; i < 6; i++)
@@ -123,13 +199,43 @@ Frustum::VIEW_TEST_RESULT Frustum::intersectTest(const BoundSphere& bound) const
 		float m = dot(p.normal, bound.center) + p.d;
 		if (m + bound.r < 0)
 		{
-			return VIEW_TEST_OUTSIDE;
+			return INTERSECTION_TEST_OUTSIDE;
 		}
 		if (m - bound.r < 0)
 		{
 			inside = false;
 		}
 	}
-	return inside ? VIEW_TEST_INSIDE : VIEW_TEST_INTERSECT;
+	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
+}
+
+bool Frustum::cullingTest(const BoundEllipticFrustum& bound) const
+{
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		if (dot(bound.support(p.normal), p.normal) + p.d < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+INTERSECTION_TEST_RESULT Frustum::intersectionTest(const BoundEllipticFrustum& bound) const
+{
+	bool inside = true;
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		vec3 support, rsupport;
+		bound.biSupport(p.normal, support, rsupport);
+		if (dot(support, p.normal) + p.d < 0)
+		{
+			return INTERSECTION_TEST_OUTSIDE;
+		}
+		inside = inside && dot(rsupport, p.normal) + p.d > 0;
+	}
+	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
 }
 

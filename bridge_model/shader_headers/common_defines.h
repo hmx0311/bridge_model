@@ -7,6 +7,9 @@ using glm::ivec2;
 using glm::vec3;
 using glm::vec4;
 using glm::mat4;
+using glm::findMSB;
+
+#define INLINE inline
 
 #define DECLARE_UNIFORM(type, name, position) \
 	constexpr int name##_binding = position;
@@ -14,6 +17,8 @@ using glm::mat4;
 	constexpr int name##_binding = position;
 #else
 #define alignas(x)
+#define INLINE
+#define constexpr
 #define DECLARE_UNIFORM(type, name, position) layout(std140, binding = position) uniform name##_block { type name; }
 #define DECLARE_BUFFER(type, name, position) layout(std430, binding = position) buffer name##_block { type name; }
 #endif // __cplusplus

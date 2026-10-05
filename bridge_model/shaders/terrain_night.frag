@@ -30,7 +30,7 @@ void main()
 				i++;
 				break;
 			}
-			ivec2 lightRange =  car_light_map.idx_range[int(modelPos.x / LIGHT_MAP_GRID_LENGTH + 0.5 * LIGHT_MAP_SIZE_X) * LIGHT_MAP_SIZE_Y + int(modelPos.y / LIGHT_MAP_GRID_LENGTH + 0.5 * LIGHT_MAP_SIZE_Y) + idxOffsets[i]];
+			ivec2 lightRange =  tile_light_map.idx_range[int(modelPos.x / LIGHT_MAP_GRID_LENGTH + 0.5 * LIGHT_MAP_SIZE_X) * LIGHT_MAP_SIZE_Y + int(modelPos.y / LIGHT_MAP_GRID_LENGTH + 0.5 * LIGHT_MAP_SIZE_Y) + idxOffsets[i]];
 			j = lightRange.x;
 			end = lightRange.y;
 			i++;
@@ -39,16 +39,16 @@ void main()
 		{
 			break;
 		}
-		int layer = findMSB((j >> 3) * 3 + 1) >> 1;
-		ivec2 shadowMapSize = ivec2(2 << layer, 4 << layer);
-		int shadowMapIdx = j - ((8 << (2 * layer)) - 8) / 3 ;
+		int layer = findTileLightShadowLayer(j);
+		ivec2 shadowMapSize = tileLightShadowLayerSize(layer);
+		int shadowMapIdx = j - tileLightShadowLayerOffset(layer);
 		vec2 shadowMapPos = vec2(shadowMapIdx % shadowMapSize.x, shadowMapIdx / shadowMapSize.x) / shadowMapSize;
-		vec4 modelPosLight = car_light_shadow.view_proj[j] * vec4(modelPos, 1.0);
-		vec4 OffsetXLight = mat3x4(car_light_shadow.view_proj[j]) * offsetX;
-		vec4 OffsetYLight = mat3x4(car_light_shadow.view_proj[j]) * offsetY;
+		vec4 modelPosLight = tile_light_transform.view_proj[j] * vec4(modelPos, 1.0);
+		vec4 OffsetXLight = mat3x4(tile_light_transform.view_proj[j]) * offsetX;
+		vec4 OffsetYLight = mat3x4(tile_light_transform.view_proj[j]) * offsetY;
 		const vec2 offsets[4] = { { -0.18, 0.36 }, { 0.36, 0.18 }, { -0.36, -0.18 }, { 0.18, -0.36 } };
 		float aveIntensity = 0;
-		vec3 modelToLight = modelPos - vec3(car_light.positions[j]);
+		vec3 modelToLight = modelPos - vec3(tile_light.positions[j]);
 		for(int k = 0; k < 4; k++)
 		{
 			vec3 offsetToLight = modelToLight + offsets[k].x * offsetX + offsets[k].y * offsetY;
@@ -78,6 +78,6 @@ void main()
 	color *= lighting;
 	
 	float fog_factor = fogFactor(modelPos);
-	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color;
+	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
 	return;
 }
