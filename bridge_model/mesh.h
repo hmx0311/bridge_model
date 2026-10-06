@@ -11,7 +11,8 @@ constexpr int SUN_VBO_SIZE = 80;
 
 extern GLuint highway_tex;
 
-extern GLuint highway_VAO, bridge_VAO;
+extern GLuint highway_VAO, highway_VBO, highway_EBO;
+extern GLuint bridge_VAO, bridge_VBO, bridge_EBO;
 extern GLuint car_VAO, car_shadow_day_VAO, car_transform_VBO, car_color_VBO;
 extern GLuint car_shadow_night_VAO, car_tile_light_shadow_transform_VBO, car_tile_light_shadow_idx_VBO;
 extern GLuint sun_VAO;

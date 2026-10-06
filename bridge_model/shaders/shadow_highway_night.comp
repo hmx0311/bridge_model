@@ -1,0 +1,73 @@
+#include "lighting_night_defines.h"
+
+layout(std430, binding = VERTEX_BUFFER_BINDING) buffer vertex_block
+{ 
+    float vertices[];
+};
+
+layout(std430, binding = INDEX_BUFFER_BINDING) buffer index_block
+{ 
+    uint indices[];
+};
+
+layout (local_size_x = 64) in;
+
+uniform int num_triangles;
+
+void main()
+{
+    uint triangle_idx = gl_GlobalInvocationID.x;
+	if(triangle_idx >= num_triangles)
+	{
+		return;
+	}
+	vec3 positions[3];
+	for(uint i = 0; i < 3; i++)
+	{
+		uint idx = indices[3 * triangle_idx + i];
+		uint offset = 3 * idx;
+		positions[i] = vec3(vertices[offset], vertices[offset + 1], vertices[offset + 2]);
+	}
+	vec2 minCoord = vec2(positions[0]);
+	vec2 maxCoord = minCoord;
+	minCoord = min(minCoord, vec2(positions[1]));
+	minCoord = min(minCoord, vec2(positions[2]));
+	maxCoord = max(maxCoord, vec2(positions[1]));
+	maxCoord = max(maxCoord, vec2(positions[2]));
+	ivec2 startIdx = ivec2(minCoord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) -1);
+	ivec2 endIdx = ivec2(maxCoord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) + 1);
+
+	int i = startIdx.x;
+	int j = startIdx.y;
+	int gird_idx = i * LIGHT_MAP_SIZE_Y + j;
+	int k = tile_light_map.idx_range[gird_idx].x - 1;
+	int end = tile_light_map.idx_range[gird_idx].y;
+	while(true)
+	{
+		k++;
+		while(k == end)
+		{
+			j++;
+			if(j > endIdx.y)
+			{
+				i++;
+				if(i > endIdx.x)
+				{
+					return;
+				}
+				j = startIdx.y;
+			}
+			gird_idx = i * LIGHT_MAP_SIZE_Y + j;
+			k = tile_light_map.idx_range[gird_idx].x;
+			end = tile_light_map.idx_range[gird_idx].y;	
+		}
+		int layer = findTileLightShadowLayer(k);
+		if(layer >= NUM_TILE_LIGHT_SHADOW_LAYERS)
+		{
+			continue;
+		}
+		int layer_triangle_idx = atomicAdd(tile_light_shadow_triangles.counts[layer], 1);
+		layer_triangle_idx += MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(layer);
+		tile_light_shadow_triangles.triangles[layer_triangle_idx] = TileLightShadowTriangle(triangle_idx, k);
+	}
+}

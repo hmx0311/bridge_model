@@ -143,6 +143,9 @@
     <ClInclude Include="CircularQueue.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="shader_headers\binding_points.h">
+      <Filter>资源文件\shader_headers\common_headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="bridge_model.rc">
@@ -229,6 +232,9 @@
     </None>
     <None Include="shaders\terrain_night.frag">
       <Filter>资源文件\shaders\draw\night</Filter>
+    </None>
+    <None Include="shaders\shadow_highway_night.comp">
+      <Filter>资源文件\shaders\shadow\night</Filter>
     </None>
   </ItemGroup>
 </Project>

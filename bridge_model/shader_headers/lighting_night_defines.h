@@ -1,9 +1,11 @@
 #include "common_defines.h"
 #include "scene_constances.h"
+#include "binding_points.h"
 #ifndef LIGHTING_NIGHT_DEFINES_H
 #define LIGHTING_NIGHT_DEFINES_H
 
 #define NUM_TILE_LIGHT_SHADOW_LAYERS 4
+#define MAX_AVERANGE_TRIANGLES_PER_LIGHT 4096
 
 INLINE int findTileLightShadowLayer(int idx)
 {
@@ -20,32 +22,36 @@ INLINE ivec2 tileLightShadowLayerSize(int layer)
 	return ivec2(2 << layer, 4 << layer);
 }
 
-struct TileLightMapData
+STORAGE_BUFFER_BEGIN(TileLightMapData, TILE_LIGHT_MAP_BUFFER_BINDING)
 {
 	ivec2 idx_range[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
-};
+}BUFFER_END(tile_light_map)
 
-DECLARE_BUFFER(TileLightMapData, tile_light_map, 3);
-
-struct TileLightData
+UNIFORM_BUFFER_BEGIN(TileLightData, TILE_LIGHT_BUFFER_BINDING)
 {
 	vec4 positions[2 * MAX_CAR_CNT];
-};
+}BUFFER_END(tile_light)
 
-DECLARE_UNIFORM(TileLightData, tile_light, 4);
-
-struct TileLightTransformData
+STORAGE_BUFFER_BEGIN(TileLightTransformData, TILE_LIGHT_TRANSFORM_BUFFER_BINDING)
 {
 	mat4 view_proj[2 * MAX_CAR_CNT];
-};
+}BUFFER_END(tile_light_transform)
 
-DECLARE_BUFFER(TileLightTransformData, tile_light_transform, 5);
-
-struct CarLightingData
+STORAGE_BUFFER_BEGIN(CarLightingData, CAR_LIGHTING_BUFFER_BINDING)
 {
 	int light_indices[MAX_CAR_CNT * LIGHTING_SIZE_PER_CAR];
+}BUFFER_END(car_lighting)
+
+struct TileLightShadowTriangle
+{
+	uint triangle_idx;
+	int light_idx;
 };
 
-DECLARE_BUFFER(CarLightingData, car_lighting, 6);
+STORAGE_BUFFER_BEGIN(TileLightShadowTriangleData, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING)
+{
+	int counts[NUM_TILE_LIGHT_SHADOW_LAYERS];
+	TileLightShadowTriangle triangles[];
+}BUFFER_END(tile_light_shadow_triangles)
 
 #endif // !LIGHTING_NIGHT_DEFINES_H

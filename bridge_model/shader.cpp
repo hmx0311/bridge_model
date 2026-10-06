@@ -238,3 +238,26 @@ GLuint linkShaderProgram(GLuint vert, GLuint frag, GLuint geom)
 	}
 	return program;
 }
+
+GLuint loadComputeProgram(const char* shader_name)
+{
+	GLuint compute_shader = loadShader(shader_name, GL_COMPUTE_SHADER);
+	GLint status;
+	GLuint program = glCreateProgram();
+	glAttachShader(program, compute_shader);
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &status);
+	if (status == GL_FALSE)
+	{
+		printf("\nERROR: Shader Program %d Link Error\n", program);
+		int len;
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
+		char* log = new char[len];
+		glGetProgramInfoLog(program, len, nullptr, log);
+		printf("%s", log);
+		delete[] log;
+	}
+	glDetachShader(program, compute_shader);
+	glDeleteShader(compute_shader);
+	return program;
+}

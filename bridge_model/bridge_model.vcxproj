@@ -123,6 +123,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="scene.h" />
     <ClInclude Include="shader.h" />
+    <ClInclude Include="shader_headers\binding_points.h" />
     <ClInclude Include="shader_headers\camera_defines.h" />
     <ClInclude Include="shader_headers\common_defines.h" />
     <ClInclude Include="shader_headers\lighting_night_defines.h" />
@@ -159,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\gen_PCSS_mips.frag" />
+    <None Include="shaders\shadow_highway_night.comp" />
     <None Include="shaders\terrain_day.frag" />
     <None Include="shaders\terrain_night.frag" />
     <None Include="shader_headers\fog.glslh" />
