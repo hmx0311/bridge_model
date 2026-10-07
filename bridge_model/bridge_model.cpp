@@ -71,6 +71,7 @@ int bloom_buffer_width;
 GLuint bloom_FBOs[2];
 GLuint bloom_texs[2];
 
+GLuint attri_less_VAO;
 GLuint tex_blit_VAO, tex_mapping_VBO;
 
 constexpr GLsizei TEXT_WIDTH = 16;
@@ -174,7 +175,8 @@ static void initShader()
 	GLuint FS_shadow = loadShader(SHADER_NAME(IDR_FS_SHADOW), GL_FRAGMENT_SHADER);
 	GLuint GS_shadow_highway_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_HIGHWAY_NIGHT), GL_GEOMETRY_SHADER);
 	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow);
-	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
+	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow);
+	//SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
 	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow);
 	SP_shadow_car_night = linkShaderProgram(VS_shadow_car_night, FS_shadow);
 	glDeleteShader(VS_shadow_highway_day);
@@ -375,6 +377,8 @@ static void init()
 	{
 		printf("ERROR: Can't Find Resource Text Altas\n");
 	}
+
+	glGenVertexArrays(1, &attri_less_VAO);
 
 	buildMeshes();
 	initScene();
@@ -1054,28 +1058,52 @@ static void drawGraphics()
 		}
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glViewport(0, 0, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE);
-		/*
+		
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, tile_light_shadow_triangles_SSBO);
+		glBindVertexArray(attri_less_VAO);
+		DrawArraysIndirectCommand commands[NUM_TILE_LIGHT_SHADOW_LAYERS]{};
+		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
+		{
+			commands[i].instance_count = 1;
+			commands[i].first = 3 * MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(i);
+		}
+
 		glUseProgram(CSP_shadow_highway_night);
-		glClearNamedBufferSubData(tile_light_shadow_triangles_SSBO, GL_R32UI, 0, sizeof(TileLightShadowTriangleData::counts), GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+		glNamedBufferSubData(tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, highway_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), HIGHWAY_EBO_SIZE / 3);
 		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 		glDispatchCompute((HIGHWAY_EBO_SIZE / 3 + 63) / 64, 1, 1);
 		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-		glClearNamedBufferSubData(tile_light_shadow_triangles_SSBO, GL_R32UI, 0, sizeof(TileLightShadowTriangleData::counts), GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr);
+		glUseProgram(SP_shadow_highway_night);
+		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
+		{
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
+			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
+		}
+
+		glUseProgram(CSP_shadow_highway_night);
+		glNamedBufferSubData(tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, bridge_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), BRIDGE_EBO_SIZE / 3);
 		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 		glDispatchCompute((BRIDGE_EBO_SIZE / 3 + 63) / 64, 1, 1);
 		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-		*/
+		glUseProgram(SP_shadow_highway_night);
+		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
+		{
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
+			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
+		}
+		/*
 		glUseProgram(SP_shadow_highway_night);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
+		*/
 		glUseProgram(SP_shadow_car_night);
 		glBindVertexArray(car_shadow_night_VAO);
 		int car_tile_light_shadow_offset = 0;

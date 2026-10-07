@@ -100,7 +100,7 @@ void buildTerrainMesh()
 		return;
 	}
 
-	auto positions = std::make_unique<vec3[][NUM_TERRAIN_GRID_Y + 1]>(NUM_TERRAIN_GRID_X + 1);
+	auto positions = std::make_unique_for_overwrite<vec3[][NUM_TERRAIN_GRID_Y + 1]>(NUM_TERRAIN_GRID_X + 1);
 
 	char* height_data = static_cast<char*>(LockResource(rc_data));
 

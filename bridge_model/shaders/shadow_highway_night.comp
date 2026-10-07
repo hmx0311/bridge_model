@@ -66,7 +66,7 @@ void main()
 		{
 			continue;
 		}
-		int layer_triangle_idx = atomicAdd(tile_light_shadow_triangles.counts[layer], 1);
+		int layer_triangle_idx = atomicAdd(tile_light_shadow_triangles.commands[layer].count, 3) / 3;
 		layer_triangle_idx += MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(layer);
 		tile_light_shadow_triangles.triangles[layer_triangle_idx] = TileLightShadowTriangle(triangle_idx, k);
 	}

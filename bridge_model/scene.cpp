@@ -61,7 +61,7 @@ void initScene()
 	glBindVertexArray(highway_VAO);
 	glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
-	auto max_depth_data = std::make_unique<GLfloat[][SCENE_GRID_SIZE_X]>(SCENE_GRID_SIZE_Y);
+	auto max_depth_data = std::make_unique_for_overwrite<GLfloat[][SCENE_GRID_SIZE_X]>(SCENE_GRID_SIZE_Y);
 	glGetTextureImage(height_map_tex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, SCENE_GRID_SIZE_X * SCENE_GRID_SIZE_Y * sizeof(GLfloat), max_depth_data.get());
 	glDepthFunc(GL_GREATER);
 	glClearDepth(0.0);
@@ -72,7 +72,7 @@ void initScene()
 	glBindVertexArray(highway_VAO);
 	glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
-	auto min_depth_data = std::make_unique<GLfloat[][SCENE_GRID_SIZE_X]>(SCENE_GRID_SIZE_Y);
+	auto min_depth_data = std::make_unique_for_overwrite<GLfloat[][SCENE_GRID_SIZE_X]>(SCENE_GRID_SIZE_Y);
 	glGetTextureImage(height_map_tex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, SCENE_GRID_SIZE_X * SCENE_GRID_SIZE_Y * sizeof(GLfloat), min_depth_data.get());
 	glDepthFunc(GL_LESS);
 	glClearDepth(1.0);

@@ -1,5 +1,7 @@
 #include "mesh.h"
 
+#include <memory>
+
 #include "ext/scalar_constants.hpp"
 
 #include "common.h"
@@ -24,7 +26,7 @@ GLuint highway_tex;
 
 static void initTex()
 {
-	vec3(*highway_tex_data)[8192] = new vec3[4096][8192];
+	auto highway_tex_data = std::make_unique_for_overwrite<vec3[][8192]>(4096);
 	for (int i = 0; i < 4096; i++)
 	{
 		for (int j = 0; j < 8192; j++)
@@ -200,7 +202,7 @@ static void initTex()
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_TexAni);
 	glGenTextures(1, &highway_tex);
 	glBindTexture(GL_TEXTURE_2D, highway_tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 8192, 4096, 0, GL_RGB, GL_FLOAT, highway_tex_data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 8192, 4096, 0, GL_RGB, GL_FLOAT, highway_tex_data.get());
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, max_TexAni);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 9);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -208,44 +210,44 @@ static void initTex()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 	glGenerateMipmap(GL_TEXTURE_2D);
-	delete[] highway_tex_data;
 }
 
 static void buildHighwayMesh()
 {
-	constexpr int VERT_SIZE = 4765;
-	vec3 positions[VERT_SIZE];
-	vec3 normals[VERT_SIZE];
-	vec2 tex_coords[VERT_SIZE];
-	GLuint indices[HIGHWAY_EBO_SIZE];
+	constexpr int VERT_SIZE = 4953;
+	auto positions = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
+	auto normals = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
+	auto tex_coords = std::make_unique_for_overwrite<vec2[]>(VERT_SIZE);
+	auto indices = std::make_unique< GLuint[]>(HIGHWAY_EBO_SIZE);
 
-	positions[0] = vec3(-2560.0f, -7.2f, 0);
-	tex_coords[0] = vec2(0.63671875f, -2560.0f / 20.48f);
-	positions[1] = vec3(-204.8f, -7.2f, 0);
-	tex_coords[1] = vec2(0.63671875f, -204.8f / 20.48f);
-	positions[2] = vec3(-204.8f, 7.2f, 0);
-	tex_coords[2] = vec2(0.98828125f, -204.8f / 20.48f);
-	positions[3] = vec3(-2560.0f, 7.2f, 0);
-	tex_coords[3] = vec2(0.98828125f, -2560.0f / 20.48f);
-	normals[0] = normals[1] = normals[2] = normals[3] = vec3(0, 0, 1);
+	int i_vert = 0;
+	int i_idx = 0;
 
-	int i_vert = 4;
-
-	positions[i_vert] = vec3(-2560.0f, -7.2f, 0);
-	positions[i_vert + 1] = vec3(-2560.0f, -8.2f, -1.0f);
-	positions[i_vert + 2] = vec3(-50.0f, -8.2f, -1.0f);
-	positions[i_vert + 3] = vec3(-50.0f, -7.2f, 0);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, -0.70710678f, 0.70710678f);
-	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(-2560.0f, 8.2f, -1.0f);
-	positions[i_vert + 1] = vec3(-2560.0f, 7.2f, 0);
-	positions[i_vert + 2] = vec3(-204.8f, 7.2f, 0);
-	positions[i_vert + 3] = vec3(-204.8f, 8.2f, -1.0f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
-	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
-	i_vert += 4;
+	auto long_quad = [&](const vec3& p0, const vec3& p1, const vec3& p2, const vec3& p3, const vec2& t0, const vec2& t1, const vec2& t2, const vec2& t3, const vec3& n)
+		{
+			float len = 0.5f * length(p2 + p3 - p0 - p1);
+			int cnt = ceil(len / 200.0f);
+			for (int i = 0; i <= cnt; i++)
+			{
+				float p = static_cast<float>(i) / cnt;
+				positions[i_vert + 2 * i] = (1 - p) * p0 + p * p2;
+				positions[i_vert + 2 * i + 1] = (1 - p) * p1 + p * p3;
+				tex_coords[i_vert + 2 * i] = (1 - p) * t0 + p * t2;
+				tex_coords[i_vert + 2 * i + 1] = (1 - p) * t1 + p * t3;
+				normals[i_vert + 2 * i] = normals[i_vert + 2 * i + 1] = n;
+			}
+			for (int i = 0; i < cnt; i++)
+			{
+				indices[i_idx + 6 * i] = i_vert + 2 * i;
+				indices[i_idx + 6 * i + 1] = i_vert + 2 * i + 2;
+				indices[i_idx + 6 * i + 2] = i_vert + 2 * i + 1;
+				indices[i_idx + 6 * i + 3] = i_vert + 2 * i + 1;
+				indices[i_idx + 6 * i + 4] = i_vert + 2 * i + 2;
+				indices[i_idx + 6 * i + 5] = i_vert + 2 * i + 3;
+			}
+			i_vert += 2 * (cnt + 1);
+			i_idx += 6 * cnt;
+		};
 
 	positions[i_vert] = vec3(-112.8f, -7.2f, 0);
 	tex_coords[i_vert] = vec2(0.63671875f, -112.8f / 20.48f);
@@ -309,60 +311,6 @@ static void buildHighwayMesh()
 	positions[i_vert + 2] = vec3(376.0f, 7.2f, 0);
 	positions[i_vert + 3] = vec3(376.0f, 8.2f, -1.0f);
 	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0.70710678f, 0.70710678f);
-	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(671.68f, -105.76f, 0);
-	tex_coords[i_vert] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
-	positions[i_vert + 1] = vec3(2560.0f, -1522.0f, 0);
-	tex_coords[i_vert + 1] = vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f) + 2360.4f) / 20.48f);
-	positions[i_vert + 2] = vec3(2560.0f, -1504.0f, 0);
-	tex_coords[i_vert + 2] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f) + 2349.6) / 20.48f);
-	positions[i_vert + 3] = vec3(680.32f, -94.24f, 0);
-	tex_coords[i_vert + 3] = vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f)) / 20.48f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(671.68f, -105.76f, 0);
-	positions[i_vert + 1] = vec3(671.08f, -106.56f, -1.0f);
-	positions[i_vert + 2] = vec3(2560.0f, -1523.25f, -1.0f);
-	positions[i_vert + 3] = vec3(2560.0f, -1522.0f, 0);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(-0.42426407f, -0.565685424f, 0.70710678f);
-	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(680.92f, -93.44f, -1.0f);
-	positions[i_vert + 1] = vec3(680.32f, -94.24f, 0);
-	positions[i_vert + 2] = vec3(2560.0f, -1504.0f, 0);
-	positions[i_vert + 3] = vec3(2560.0f, -1502.75f, -1.0f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0.42426407f, 0.565685424f, 0.70710678f);
-	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(-7.2f, 128.0f, 0);
-	tex_coords[i_vert] = vec2(0.63671875f, 128.0f / 20.48f);
-	positions[i_vert + 1] = vec3(7.2f, 128.0f, 0);
-	tex_coords[i_vert + 1] = vec2(0.98828125f, 128.0f / 20.48f);
-	positions[i_vert + 2] = vec3(7.2f, 2048.0f, 0);
-	tex_coords[i_vert + 2] = vec2(0.98828125f, 2048.0f / 20.48f);
-	positions[i_vert + 3] = vec3(-7.2f, 2048.0f, 0);
-	tex_coords[i_vert + 3] = vec2(0.63671875f, 2048.0f / 20.48f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(7.2f, 128.0f, 0);
-	positions[i_vert + 1] = vec3(8.2f, 128.0f, -1.0f);
-	positions[i_vert + 2] = vec3(8.2f, 2048.0f, -1.0f);
-	positions[i_vert + 3] = vec3(7.2f, 2048.0f, 0);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0.70710678f, 0, 0.70710678f);
-	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
-	i_vert += 4;
-
-	positions[i_vert] = vec3(-8.2f, 128.0f, -1.0f);
-	positions[i_vert + 1] = vec3(-7.2f, 128.0f, 0);
-	positions[i_vert + 2] = vec3(-7.2f, 2048.0f, 0);
-	positions[i_vert + 3] = vec3(-8.2f, 2048.0f, -1.0f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(-0.70710678f, 0, 0.70710678f);
 	tex_coords[i_vert] = tex_coords[i_vert + 1] = tex_coords[i_vert + 2] = tex_coords[i_vert + 3] = vec2(0.09375f, 0.8125f);
 	i_vert += 4;
 
@@ -452,7 +400,100 @@ static void buildHighwayMesh()
 		indices[6 * i + 5] = 4 * i + 3;
 	}
 
-	int i_idx = i_vert / 4 * 6;
+	i_idx += i_vert / 4 * 6;
+	
+	long_quad(
+		vec3(-2560.0f, -7.2f, 0),
+		vec3(-2560.0f, 7.2f, 0),
+		vec3(-204.8f, -7.2f, 0),
+		vec3(-204.8f, 7.2f, 0),
+		vec2(0.63671875f, -2560.0f / 20.48f),
+		vec2(0.98828125f, -2560.0f / 20.48f),
+		vec2(0.63671875f, -204.8f / 20.48f),
+		vec2(0.98828125f, -204.8f / 20.48f),
+		vec3(0, 0, 1));
+	long_quad(
+		vec3(-2560.0f, -8.2f, -1.0f),
+		vec3(-2560.0f, -7.2f, 0),
+		vec3(-50.0f, -8.2f, -1.0f),
+		vec3(-50.0f, -7.2f, 0),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec3(0, -0.70710678f, 0.70710678f));
+	long_quad(
+		vec3(-2560.0f, 7.2f, 0),
+		vec3(-2560.0f, 8.2f, -1.0f),
+		vec3(-204.8f, 7.2f, 0),
+		vec3(-204.8f, 8.2f, -1.0f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec3(0, 0.70710678f, 0.70710678f));
+
+	long_quad(
+		vec3(671.68f, -105.76f, 0),
+		vec3(680.32f, -94.24f, 0),
+		vec3(2560.0f, -1522.0f, 0),
+		vec3(2560.0f, -1504.0f, 0),
+		vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f)) / 20.48f),
+		vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f)) / 20.48f),
+		vec2(0.63671875f, (376.0f + 500.0f * asin(0.6f) + 2360.4f) / 20.48f),
+		vec2(0.98828125f, (376.0f + 500.0f * asin(0.6f) + 2349.6) / 20.48f),
+		vec3(0, 0, 1));
+	long_quad(
+		vec3(671.08f, -106.56f, -1.0f),
+		vec3(671.68f, -105.76f, 0),
+		vec3(2560.0f, -1523.25f, -1.0f),
+		vec3(2560.0f, -1522.0f, 0),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec3(-0.42426407f, -0.565685424f, 0.70710678f));
+	long_quad(
+		vec3(680.32f, -94.24f, 0),
+		vec3(680.92f, -93.44f, -1.0f),
+		vec3(2560.0f, -1504.0f, 0),
+		vec3(2560.0f, -1502.75f, -1.0f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec3(0.42426407f, 0.565685424f, 0.70710678f));
+
+	long_quad(
+		vec3(7.2f, 128.0f, 0),
+		vec3(-7.2f, 128.0f, 0),
+		vec3(7.2f, 2048.0f, 0),
+		vec3(-7.2f, 2048.0f, 0),
+		vec2(0.98828125f, 128.0f / 20.48f),
+		vec2(0.63671875f, 128.0f / 20.48f),
+		vec2(0.98828125f, 2048.0f / 20.48f),
+		vec2(0.63671875f, 2048.0f / 20.48f),
+		vec3(0, 0, 1));
+	long_quad(
+		vec3(8.2f, 128.0f, -1.0f),
+		vec3(7.2f, 128.0f, 0),
+		vec3(8.2f, 2048.0f, -1.0f),
+		vec3(7.2f, 2048.0f, 0),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec3(0.70710678f, 0, 0.70710678f));
+	long_quad(
+		vec3(-7.2f, 128.0f, 0),
+		vec3(-8.2f, 128.0f, -1.0f),
+		vec3(-7.2f, 2048.0f, 0),
+		vec3(-8.2f, 2048.0f, -1.0f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec2(0.09375f, 0.8125f),
+		vec3(-0.70710678f, 0, 0.70710678f));
 
 	float theta = asin(0.6f);
 	int n = theta * sqrtf(50000.0f) + 3;
@@ -1077,29 +1118,29 @@ static void buildHighwayMesh()
 	glBindVertexArray(highway_VAO);
 	glGenBuffers(1, &highway_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, highway_VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(positions) + sizeof(normals) + sizeof(tex_coords), nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(positions), positions);
-	glBufferSubData(GL_ARRAY_BUFFER, sizeof(positions), sizeof(normals), normals);
-	glBufferSubData(GL_ARRAY_BUFFER, sizeof(positions) + sizeof(normals), sizeof(tex_coords), tex_coords);
+	glBufferData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, VERT_SIZE * sizeof(vec3), positions.get());
+	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * sizeof(vec3), VERT_SIZE * sizeof(vec3), normals.get());
+	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3)), VERT_SIZE * sizeof(vec2), tex_coords.get());
 	glGenBuffers(1, &highway_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, highway_EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, HIGHWAY_EBO_SIZE * sizeof(GLuint), indices.get(), GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * sizeof(vec3)));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * (sizeof(vec3) + sizeof(vec3))));
 	glEnableVertexAttribArray(2);
 	glBindVertexArray(0);
 }
 
 static void buildBridgeMesh()
 {
-	constexpr int VERTICES_SIZE = 5770;
-	vec3 positions[VERTICES_SIZE];
-	vec3 normals[VERTICES_SIZE];
-	vec2 tex_coords[VERTICES_SIZE];
-	GLuint indices[BRIDGE_EBO_SIZE];
+	constexpr int VERT_SIZE = 5770;
+	auto positions = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
+	auto normals = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
+	auto tex_coords = std::make_unique_for_overwrite<vec2[]>(VERT_SIZE);
+	auto indices = std::make_unique_for_overwrite< GLuint[]>(BRIDGE_EBO_SIZE);
 
 	positions[0] = vec3(-3.76f, 116.0f, 0);
 	positions[1] = vec3(-4.0f, 116.0f, 0);
@@ -1804,18 +1845,18 @@ static void buildBridgeMesh()
 	glBindVertexArray(bridge_VAO);
 	glGenBuffers(1, &bridge_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, bridge_VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(positions) + sizeof(normals) + sizeof(tex_coords), nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(positions), positions);
-	glBufferSubData(GL_ARRAY_BUFFER, sizeof(positions), sizeof(normals), normals);
-	glBufferSubData(GL_ARRAY_BUFFER, sizeof(positions) + sizeof(normals), sizeof(tex_coords), tex_coords);
+	glBufferData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, VERT_SIZE * sizeof(vec3), positions.get());
+	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * sizeof(vec3), VERT_SIZE * sizeof(vec3), normals.get());
+	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3)), VERT_SIZE * sizeof(vec2), tex_coords.get());
 	glGenBuffers(1, &bridge_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bridge_EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, BRIDGE_EBO_SIZE * sizeof(GLuint), indices.get(), GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * sizeof(vec3)));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * (sizeof(vec3) + sizeof(vec3))));
 	glEnableVertexAttribArray(2);
 	glBindVertexArray(0);
 }
@@ -1870,7 +1911,6 @@ const BoundAABB car_local_bound{ { -X2, -Y0, 0.0f }, { X2, Y0, Z5 } };
 
 static void buildCarMesh()
 {
-	constexpr int VERTICES_SIZE = 884;
 	constexpr float HUB_COLOR[3] = { 0.3f,0.3f,0.3f };
 	constexpr float TYRE_COLOR[3] = { 0.03f,0.03f,0.03f };
 	glProgramUniform3f(SP_car_day, glGetUniformLocation(SP_car_day, "materials[0].albedo"), 0.08f, 0.08f, 0.12f);
@@ -1911,27 +1951,28 @@ static void buildCarMesh()
 	glProgramUniform3fv(SP_car_night, glGetUniformLocation(SP_car_night, "materials[6].specular"), 1, COLOR_BLACK);
 	glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "materials[6].shininess"), 0);
 
-	vec3 positions[VERTICES_SIZE] = { {	 POINT0},	{POINT1},	{POINT2},	{POINT3},	//×óÇ°µÆ
-										{POINT4},	{POINT5},	{POINT6},	{POINT7},	//ÓÒÇ°µÆ
-										{POINT8},	{POINT9},	{POINT10},	{POINT11},	//×óºóµÆ
-										{POINT12},	{POINT13},	{POINT14},	{POINT15},	//ÓÒºóµÆ
-										{POINT7},	{POINT2},	{POINT16},	{POINT17},	//Ç°ÉÏ
-										{POINT5},	{POINT0},	{POINT3},	{POINT6},	//Ç°ÖÐ
-										{POINT18},	{POINT19},	{POINT1},	{POINT4},	//Ç°ÏÂ
-										{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ×
-										{POINT9},	{POINT12},	{POINT15},	{POINT10},	//ºóÉÏ
-										{POINT21},	{POINT20},	{POINT13},	{POINT8},	//ºóÏÂ
-										{POINT19},	{POINT21},	{POINT11},	{POINT16},	//×ó
-										{POINT20},	{POINT18},	{POINT17},	{POINT14},	//ÓÒ
-										{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÒýÇæ¸Ç
-										{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¶¥
-										{POINT23},	{POINT22},	{POINT25},	{POINT24},	//Ç°²£Á§
-										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
-										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
-										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
-	vec3 normals[VERTICES_SIZE];
-	int material_idxs[VERTICES_SIZE];
-	GLuint indices[CAR_EBO_SIZE]{};
+	constexpr int VERT_SIZE = 884;
+	vec3 positions[VERT_SIZE] = { {POINT0},	{POINT1},	{POINT2},	{POINT3},	//×óÇ°µÆ
+									{POINT4},	{POINT5},	{POINT6},	{POINT7},	//ÓÒÇ°µÆ
+									{POINT8},	{POINT9},	{POINT10},	{POINT11},	//×óºóµÆ
+									{POINT12},	{POINT13},	{POINT14},	{POINT15},	//ÓÒºóµÆ
+									{POINT7},	{POINT2},	{POINT16},	{POINT17},	//Ç°ÉÏ
+									{POINT5},	{POINT0},	{POINT3},	{POINT6},	//Ç°ÖÐ
+									{POINT18},	{POINT19},	{POINT1},	{POINT4},	//Ç°ÏÂ
+									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ×
+									{POINT9},	{POINT12},	{POINT15},	{POINT10},	//ºóÉÏ
+									{POINT21},	{POINT20},	{POINT13},	{POINT8},	//ºóÏÂ
+									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//×ó
+									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//ÓÒ
+									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÒýÇæ¸Ç
+									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¶¥
+									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//Ç°²£Á§
+									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
+									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
+									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
+	vec3 normals[VERT_SIZE];
+	int material_idxs[VERT_SIZE];
+	GLuint indices[CAR_EBO_SIZE];
 
 	for (int i = 0; i < 4; i++)
 	{
@@ -2113,20 +2154,20 @@ static void buildCarMesh()
 
 static void buildCarShadowMesh()
 {
-	constexpr int VERTICES_SIZE = 560;
+	constexpr int VERT_SIZE = 560;
 
-	vec3 positions[VERTICES_SIZE] = { {	 POINT16},	{POINT17},	{POINT18},	{POINT19},	//Ç°
-										{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ×
-										{POINT21},	{POINT20},	{POINT14},	{POINT11},	//ºó
-										{POINT19},	{POINT21},	{POINT11},	{POINT16},	//×ó
-										{POINT20},	{POINT18},	{POINT17},	{POINT14},	//ÓÒ
-										{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÒýÇæ¸Ç
-										{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¶¥
-										{POINT23},	{POINT22},	{POINT25},	{POINT24},	//Ç°²£Á§
-										{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
-										{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
-										{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
-	GLuint indices[CAR_SHADOW_EBO_SIZE]{};
+	vec3 positions[VERT_SIZE] = { {POINT16},	{POINT17},	{POINT18},	{POINT19},	//Ç°
+									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ×
+									{POINT21},	{POINT20},	{POINT14},	{POINT11},	//ºó
+									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//×ó
+									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//ÓÒ
+									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÒýÇæ¸Ç
+									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¶¥
+									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//Ç°²£Á§
+									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
+									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
+									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
+	GLuint indices[CAR_SHADOW_EBO_SIZE];
 
 	for (int i = 0; i < 11; i++)
 	{

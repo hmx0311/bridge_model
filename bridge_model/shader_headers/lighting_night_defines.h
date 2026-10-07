@@ -42,6 +42,14 @@ STORAGE_BUFFER_BEGIN(CarLightingData, CAR_LIGHTING_BUFFER_BINDING)
 	int light_indices[MAX_CAR_CNT * LIGHTING_SIZE_PER_CAR];
 }BUFFER_END(car_lighting)
 
+struct DrawArraysIndirectCommand
+{
+	int count;
+	int instance_count;
+	int first;
+	int base_instance;
+};
+
 struct TileLightShadowTriangle
 {
 	uint triangle_idx;
@@ -50,7 +58,7 @@ struct TileLightShadowTriangle
 
 STORAGE_BUFFER_BEGIN(TileLightShadowTriangleData, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING)
 {
-	int counts[NUM_TILE_LIGHT_SHADOW_LAYERS];
+	DrawArraysIndirectCommand commands[NUM_TILE_LIGHT_SHADOW_LAYERS];
 	TileLightShadowTriangle triangles[];
 }BUFFER_END(tile_light_shadow_triangles)
 
