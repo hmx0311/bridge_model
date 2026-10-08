@@ -46,11 +46,11 @@ void main()
 		for(int i = lightingOffset + 1; i < end; i++)
 		{
 			int idx = car_lighting.light_indices[i];
-			vec3 modelToLight = modelPos - vec3(tile_light.positions[idx]);
+			vec3 modelToLight = modelPos - vec3(tile_lights[idx].position);
 			float lightDistance = length(modelToLight);
 			modelToLight /= lightDistance;
 			float intensity = -dot(modelToLight, aNormal) / (lightDistance * lightDistance);
-			vec4 modelPosLight = tile_light_transform.view_proj[idx] * vec4(modelPos, 1.0);
+			vec4 modelPosLight = tile_lights[idx].view_proj * vec4(modelPos, 1.0);
 			modelPosLight.xy /= modelPosLight.w;
 			float r = length(modelPosLight.xy);
 			if(lightDistance > 0.5 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r < 1.0)

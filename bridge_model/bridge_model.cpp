@@ -100,12 +100,10 @@ GLuint shadow_UBO;
 // binding = 3
 GLuint tile_light_map_SSBO;
 // binding = 4
-GLuint tile_light_pos_UBO;
+GLuint tile_lights_SSBO;
 // binding = 5
-GLuint tile_light_transform_SSBO;
-// binding = 6
 GLuint car_lighting_SSBO;
-// binding = 7
+// binding = 6
 GLuint tile_light_shadow_triangles_SSBO;
 
 CameraData camera;
@@ -113,8 +111,7 @@ ShadowTransformData sun_shadow;
 const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(CAR_LIGHT_V_RAD, CAR_LIGHT_ASPECT, CAR_LIGHT_NEAR, CAR_LIGHT_NEAR + CAR_LIGHT_RANGE);
 
 TileLightMapData tile_light_map;
-TileLightData tile_light_pos;
-TileLightTransformData tile_light_transforms;
+TileLightData tile_light_data;
 CarLightingData car_lightings;
 
 GLuint SP_highway_day;
@@ -225,41 +222,28 @@ static void init()
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &UBO_offset_alignment);
 
 	scene_UBO_offset1 = ((sizeof(camera) - 1) / UBO_offset_alignment + 1) * UBO_offset_alignment;
-	glGenBuffers(1, &scene_UBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, scene_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, scene_UBO_offset1 + sizeof(SunData), nullptr, GL_DYNAMIC_DRAW);
+	glCreateBuffers(1, &scene_UBO);
+	glNamedBufferData(scene_UBO, scene_UBO_offset1 + sizeof(SunData), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, CAMERA_BUFFER_BINDING, scene_UBO, 0, sizeof(CameraData));
 	glBindBufferRange(GL_UNIFORM_BUFFER, SUN_BUFFER_BINDING, scene_UBO, scene_UBO_offset1, sizeof(SunData));
 
-	glGenBuffers(1, &shadow_UBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, shadow_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(sun_shadow), nullptr, GL_DYNAMIC_DRAW);
+	glCreateBuffers(1, &shadow_UBO);
+	glNamedBufferData(shadow_UBO, sizeof(sun_shadow), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, SHADOW_TRANSFORM_BUFFER_BINDING, shadow_UBO, 0, sizeof(sun_shadow));
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-	glGenBuffers(1, &tile_light_map_SSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, tile_light_map_SSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(tile_light_map), nullptr, GL_DYNAMIC_DRAW);
+	glCreateBuffers(1, &tile_light_map_SSBO);
+	glNamedBufferData(tile_light_map_SSBO, sizeof(tile_light_map), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_MAP_BUFFER_BINDING, tile_light_map_SSBO, 0, sizeof(tile_light_map));
-	glGenBuffers(1, &tile_light_pos_UBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, tile_light_pos_UBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(tile_light_pos), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, TILE_LIGHT_BUFFER_BINDING, tile_light_pos_UBO, 0, sizeof(tile_light_pos));
-	glGenBuffers(1, &tile_light_transform_SSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, tile_light_transform_SSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, 2 * MAX_CAR_CNT * sizeof(mat4), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_TRANSFORM_BUFFER_BINDING, tile_light_transform_SSBO, 0, sizeof(TileLightTransformData));
-	glGenBuffers(1, &car_lighting_SSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, car_lighting_SSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
+	glCreateBuffers(1, &tile_lights_SSBO);
+	glNamedBufferData(tile_lights_SSBO, sizeof(tile_light_data), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_BUFFER_BINDING, tile_lights_SSBO, 0, sizeof(tile_light_data));
+	glCreateBuffers(1, &car_lighting_SSBO);
+	glNamedBufferData(car_lighting_SSBO, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, CAR_LIGHTING_BUFFER_BINDING, car_lighting_SSBO, 0, sizeof(car_lightings));
-	glGenBuffers(1, &tile_light_shadow_triangles_SSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, tile_light_shadow_triangles_SSBO);
+	glCreateBuffers(1, &tile_light_shadow_triangles_SSBO);
 	constexpr GLsizeiptr tile_light_shadow_triangles_SSBO_size = sizeof(TileLightShadowTriangleData) + tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS) * MAX_AVERANGE_TRIANGLES_PER_LIGHT * sizeof(TileLightShadowTriangle);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
+	glNamedBufferData(tile_light_shadow_triangles_SSBO, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	glGenFramebuffers(1, &multisample_render_FBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
@@ -859,8 +843,8 @@ static void drawGraphics()
 				car_light_info.light_map_grid->x = car_light_info.light_map_grid->y;
 			}
 			int idx = car_light_info.light_map_grid->y++;
-			tile_light_pos.positions[idx] = car_light_info.pos;
-			tile_light_transforms.view_proj[idx] = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
+			tile_light_data.tile_lights[idx].position = car_light_info.pos;
+			tile_light_data.tile_lights[idx].view_proj = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
 			tile_light_bounds[idx] = car_light_info.bound;
 		}
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
@@ -891,7 +875,7 @@ static void drawGraphics()
 									if (layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 									{
 										car_tile_light_shadow_idx[layer].push_back(k);
-										car_tile_light_shadow_transform[layer].push_back(tile_light_transforms.view_proj[k] * transform);
+										car_tile_light_shadow_transform[layer].push_back(tile_light_data.tile_lights[k].view_proj * transform);
 									}
 									light_indices[i * LIGHTING_SIZE_PER_CAR + num_lighting] = k;
 								}
@@ -936,8 +920,7 @@ static void drawGraphics()
 	else
 	{
 		glNamedBufferSubData(tile_light_map_SSBO, 0, sizeof(tile_light_map), &tile_light_map);
-		glNamedBufferSubData(tile_light_pos_UBO, 0, num_visible_car_lights * sizeof(vec4), &tile_light_pos);
-		glNamedBufferSubData(tile_light_transform_SSBO, 0, num_visible_car_lights * sizeof(mat4), &tile_light_transforms);
+		glNamedBufferSubData(tile_lights_SSBO, 0, num_visible_car_lights * sizeof(TileLight), &tile_light_data);
 		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_light_on_cars * sizeof(mat4), logical_data.car_transform);
 		glNamedBufferSubData(car_color_VBO, 0, num_visible_light_on_cars * sizeof(vec3), logical_data.car_color);

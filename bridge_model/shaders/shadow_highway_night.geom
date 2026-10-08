@@ -49,14 +49,14 @@ void main()
 			continue;
 		}
 		vec4 pos[3];
-		vec3 test[3];
+		vec2 test[3];
 		for(int p = 0; p < 3; p++)
 		{
-			pos[p] = tile_light_transform.view_proj[k] * gl_in[p].gl_Position;
-			test[p]= pos[p].xyz / pos[p].w;
+			pos[p] = tile_lights[k].view_proj * gl_in[p].gl_Position;
+			test[p]= pos[p].xy / pos[p].w;
 		}
-		vec3 projNoraml = cross(test[1] - test[0], test[2] - test[0]);
-		if(pos[0].z >= pos[0].w && pos[1].z >= pos[1].w && pos[2].z >= pos[2].w || projNoraml.z * pos[0].w * pos[1].w * pos[2].w <= 0)
+		vec3 normal = cross(gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz, gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz);
+		if(pos[0].z >= pos[0].w && pos[1].z >= pos[1].w && pos[2].z >= pos[2].w || dot(normal, tile_lights[k].position.xyz - gl_in[0].gl_Position.xyz) <= 0)
 		{
 			continue;
 		}
@@ -66,9 +66,9 @@ void main()
 		bool isIn = surroundTest[0] == surroundTest[1] && surroundTest[0] == surroundTest[2];
 		for(int p = 0; p < 3 && !isIn; p++)
 		{
-			vec2 a = test[p].xy;
+			vec2 a = test[p];
 			int p2 = (p + 1) % 3;
-			vec2 v = test[p2].xy - a;
+			vec2 v = test[p2] - a;
 			float lt2 = dot(a, a);
 			if(pos[p2].w < 0)
 			{
@@ -82,7 +82,7 @@ void main()
 			else if(pos[p].w < 0)
 			{
 				lt2 = min(lt2, 1.0);
-				a = test[p2].xy;
+				a = test[p2];
 			}
 			float t = v.x * a.y - v.y * a.x;
 			isIn = lt2 < 1.0 || dot(v, a) < 0 && dot(v, v) > max(t * t, lt2 - 1);

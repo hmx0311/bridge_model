@@ -29,15 +29,16 @@ STORAGE_BUFFER_BEGIN(TileLightMapData, TILE_LIGHT_MAP_BUFFER_BINDING)
 	ivec2 idx_range[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
 }BUFFER_END(tile_light_map)
 
-UNIFORM_BUFFER_BEGIN(TileLightData, TILE_LIGHT_BUFFER_BINDING)
+struct TileLight
 {
-	vec4 positions[2 * MAX_CAR_CNT];
-}BUFFER_END(tile_light)
+	vec4 position;
+	mat4 view_proj;
+};
 
-STORAGE_BUFFER_BEGIN(TileLightTransformData, TILE_LIGHT_TRANSFORM_BUFFER_BINDING)
+STORAGE_BUFFER_BEGIN(TileLightData, TILE_LIGHT_BUFFER_BINDING)
 {
-	mat4 view_proj[2 * MAX_CAR_CNT];
-}BUFFER_END(tile_light_transform)
+	TileLight tile_lights[2 * MAX_CAR_CNT];
+}BUFFER_END()
 
 STORAGE_BUFFER_BEGIN(CarLightingData, CAR_LIGHTING_BUFFER_BINDING)
 {

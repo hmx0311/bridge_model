@@ -23,7 +23,7 @@ void main()
 	ivec2 layer_size = tileLightShadowLayerSize(layer);
 	int shadow_idx = light_idx - tileLightShadowLayerOffset(layer);
 	vec2 shadow_map_pos = vec2(shadow_idx % layer_size.x, shadow_idx / layer_size.x) / (0.5 * layer_size) - 1.0;
-	gl_Position = tile_light_transform.view_proj[light_idx] * vec4(vertex, 1.0);
+	gl_Position = tile_lights[light_idx].view_proj * vec4(vertex, 1.0);
 	gl_ClipDistance[0] = gl_Position.w + gl_Position.x;
 	gl_ClipDistance[1] = gl_Position.w - gl_Position.x;
 	gl_ClipDistance[2] = gl_Position.w + gl_Position.y;
