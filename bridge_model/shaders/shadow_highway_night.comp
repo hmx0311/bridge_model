@@ -22,18 +22,19 @@ void main()
 		return;
 	}
 	vec3 positions[3];
+	uint vert_idx[3];
 	for(uint i = 0; i < 3; i++)
 	{
-		uint idx = indices[3 * triangle_idx + i];
-		uint offset = 3 * idx;
+		vert_idx[i] = indices[3 * triangle_idx + i];
+		uint offset = 3 * vert_idx[i];
 		positions[i] = vec3(vertices[offset], vertices[offset + 1], vertices[offset + 2]);
 	}
-	vec2 minCoord = vec2(positions[0]);
+	vec2 minCoord = positions[0].xy;
 	vec2 maxCoord = minCoord;
-	minCoord = min(minCoord, vec2(positions[1]));
-	minCoord = min(minCoord, vec2(positions[2]));
-	maxCoord = max(maxCoord, vec2(positions[1]));
-	maxCoord = max(maxCoord, vec2(positions[2]));
+	minCoord = min(minCoord, positions[1].xy);
+	minCoord = min(minCoord, positions[2].xy);
+	maxCoord = max(maxCoord, positions[1].xy);
+	maxCoord = max(maxCoord, positions[2].xy);
 	ivec2 startIdx = ivec2(minCoord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) -1);
 	ivec2 endIdx = ivec2(maxCoord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) + 1);
 
@@ -66,8 +67,50 @@ void main()
 		{
 			continue;
 		}
-		int layer_triangle_idx = atomicAdd(tile_light_shadow_triangles.commands[layer].count, 3) / 3;
-		layer_triangle_idx += MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(layer);
-		tile_light_shadow_triangles.triangles[layer_triangle_idx] = TileLightShadowTriangle(triangle_idx, k);
+		vec4 pos[3];
+		vec3 test[3];
+		for(int p = 0; p < 3; p++)
+		{
+			pos[p] = tile_light_transform.view_proj[k] * vec4(positions[p], 1.0);
+			test[p]= pos[p].xyz / pos[p].w;
+		}
+		vec3 projNormal = cross(test[1] - test[0], test[2] - test[0]);
+		if(pos[0].z >= pos[0].w && pos[1].z >= pos[1].w && pos[2].z >= pos[2].w || projNormal.z * pos[0].w * pos[1].w * pos[2].w <= 0)
+		{
+			continue;
+		}
+		bool surroundTest[3] = { (test[0].x * test[1].y - test[0].y * test[1].x) * pos[2].w > 0,
+								(test[1].x * test[2].y - test[1].y * test[2].x) * pos[0].w > 0,
+								(test[2].x * test[0].y - test[2].y * test[0].x) * pos[1].w > 0 };
+		bool isIn = surroundTest[0] == surroundTest[1] && surroundTest[0] == surroundTest[2];
+		for(int p = 0; p < 3 && !isIn; p++)
+		{
+			vec2 a = test[p].xy;
+			int p2 = (p + 1) % 3;
+			vec2 v = test[p2].xy - a;
+			float lt2 = dot(a, a);
+			if(pos[p2].w < 0)
+			{
+				if(pos[p].w < 0)
+				{
+					continue;
+				}
+				lt2 = min(lt2, 1.0);
+				v = -v;
+			}
+			else if(pos[p].w < 0)
+			{
+				lt2 = min(lt2, 1.0);
+				a = test[p2].xy;
+			}
+			float t = v.x * a.y - v.y * a.x;
+			isIn = lt2 < 1.0 || dot(v, a) < 0 && dot(v, v) > max(t * t, lt2 - 1);
+		}
+		if(isIn)
+		{
+			int layer_triangle_idx = atomicAdd(tile_light_shadow_triangles.commands[layer].count, 3) / 3;
+			layer_triangle_idx += MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(layer);
+			tile_light_shadow_triangles.triangles[layer_triangle_idx] = TileLightShadowTriangle(vert_idx, k);
+		}
 	}
 }

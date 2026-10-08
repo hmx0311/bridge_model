@@ -7,6 +7,8 @@
 #define NUM_TILE_LIGHT_SHADOW_LAYERS 4
 #define MAX_AVERANGE_TRIANGLES_PER_LIGHT 4096
 
+#define USE_CS 1
+
 INLINE int findTileLightShadowLayer(int idx)
 {
 	return findMSB((idx >> 3) * 3 + 1) >> 1;
@@ -52,7 +54,7 @@ struct DrawArraysIndirectCommand
 
 struct TileLightShadowTriangle
 {
-	uint triangle_idx;
+	uint vert_idx[3];
 	int light_idx;
 };
 

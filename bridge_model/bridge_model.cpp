@@ -175,8 +175,11 @@ static void initShader()
 	GLuint FS_shadow = loadShader(SHADER_NAME(IDR_FS_SHADOW), GL_FRAGMENT_SHADER);
 	GLuint GS_shadow_highway_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_HIGHWAY_NIGHT), GL_GEOMETRY_SHADER);
 	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow);
+#if USE_CS
 	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow);
-	//SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
+#else
+	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
+#endif
 	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow);
 	SP_shadow_car_night = linkShaderProgram(VS_shadow_car_night, FS_shadow);
 	glDeleteShader(VS_shadow_highway_day);
@@ -645,12 +648,12 @@ static void drawGraphics()
 		float camera_z_far = scene_z_far;
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
-			x_mins[i] = FLT_MAX, x_maxs[i] = FLT_MIN, y_mins[i] = FLT_MAX, y_maxs[i] = FLT_MIN;
+			x_mins[i] = FLT_MAX, x_maxs[i] = -FLT_MAX, y_mins[i] = FLT_MAX, y_maxs[i] = -FLT_MAX;
 			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
 			float camera_z_near = camera_z_far / CSM_ratio;
 			Frustum camera_level_frustum{ camera.view, FOV_Y, float(window_width) / window_height, camera_z_near, camera_z_far };
 			BoundFrustum camera_level_bound{ camera.inv_view, FOV_Y, float(window_width) / window_height, camera_z_near, camera_z_far };
-			float frustum_x_min = FLT_MAX, frustum_x_max = FLT_MIN, frustum_y_min = FLT_MAX, frustum_y_max = FLT_MIN, frustum_z_far = FLT_MAX;
+			float frustum_x_min = FLT_MAX, frustum_x_max = -FLT_MAX, frustum_y_min = FLT_MAX, frustum_y_max = -FLT_MAX, frustum_z_far = FLT_MAX;
 			for (int i = 0; i < 8; i++)
 			{
 				vec3 corner_in_shadow = sun_shadow_view * vec4{ camera_level_bound.points[i], 1.0f };
@@ -723,7 +726,7 @@ static void drawGraphics()
 
 		for (int i = 0; i < CSM_LEVELS - 3; i += 4)
 		{
-			float group_x_min = FLT_MAX, group_x_max = FLT_MIN, group_y_min = FLT_MAX, group_y_max = FLT_MIN, group_z_min = FLT_MAX;
+			float group_x_min = FLT_MAX, group_x_max = -FLT_MAX, group_y_min = FLT_MAX, group_y_max = -FLT_MAX, group_z_min = FLT_MAX;
 			for (int j = 0; j < 4; j++)
 			{
 				group_z_min = std::min(group_z_min, z_mins[i + j]);
@@ -756,7 +759,7 @@ static void drawGraphics()
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
 			Frustum shadow_frustum(sun_shadow_view, x_mins[i], x_maxs[i], y_mins[i], y_maxs[i], 0.0f, 1.0f);
-			float z_max = FLT_MIN;
+			float z_max = -FLT_MAX;
 			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
 			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_X; j++)
 			{
@@ -1058,7 +1061,7 @@ static void drawGraphics()
 		}
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glViewport(0, 0, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE);
-		
+
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, tile_light_shadow_triangles_SSBO);
 		glBindVertexArray(attri_less_VAO);
 		DrawArraysIndirectCommand commands[NUM_TILE_LIGHT_SHADOW_LAYERS]{};
@@ -1067,15 +1070,15 @@ static void drawGraphics()
 			commands[i].instance_count = 1;
 			commands[i].first = 3 * MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(i);
 		}
-
+#if USE_CS
 		glUseProgram(CSP_shadow_highway_night);
+		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 		glNamedBufferSubData(tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, highway_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), HIGHWAY_EBO_SIZE / 3);
-		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 		glDispatchCompute((HIGHWAY_EBO_SIZE / 3 + 63) / 64, 1, 1);
-		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 		glUseProgram(SP_shadow_highway_night);
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
@@ -1084,26 +1087,26 @@ static void drawGraphics()
 		}
 
 		glUseProgram(CSP_shadow_highway_night);
+		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 		glNamedBufferSubData(tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, bridge_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), BRIDGE_EBO_SIZE / 3);
-		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 		glDispatchCompute((BRIDGE_EBO_SIZE / 3 + 63) / 64, 1, 1);
-		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 		glUseProgram(SP_shadow_highway_night);
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
 			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
 		}
-		/*
+#else
 		glUseProgram(SP_shadow_highway_night);
 		glBindVertexArray(highway_VAO);
 		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		*/
+#endif
 		glUseProgram(SP_shadow_car_night);
 		glBindVertexArray(car_shadow_night_VAO);
 		int car_tile_light_shadow_offset = 0;
@@ -1111,7 +1114,7 @@ static void drawGraphics()
 		{
 			int count = car_tile_light_shadow_transform[i].size();
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
-			glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_tile_light_shadow_offset);
+			//glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_tile_light_shadow_offset);
 			car_tile_light_shadow_offset += count;
 		}
 		for (int i = 0; i < 4; i++)

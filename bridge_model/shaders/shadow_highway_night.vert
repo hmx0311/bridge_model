@@ -1,5 +1,5 @@
 #include "lighting_night_defines.h"
-
+#if USE_CS
 layout(std430, binding = VERTEX_BUFFER_BINDING) buffer vertex_block
 { 
     float vertices[];
@@ -15,7 +15,7 @@ out float gl_ClipDistance[4];
 void main()
 {
 	uint triangle_id = gl_VertexID / 3;
-	uint vert_idx = indices[3 * tile_light_shadow_triangles.triangles[triangle_id].triangle_idx + gl_VertexID % 3];
+	uint vert_idx = tile_light_shadow_triangles.triangles[triangle_id].vert_idx[gl_VertexID % 3];
 	uint offset = 3 * vert_idx;
 	vec3 vertex = vec3(vertices[offset], vertices[offset + 1], vertices[offset + 2]);		
 	int light_idx = tile_light_shadow_triangles.triangles[triangle_id].light_idx;
@@ -32,7 +32,8 @@ void main()
 }
 
 
-/*
+#else
+
 layout(location = 0) in vec3 vertex;
 layout(location = 1) in vec3 normal;
 
@@ -43,4 +44,4 @@ void main()
 	aNormal = normal;
 	gl_Position = vec4(vertex, 1.0);
 }
-*/
+#endif
