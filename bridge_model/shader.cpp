@@ -30,7 +30,7 @@ GLuint loadShader(const char* shader_name, GLenum type)
 	}
 	sources.push_back(static_cast<const char*>(LockResource(rc_data)));
 	source_names.push_back({ shader_name, static_cast<int>(strlen(shader_name)) });
-	for (int i = 0; i < sources.size(); i++)
+	for (int i = 0; i < source_names.size(); i++)
 	{
 		const char* source = sources[i];
 		int len = sizes[i];
@@ -129,7 +129,20 @@ GLuint loadShader(const char* shader_name, GLenum type)
 						source_names.insert(source_names.begin() + i + 1, { source + name_begin, name_len });
 					}
 					len -= j;
-					source = &source[j];
+					source += j;
+					sizes[i] = len;
+					sources[i] = source;
+					j = 0;
+					continue;
+				}
+				else if (source[j] == '#' && j + sizeof("#extension") - 1 < len && strncmp(source + j, "#extension", sizeof("#extension") - 1) == 0)
+				{
+					j += sizeof("#extension") - 1;
+					while (j < len && source[j++] != '\n');
+					sizes.insert(sizes.begin() + source_names.size(), j);
+					sources.insert(sources.begin() + source_names.size(), source);
+					len -= j;
+					source += j;
 					sizes[i] = len;
 					sources[i] = source;
 					j = 0;

@@ -35,8 +35,7 @@ void initScene()
 	glBindFramebuffer(GL_FRAMEBUFFER, height_map_FBO);
 
 	GLuint height_map_tex;
-	glGenTextures(1, &height_map_tex);
-	glBindTexture(GL_TEXTURE_2D, height_map_tex);
+	glCreateTextures(GL_TEXTURE_2D, 1, &height_map_tex);
 	glTextureStorage2D(height_map_tex, 1, GL_DEPTH_COMPONENT32, SCENE_GRID_SIZE_X, SCENE_GRID_SIZE_Y);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, height_map_tex, 0);
 	glDrawBuffer(GL_NONE);

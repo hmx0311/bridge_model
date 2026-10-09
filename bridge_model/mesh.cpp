@@ -200,16 +200,15 @@ static void initTex()
 
 	GLfloat max_TexAni;
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_TexAni);
-	glGenTextures(1, &highway_tex);
-	glBindTexture(GL_TEXTURE_2D, highway_tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 8192, 4096, 0, GL_RGB, GL_FLOAT, highway_tex_data.get());
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, max_TexAni);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 9);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	glCreateTextures(GL_TEXTURE_2D, 1, &highway_tex);
+	glTextureStorage2D(highway_tex, 14, GL_RGB8, 8192, 4096);
+	glTextureSubImage2D(highway_tex, 0, 0, 0, 8192, 4096, GL_RGB, GL_FLOAT, highway_tex_data.get());
+	glTextureParameterf(highway_tex, GL_TEXTURE_MAX_ANISOTROPY, max_TexAni);
+	glTextureParameteri(highway_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(highway_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTextureParameteri(highway_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(highway_tex, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glGenerateTextureMipmap(highway_tex);
 }
 
 static void buildHighwayMesh()
@@ -218,7 +217,7 @@ static void buildHighwayMesh()
 	auto positions = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
 	auto normals = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
 	auto tex_coords = std::make_unique_for_overwrite<vec2[]>(VERT_SIZE);
-	auto indices = std::make_unique< GLuint[]>(HIGHWAY_EBO_SIZE);
+	auto indices = std::make_unique<GLuint[]>(HIGHWAY_EBO_SIZE);
 
 	int i_vert = 0;
 	int i_idx = 0;
@@ -401,7 +400,7 @@ static void buildHighwayMesh()
 	}
 
 	i_idx += i_vert / 4 * 6;
-	
+
 	long_quad(
 		vec3(-2560.0f, -7.2f, 0),
 		vec3(-2560.0f, 7.2f, 0),
@@ -1952,24 +1951,24 @@ static void buildCarMesh()
 	glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "materials[6].shininess"), 0);
 
 	constexpr int VERT_SIZE = 884;
-	vec3 positions[VERT_SIZE] = { {POINT0},	{POINT1},	{POINT2},	{POINT3},	//◊Û«∞µ∆
-									{POINT4},	{POINT5},	{POINT6},	{POINT7},	//”“«∞µ∆
-									{POINT8},	{POINT9},	{POINT10},	{POINT11},	//◊Û∫Ûµ∆
-									{POINT12},	{POINT13},	{POINT14},	{POINT15},	//”“∫Ûµ∆
-									{POINT7},	{POINT2},	{POINT16},	{POINT17},	//«∞…œ
-									{POINT5},	{POINT0},	{POINT3},	{POINT6},	//«∞÷–
-									{POINT18},	{POINT19},	{POINT1},	{POINT4},	//«∞œ¬
-									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ◊
-									{POINT9},	{POINT12},	{POINT15},	{POINT10},	//∫Û…œ
-									{POINT21},	{POINT20},	{POINT13},	{POINT8},	//∫Ûœ¬
-									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//◊Û
-									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//”“
-									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//“˝«Ê∏«
-									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//∂•
-									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//«∞≤£¡ß
-									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//∫Û≤£¡ß
-									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//◊Û≤£¡ß
-									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//”“≤£¡ß
+	vec3 positions[VERT_SIZE] = { {POINT0},	{POINT1},	{POINT2},	{POINT3},	//√ó√≥√á¬∞¬µ√Ü
+									{POINT4},	{POINT5},	{POINT6},	{POINT7},	//√ì√í√á¬∞¬µ√Ü
+									{POINT8},	{POINT9},	{POINT10},	{POINT11},	//√ó√≥¬∫√≥¬µ√Ü
+									{POINT12},	{POINT13},	{POINT14},	{POINT15},	//√ì√í¬∫√≥¬µ√Ü
+									{POINT7},	{POINT2},	{POINT16},	{POINT17},	//√á¬∞√â√è
+									{POINT5},	{POINT0},	{POINT3},	{POINT6},	//√á¬∞√ñ√ê
+									{POINT18},	{POINT19},	{POINT1},	{POINT4},	//√á¬∞√è√Ç
+									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//¬µ√ó
+									{POINT9},	{POINT12},	{POINT15},	{POINT10},	//¬∫√≥√â√è
+									{POINT21},	{POINT20},	{POINT13},	{POINT8},	//¬∫√≥√è√Ç
+									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//√ó√≥
+									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//√ì√í
+									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//√í√Ω√á√¶¬∏√á
+									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¬∂¬•
+									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//√á¬∞¬≤¬£√Å¬ß
+									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//¬∫√≥¬≤¬£√Å¬ß
+									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//√ó√≥¬≤¬£√Å¬ß
+									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//√ì√í¬≤¬£√Å¬ß
 	vec3 normals[VERT_SIZE];
 	int material_idxs[VERT_SIZE];
 	GLuint indices[CAR_EBO_SIZE];
@@ -2156,17 +2155,17 @@ static void buildCarShadowMesh()
 {
 	constexpr int VERT_SIZE = 560;
 
-	vec3 positions[VERT_SIZE] = { {POINT16},	{POINT17},	{POINT18},	{POINT19},	//«∞
-									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ◊
-									{POINT21},	{POINT20},	{POINT14},	{POINT11},	//∫Û
-									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//◊Û
-									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//”“
-									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//“˝«Ê∏«
-									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//∂•
-									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//«∞≤£¡ß
-									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//∫Û≤£¡ß
-									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//◊Û≤£¡ß
-									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//”“≤£¡ß
+	vec3 positions[VERT_SIZE] = { {POINT16},	{POINT17},	{POINT18},	{POINT19},	//√á¬∞
+									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//¬µ√ó
+									{POINT21},	{POINT20},	{POINT14},	{POINT11},	//¬∫√≥
+									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//√ó√≥
+									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//√ì√í
+									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//√í√Ω√á√¶¬∏√á
+									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¬∂¬•
+									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//√á¬∞¬≤¬£√Å¬ß
+									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//¬∫√≥¬≤¬£√Å¬ß
+									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//√ó√≥¬≤¬£√Å¬ß
+									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//√ì√í¬≤¬£√Å¬ß
 	GLuint indices[CAR_SHADOW_EBO_SIZE];
 
 	for (int i = 0; i < 11; i++)

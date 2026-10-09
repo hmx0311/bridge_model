@@ -245,44 +245,19 @@ static void init()
 	glNamedBufferData(tile_light_shadow_triangles_SSBO, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
 
-	glGenFramebuffers(1, &multisample_render_FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
-	glGenRenderbuffers(2, multisample_render_RBOs);
+	glCreateFramebuffers(1, &multisample_render_FBO);
+	glCreateRenderbuffers(2, multisample_render_RBOs);
 	for (int i = 0; i < 2; i++)
 	{
-		glBindRenderbuffer(GL_RENDERBUFFER, multisample_render_RBOs[i]);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, multisample_render_RBOs[i]);
+		glNamedFramebufferRenderbuffer(multisample_render_FBO, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, multisample_render_RBOs[i]);
 	}
-	glGenRenderbuffers(1, &depth_RBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, depth_RBO);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_RBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glCreateRenderbuffers(1, &depth_RBO);
+	glNamedFramebufferRenderbuffer(multisample_render_FBO, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_RBO);
 	GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	glDrawBuffers(2, attachments);
 
-	glGenFramebuffers(1, &render_FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, render_FBO);
-	glGenTextures(1, &render_tex);
-	glBindTexture(GL_TEXTURE_2D, render_tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 3);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, render_tex, 0);
-
-	glGenFramebuffers(2, bloom_FBOs);
-	glGenTextures(2, bloom_texs);
-	for (int i = 0; i < 2; i++)
-	{
-		glBindFramebuffer(GL_FRAMEBUFFER, bloom_FBOs[i]);
-		glBindTexture(GL_TEXTURE_2D, bloom_texs[i]);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bloom_texs[i], 0);
-	}
+	glCreateFramebuffers(1, &render_FBO);
+	glCreateFramebuffers(2, bloom_FBOs);
 
 	vec2 screen_coords[4] = { { 1, 1 },{ -1, 1 }, { -1, -1 }, { 1, -1 } };
 	glGenVertexArrays(1, &tex_blit_VAO);
@@ -294,24 +269,21 @@ static void init()
 	glEnableVertexAttribArray(0);
 	glBindVertexArray(0);
 
-	glGenFramebuffers(1, &shadow_day_FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, shadow_day_FBO);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-	glGenTextures(1, &shadow_day_tex);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_day_tex);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1 + PCSS_MIP_LEVELS, GL_DEPTH_COMPONENT24, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE, CSM_LEVELS);
+	glCreateFramebuffers(1, &shadow_day_FBO);
+	glNamedFramebufferDrawBuffer(shadow_day_FBO, GL_NONE);
+	glNamedFramebufferReadBuffer(shadow_day_FBO, GL_NONE);
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &shadow_day_tex);
+	glTextureParameteri(shadow_day_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(shadow_day_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(shadow_day_tex, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTextureParameteri(shadow_day_tex, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTextureParameteri(shadow_day_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(shadow_day_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTextureStorage3D(shadow_day_tex, 1 + PCSS_MIP_LEVELS, GL_DEPTH_COMPONENT24, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE, CSM_LEVELS);
 
-	glGenFramebuffers(1, &shadow_mip_gen_FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, shadow_mip_gen_FBO);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
+	glCreateFramebuffers(1, &shadow_mip_gen_FBO);
+	glNamedFramebufferDrawBuffer(shadow_mip_gen_FBO, GL_NONE);
+	glNamedFramebufferReadBuffer(shadow_mip_gen_FBO, GL_NONE);
 
 	glGenSamplers(1, &shadow_PCF_sampler);
 	glSamplerParameteri(shadow_PCF_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -326,34 +298,32 @@ static void init()
 	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glSamplerParameteri(shadow_depth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	glGenFramebuffers(1, &shadow_night_FBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, shadow_night_FBO);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-	glGenTextures(1, &shadow_night_tex);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_night_tex);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_DEPTH_COMPONENT24, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE, NUM_TILE_LIGHT_SHADOW_LAYERS);
+	glCreateFramebuffers(1, &shadow_night_FBO);
+	glNamedFramebufferDrawBuffer(shadow_night_FBO, GL_NONE);
+	glNamedFramebufferReadBuffer(shadow_night_FBO, GL_NONE);
+	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &shadow_night_tex);
+	glTextureParameteri(shadow_night_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(shadow_night_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTextureParameteri(shadow_night_tex, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTextureParameteri(shadow_night_tex, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTextureParameteri(shadow_night_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(shadow_night_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTextureStorage3D(shadow_night_tex, 1, GL_DEPTH_COMPONENT24, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE, NUM_TILE_LIGHT_SHADOW_LAYERS);
 
-	glGenTextures(1, &text_atlas_tex);
+	glCreateTextures(GL_TEXTURE_2D, 1, &text_atlas_tex);
 	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TEXT_ATLAS), L"TEXTURE");
 	if (rc_info != nullptr)
 	{
 		HGLOBAL rc_data = LoadResource(nullptr, rc_info);
 		if (rc_data != nullptr)
 		{
-			glBindTexture(GL_TEXTURE_2D, text_atlas_tex);
 			const char* data = (const char*)(LockResource(rc_data));
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y, 0, GL_RED, GL_UNSIGNED_BYTE, data);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTextureStorage2D(text_atlas_tex, 1, GL_R8, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y);
+			glTextureSubImage2D(text_atlas_tex, 0, 0, 0, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y, GL_RED, GL_UNSIGNED_BYTE, data);
+			glTextureParameteri(text_atlas_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(text_atlas_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(text_atlas_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(text_atlas_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		}
 		else
 		{
@@ -536,7 +506,8 @@ static void drawGraphics()
 			vec3 half_size = 0.5f * bound.size();
 			auto& p_near = camera_frustum.getPlane(Frustum::NEAR);
 			auto& p_far = camera_frustum.getPlane(Frustum::FAR);
-			float r = dot(half_size, abs(p_near.normal));
+			vec3 abs_noraml = abs(p_near.normal);
+			float r = dot(half_size, abs_noraml);
 			float m_near = dot(p_near.normal, bound.center()) + p_near.d;
 			float m_far = dot(p_far.normal, bound.center()) + p_far.d;
 			float z_near = MIN_VIEW_Z_NEAR + m_near - r;
@@ -558,8 +529,11 @@ static void drawGraphics()
 			}
 			if (result == INTERSECTION_TEST_INSIDE)
 			{
-				view_z_near = std::min(view_z_near, z_near + 4.0f / 3.0f * r);
-				scene_z_far = std::max(scene_z_far, z_far - 4.0f / 3.0f * r);
+				vec3 v = abs_noraml * half_size;
+				float r_separate = std::max(v.x, std::max(v.y, v.z)) / (v.x + v.y + v.z);
+				r_separate = 2.0f * r * (1.0f - r_separate);
+				view_z_near = std::min(view_z_near, z_near + r_separate);
+				scene_z_far = std::max(scene_z_far, z_far - r_separate);
 			}
 			grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
 			grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
@@ -626,7 +600,6 @@ static void drawGraphics()
 		view_top = mat3(camera.inv_view) * view_top;
 		view_left = mat3(camera.inv_view) * view_left;
 		float z_min = FLT_MAX;
-		float slope = sqrt(1.0f / (sun.light_dir_and_radius.z * sun.light_dir_and_radius.z) - 1.0f);
 		float x_maxs[CSM_LEVELS], x_mins[CSM_LEVELS], y_maxs[CSM_LEVELS], y_mins[CSM_LEVELS], z_mins[CSM_LEVELS];
 		float CSM_ratio = pow(scene_z_far / view_z_near, 1.0f / CSM_LEVELS);
 		float camera_z_far = scene_z_far;
@@ -647,7 +620,6 @@ static void drawGraphics()
 				frustum_y_min = std::min(frustum_y_min, corner_in_shadow.y);
 				frustum_y_max = std::max(frustum_y_max, corner_in_shadow.y);
 			}
-
 			camera_z_far = camera_z_near;
 			for (int j = 0; j < NUM_SCENE_GRID_ROOTS_X; j++)
 			{
@@ -690,10 +662,16 @@ static void drawGraphics()
 				}
 				if (result == INTERSECTION_TEST_INSIDE)
 				{
-					x_mins[i] = std::min(x_mins[i], center.x + 1.0f / 3.0f * r.x);
-					x_maxs[i] = std::max(x_maxs[i], center.x - 1.0f / 3.0f * r.x);
-					y_mins[i] = std::min(y_mins[i], center.y + 1.0f / 3.0f * r.y);
-					y_maxs[i] = std::max(y_maxs[i], center.y - 1.0f / 3.0f * r.y);
+					vec3 v_x{ abs_sun_shadow_rot[0][0] * half_size.x, abs_sun_shadow_rot[1][0] * half_size.x, abs_sun_shadow_rot[2][0] * half_size.z };
+					vec3 v_y{ abs_sun_shadow_rot[0][1] * half_size.y, abs_sun_shadow_rot[1][1] * half_size.y, abs_sun_shadow_rot[2][1] * half_size.z };
+					float r_separate_x = std::max(v_x.x, std::max(v_x.y, v_x.z)) / (v_x.x + v_x.y + v_x.z);
+					float r_separate_y = std::max(v_y.x, std::max(v_y.y, v_y.z)) / (v_y.x + v_y.y + v_y.z);
+					r_separate_x = (1.0f - 2.0f * r_separate_x) * r.x;
+					r_separate_y = (1.0f - 2.0f * r_separate_y) * r.y;
+					x_mins[i] = std::min(x_mins[i], center.x + r_separate_x);
+					x_maxs[i] = std::max(x_maxs[i], center.x - r_separate_x);
+					y_mins[i] = std::min(y_mins[i], center.y + r_separate_y);
+					y_maxs[i] = std::max(y_maxs[i], center.y - r_separate_y);
 				}
 				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
 				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y);
@@ -1097,7 +1075,7 @@ static void drawGraphics()
 		{
 			int count = car_tile_light_shadow_transform[i].size();
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
-			//glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_tile_light_shadow_offset);
+			glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_tile_light_shadow_offset);
 			car_tile_light_shadow_offset += count;
 		}
 		for (int i = 0; i < 4; i++)
@@ -1176,7 +1154,7 @@ static void drawGraphics()
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 	static float fps = 60;
-	fps = (fps + 1) / (1.0f + dt_us * 1e-6f);
+	fps = (fps + 0.1) / (1.0f + 0.1 * dt_us * 1e-6f);
 
 	if (show_fps)
 	{
@@ -1228,19 +1206,31 @@ static void onResize(GLFWwindow*, int width, int height)
 	int MSAA_level = 8;
 	for (int i = 0; i < 2; i++)
 	{
-		glBindRenderbuffer(GL_RENDERBUFFER, multisample_render_RBOs[i]);
-		glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_level, GL_RGB16F, width, height);
+		glNamedRenderbufferStorageMultisample(multisample_render_RBOs[i], MSAA_level, GL_RGB16F, width, height);
 	}
-	glBindRenderbuffer(GL_RENDERBUFFER, depth_RBO);
-	glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_level, GL_DEPTH_COMPONENT32, width, height);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glNamedRenderbufferStorageMultisample(depth_RBO, MSAA_level, GL_DEPTH_COMPONENT32, width, height);
 
-	glBindTexture(GL_TEXTURE_2D, render_tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
-	glBindTexture(GL_TEXTURE_2D, bloom_texs[0]);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, bloom_buffer_width, BLOOM_BUFFER_HEIGHT, 0, GL_RGB, GL_FLOAT, nullptr);
-	glBindTexture(GL_TEXTURE_2D, bloom_texs[1]);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, BLOOM_BUFFER_HEIGHT, bloom_buffer_width, 0, GL_RGB, GL_FLOAT, nullptr);
+	glDeleteTextures(1, &render_tex);
+	glCreateTextures(GL_TEXTURE_2D, 1, &render_tex);
+	glTextureStorage2D(render_tex, 4, GL_RGB16F, width, height);
+	glTextureParameteri(render_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTextureParameteri(render_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTextureParameteri(render_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTextureParameteri(render_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glNamedFramebufferTexture(render_FBO, GL_COLOR_ATTACHMENT0, render_tex, 0);
+
+	glDeleteTextures(2, bloom_texs);
+	glCreateTextures(GL_TEXTURE_2D, 2, bloom_texs);
+	glTextureStorage2D(bloom_texs[0], 1, GL_RGB16F, bloom_buffer_width, BLOOM_BUFFER_HEIGHT);
+	glTextureStorage2D(bloom_texs[1], 1, GL_RGB16F, BLOOM_BUFFER_HEIGHT, bloom_buffer_width);
+	for (int i = 0; i < 2; i++)
+	{
+		glTextureParameteri(bloom_texs[i], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(bloom_texs[i], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(bloom_texs[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(bloom_texs[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glNamedFramebufferTexture(bloom_FBOs[i], GL_COLOR_ATTACHMENT0, bloom_texs[i], 0);
+	}
 }
 
 static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
@@ -1418,10 +1408,10 @@ int main(int argc, char** argv)
 	printf("%s\n", glGetString(GL_VERSION));
 	printf("%s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	GLint redBits, greenBits, blueBits;
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &redBits);
-	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, &greenBits);
-	glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, &blueBits);
+	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &redBits);
+	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, &greenBits);
+	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, &blueBits);
+
 	if (redBits == greenBits && redBits == blueBits)
 	{
 		printf("pixel format: RGB%d\n", redBits);
