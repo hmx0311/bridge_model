@@ -183,9 +183,6 @@
     <Text Include="shaders\shadow_car_night.vert">
       <Filter>资源文件\shaders\shadow\night</Filter>
     </Text>
-    <Text Include="shaders\shadow_highway_night.geom">
-      <Filter>资源文件\shaders\shadow\night</Filter>
-    </Text>
     <Text Include="shaders\car.vert">
       <Filter>资源文件\shaders\draw</Filter>
     </Text>

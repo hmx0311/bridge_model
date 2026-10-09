@@ -1,13 +1,8 @@
 #include "lighting_night_defines.h"
-#if USE_CS
+
 layout(std430, binding = VERTEX_BUFFER_BINDING) buffer vertex_block
 { 
     float vertices[];
-};
-
-layout(std430, binding = INDEX_BUFFER_BINDING) buffer index_block
-{ 
-    uint indices[];
 };
 
 out float gl_ClipDistance[4];
@@ -30,18 +25,3 @@ void main()
 	gl_ClipDistance[3] = gl_Position.w - gl_Position.y;
 	gl_Position.xy = (gl_Position.xy + gl_Position.w) / layer_size + shadow_map_pos * gl_Position.w;
 }
-
-
-#else
-
-layout(location = 0) in vec3 vertex;
-layout(location = 1) in vec3 normal;
-
-out vec3 aNormal;
-
-void main()
-{
-	aNormal = normal;
-	gl_Position = vec4(vertex, 1.0);
-}
-#endif

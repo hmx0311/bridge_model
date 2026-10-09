@@ -3,6 +3,6 @@
 
 GLuint loadShader(const char* shader_name, GLenum type);
 
-GLuint linkShaderProgram(GLuint vert, GLuint frag, GLuint geom = 0);
+GLuint linkShaderProgram(GLuint vert, GLuint frag);
 
 GLuint loadComputeProgram(const char* shader_name);

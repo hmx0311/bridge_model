@@ -2,6 +2,7 @@
 
 #include "shader.h"
 
+#include <memory>
 #include <vector>
 #include <string>
 
@@ -221,16 +222,12 @@ GLuint loadShader(const char* shader_name, GLenum type)
 	return shader;
 }
 
-GLuint linkShaderProgram(GLuint vert, GLuint frag, GLuint geom)
+GLuint linkShaderProgram(GLuint vert, GLuint frag)
 {
 	GLint status;
 	GLuint program = glCreateProgram();
 	glAttachShader(program, vert);
 	glAttachShader(program, frag);
-	if (geom != 0)
-	{
-		glAttachShader(program, geom);
-	}
 	glLinkProgram(program);
 	glGetProgramiv(program, GL_LINK_STATUS, &status);
 	if (status == GL_FALSE)
@@ -238,17 +235,12 @@ GLuint linkShaderProgram(GLuint vert, GLuint frag, GLuint geom)
 		printf("\nERROR: Shader Program %d Link Error\n", program);
 		int len;
 		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
-		char* log = new char[len];
-		glGetProgramInfoLog(program, len, nullptr, log);
-		printf("%s", log);
-		delete[] log;
+		auto log = std::make_unique<char>(len);
+		glGetProgramInfoLog(program, len, nullptr, log.get());
+		printf("%s", log.get());
 	}
 	glDetachShader(program, vert);
 	glDetachShader(program, frag);
-	if (geom != 0)
-	{
-		glDetachShader(program, geom);
-	}
 	return program;
 }
 

@@ -55,7 +55,6 @@ float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 10
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
 bool need_update_view = true;
-uint64_t last_time_us;
 
 constexpr float HEIGHT_RANGE[2] = { -10.0f, 646.0f };
 
@@ -104,7 +103,10 @@ GLuint tile_lights_SSBO;
 // binding = 5
 GLuint car_lighting_SSBO;
 // binding = 6
-GLuint tile_light_shadow_triangles_SSBO;
+GLuint highway_tile_light_shadow_triangles_SSBO;
+GLuint bridge_tile_light_shadow_triangles_SSBO;
+
+constexpr GLsizeiptr tile_light_shadow_triangles_SSBO_size = sizeof(TileLightShadowTriangleData) + tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS) * MAX_AVERANGE_TRIANGLES_PER_LIGHT * sizeof(TileLightShadowTriangle);
 
 CameraData camera;
 ShadowTransformData sun_shadow;
@@ -170,18 +172,12 @@ static void initShader()
 	GLuint VS_shadow_car_day = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_DAY), GL_VERTEX_SHADER);
 	GLuint VS_shadow_car_night = loadShader(SHADER_NAME(IDR_VS_SHADOW_CAR_NIGHT), GL_VERTEX_SHADER);
 	GLuint FS_shadow = loadShader(SHADER_NAME(IDR_FS_SHADOW), GL_FRAGMENT_SHADER);
-	GLuint GS_shadow_highway_night = loadShader(SHADER_NAME(IDR_GS_SHADOW_HIGHWAY_NIGHT), GL_GEOMETRY_SHADER);
 	SP_shadow_highway_day = linkShaderProgram(VS_shadow_highway_day, FS_shadow);
-#if USE_CS
 	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow);
-#else
-	SP_shadow_highway_night = linkShaderProgram(VS_shadow_highway_night, FS_shadow, GS_shadow_highway_night);
-#endif
 	SP_shadow_car_day = linkShaderProgram(VS_shadow_car_day, FS_shadow);
 	SP_shadow_car_night = linkShaderProgram(VS_shadow_car_night, FS_shadow);
 	glDeleteShader(VS_shadow_highway_day);
 	glDeleteShader(VS_shadow_highway_night);
-	glDeleteShader(GS_shadow_highway_night);
 	glDeleteShader(VS_shadow_car_day);
 	glDeleteShader(VS_shadow_car_night);
 	glDeleteShader(FS_shadow);
@@ -240,10 +236,10 @@ static void init()
 	glCreateBuffers(1, &car_lighting_SSBO);
 	glNamedBufferData(car_lighting_SSBO, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, CAR_LIGHTING_BUFFER_BINDING, car_lighting_SSBO, 0, sizeof(car_lightings));
-	glCreateBuffers(1, &tile_light_shadow_triangles_SSBO);
-	constexpr GLsizeiptr tile_light_shadow_triangles_SSBO_size = sizeof(TileLightShadowTriangleData) + tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS) * MAX_AVERANGE_TRIANGLES_PER_LIGHT * sizeof(TileLightShadowTriangle);
-	glNamedBufferData(tile_light_shadow_triangles_SSBO, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
+	glCreateBuffers(1, &highway_tile_light_shadow_triangles_SSBO);
+	glNamedBufferData(highway_tile_light_shadow_triangles_SSBO, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
+	glCreateBuffers(1, &bridge_tile_light_shadow_triangles_SSBO);
+	glNamedBufferData(bridge_tile_light_shadow_triangles_SSBO, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
 
 	glCreateFramebuffers(1, &multisample_render_FBO);
 	glCreateRenderbuffers(2, multisample_render_RBOs);
@@ -339,7 +335,6 @@ static void init()
 
 	buildMeshes();
 	initScene();
-	last_time_us = getTimestampMicroseconds();
 }
 
 static void drawGraphics()
@@ -352,8 +347,9 @@ static void drawGraphics()
 	static std::vector<mat4> car_tile_light_shadow_transform[NUM_TILE_LIGHT_SHADOW_LAYERS];
 	static std::vector<int> car_tile_light_shadow_idx[NUM_TILE_LIGHT_SHADOW_LAYERS];
 
+	static uint64_t last_time_us = 0;
 	uint64_t time_us = getTimestampMicroseconds();
-	uint64_t dt_us = time_us - last_time_us;
+	uint64_t dt_us = last_time_us > 0 ? time_us - last_time_us : 0;
 	last_time_us = time_us;
 	LogicalData& logical_data = getLatestLogicalData();
 	if (focus_move_dir != 0)
@@ -1023,51 +1019,48 @@ static void drawGraphics()
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glViewport(0, 0, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE);
 
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, tile_light_shadow_triangles_SSBO);
-		glBindVertexArray(attri_less_VAO);
 		DrawArraysIndirectCommand commands[NUM_TILE_LIGHT_SHADOW_LAYERS]{};
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
 			commands[i].instance_count = 1;
 			commands[i].first = 3 * MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(i);
 		}
-#if USE_CS
 		glUseProgram(CSP_shadow_highway_night);
 		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-		glNamedBufferSubData(tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
+		glNamedBufferSubData(highway_tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
+		glNamedBufferSubData(bridge_tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
+
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, highway_tile_light_shadow_triangles_SSBO);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, highway_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, highway_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), HIGHWAY_EBO_SIZE / 3);
 		glDispatchCompute((HIGHWAY_EBO_SIZE / 3 + 63) / 64, 1, 1);
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
-		glUseProgram(SP_shadow_highway_night);
-		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
-		{
-			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
-			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
-		}
 
-		glUseProgram(CSP_shadow_highway_night);
-		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-		glNamedBufferSubData(tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bridge_tile_light_shadow_triangles_SSBO);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, bridge_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, bridge_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), BRIDGE_EBO_SIZE / 3);
 		glDispatchCompute((BRIDGE_EBO_SIZE / 3 + 63) / 64, 1, 1);
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+
 		glUseProgram(SP_shadow_highway_night);
+		glBindVertexArray(attri_less_VAO);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
+
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, highway_tile_light_shadow_triangles_SSBO);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, highway_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
+			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
+
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bridge_tile_light_shadow_triangles_SSBO);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, bridge_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
 			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
 		}
-#else
-		glUseProgram(SP_shadow_highway_night);
-		glBindVertexArray(highway_VAO);
-		glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		glBindVertexArray(bridge_VAO);
-		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
-#endif
 		glUseProgram(SP_shadow_car_night);
 		glBindVertexArray(car_shadow_night_VAO);
 		int car_tile_light_shadow_offset = 0;
@@ -1153,8 +1146,11 @@ static void drawGraphics()
 	glUseProgram(SP_buffer_to_screen);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-	static float fps = 60;
-	fps = (fps + 0.1) / (1.0f + 0.1 * dt_us * 1e-6f);
+	static float fps = -1.0f;
+	if (dt_us > 0)
+	{
+		fps = fps > 0.0f ? (fps + 1.0f) / (1.0f + dt_us * 1e-6f) : 1e6f / dt_us;
+	}
 
 	if (show_fps)
 	{

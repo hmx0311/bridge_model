@@ -148,7 +148,6 @@
     <Text Include="shaders\shadow.frag" />
     <Text Include="shaders\sun.frag" />
     <Text Include="shaders\tex_blit.frag" />
-    <Text Include="shaders\shadow_highway_night.geom" />
     <Text Include="shaders\shadow_car_night.vert" />
     <Text Include="shaders\shadow_highway_night.vert" />
     <Text Include="shaders\tex_blit.vert" />
