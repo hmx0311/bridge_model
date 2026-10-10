@@ -3,7 +3,7 @@
 
 #include "Bound.h"
 
-constexpr int HIGHWAY_EBO_SIZE = 14517;
+constexpr int HIGHWAY_EBO_SIZE = 14511;
 constexpr int BRIDGE_EBO_SIZE = 16914;
 constexpr int CAR_EBO_SIZE = 2496;
 constexpr int CAR_SHADOW_EBO_SIZE = 1566;

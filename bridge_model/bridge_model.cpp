@@ -348,10 +348,15 @@ static void drawGraphics()
 	static std::vector<int> car_tile_light_shadow_idx[NUM_TILE_LIGHT_SHADOW_LAYERS];
 
 	static uint64_t last_time_us = 0;
+	static float fps = -1.0f;
 	uint64_t time_us = getTimestampMicroseconds();
 	uint64_t dt_us = last_time_us > 0 ? time_us - last_time_us : 0;
+	if (dt_us > 0)
+	{
+		fps = fps > 0.0f ? (fps + 1.0f) / (1.0f + dt_us * 1e-6f) : 1e6f / dt_us;
+	}
 	last_time_us = time_us;
-	LogicalData& logical_data = getLatestLogicalData();
+
 	if (focus_move_dir != 0)
 	{
 		vec2 dir = vec2(0.0f);
@@ -542,6 +547,7 @@ static void drawGraphics()
 		camera.view_proj = camera.projection * camera.view;
 	}
 
+	LogicalData& logical_data = getLatestLogicalData();
 	SunData sun;
 	sun.light_dir_and_radius = vec4(logical_data.sun_dir, 1.0f);
 	sun.diffuse_specular = vec3(0.4);
@@ -1146,23 +1152,36 @@ static void drawGraphics()
 	glUseProgram(SP_buffer_to_screen);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-	static float fps = -1.0f;
-	if (dt_us > 0)
-	{
-		fps = fps > 0.0f ? (fps + 1.0f) / (1.0f + dt_us * 1e-6f) : 1e6f / dt_us;
-	}
-
-	if (show_fps)
+	if (show_fps && fps > 0.0f)
 	{
 		char str[40];
-		static int displayed_fps = fps, displayed_tick_rate = tick_rate;
-		if (fps > displayed_fps + 1 || fps < displayed_fps - 1)
+		static int displayed_fps = round(fps), displayed_tick_rate = round(tick_rate);
+		static float cumulative_fps_diff = 0.0f, cumulative_tick_rate_diff = 0.0f;
+		if (fps > displayed_fps + 0.5f)
+		{
+			cumulative_fps_diff += fps - 0.5f - displayed_fps;
+		}
+		else if (fps < displayed_fps - 0.5f)
+		{
+			cumulative_fps_diff += fps + 0.5f - displayed_fps;
+		}
+		if (abs(cumulative_fps_diff) > 1.0f)
 		{
 			displayed_fps = round(fps);
+			cumulative_fps_diff = 0.0f;
 		}
-		if (tick_rate > displayed_tick_rate + 1 || tick_rate < displayed_tick_rate - 1)
+		if (tick_rate > displayed_tick_rate + 0.5f)
+		{
+			cumulative_tick_rate_diff += tick_rate - 0.5f - displayed_tick_rate;
+		}
+		else if (tick_rate < displayed_tick_rate - 0.5f)
+		{
+			cumulative_tick_rate_diff += tick_rate + 0.5f - displayed_tick_rate;
+		}
+		if (abs(cumulative_tick_rate_diff) > 1.0f)
 		{
 			displayed_tick_rate = round(tick_rate);
+			cumulative_tick_rate_diff = 0.0f;
 		}
 		sprintf_s(str, 40, "fps: %d|%d", displayed_fps, displayed_tick_rate);
 		glBindTextureUnit(0, text_atlas_tex);
@@ -1450,3 +1469,8 @@ int main(int argc, char** argv)
 	logical_thread.join();
 	return 0;
 }
+
+#ifdef _WIN32
+extern "C" __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+extern "C" __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+#endif

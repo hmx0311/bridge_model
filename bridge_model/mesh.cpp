@@ -201,7 +201,7 @@ static void initTex()
 	GLfloat max_TexAni;
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_TexAni);
 	glCreateTextures(GL_TEXTURE_2D, 1, &highway_tex);
-	glTextureStorage2D(highway_tex, 14, GL_RGB8, 8192, 4096);
+	glTextureStorage2D(highway_tex, 10, GL_RGB8, 8192, 4096);
 	glTextureSubImage2D(highway_tex, 0, 0, 0, 8192, 4096, GL_RGB, GL_FLOAT, highway_tex_data.get());
 	glTextureParameterf(highway_tex, GL_TEXTURE_MAX_ANISOTROPY, max_TexAni);
 	glTextureParameteri(highway_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -213,11 +213,11 @@ static void initTex()
 
 static void buildHighwayMesh()
 {
-	constexpr int VERT_SIZE = 4953;
+	constexpr int VERT_SIZE = 4951;
 	auto positions = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
 	auto normals = std::make_unique_for_overwrite<vec3[]>(VERT_SIZE);
 	auto tex_coords = std::make_unique_for_overwrite<vec2[]>(VERT_SIZE);
-	auto indices = std::make_unique<GLuint[]>(HIGHWAY_EBO_SIZE);
+	auto indices = std::make_unique_for_overwrite<GLuint[]>(HIGHWAY_EBO_SIZE);
 
 	int i_vert = 0;
 	int i_idx = 0;
@@ -834,15 +834,11 @@ static void buildHighwayMesh()
 	tex_coords[i_vert] = vec2(0.58703125f, 0.5859375f);
 	positions[i_vert + 1] = vec3(-3.56352f, 128.0f, 0);
 	tex_coords[i_vert + 1] = vec2(0.41296875f, 0.5859375f);
-	positions[i_vert + 2] = vec3(3.65f, 123.2f, 0);
-	tex_coords[i_vert + 2] = vec2(0.5891113f, 0.3515625f);
-	positions[i_vert + 3] = vec3(-3.65f, 123.2f, 0);
-	tex_coords[i_vert + 3] = vec2(0.41088867f, 0.3515625f);
-	positions[i_vert + 4] = vec3(3.65f, 116.0f, 0);
-	tex_coords[i_vert + 4] = vec2(0.5891113f, 0.0f);
-	positions[i_vert + 5] = vec3(-3.65f, 116.0f, 0);
-	tex_coords[i_vert + 5] = vec2(0.41088867f, 0.0f);
-	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = normals[i_vert + 4] = normals[i_vert + 5] = vec3(0, 0, 1);
+	positions[i_vert + 2] = vec3(3.776f, 116.0f, 0);
+	tex_coords[i_vert + 2] = vec2(0.5921875f, 0.0f);
+	positions[i_vert + 3] = vec3(-3.776f, 116.0f, 0);
+	tex_coords[i_vert + 3] = vec2(0.4078125f, 0.0f);
+	normals[i_vert] = normals[i_vert + 1] = normals[i_vert + 2] = normals[i_vert + 3] = vec3(0, 0, 1);
 
 	indices[i_idx] = i_vert;
 	indices[i_idx + 1] = i_vert + 1;
@@ -850,15 +846,9 @@ static void buildHighwayMesh()
 	indices[i_idx + 3] = i_vert;
 	indices[i_idx + 4] = i_vert + 3;
 	indices[i_idx + 5] = i_vert + 2;
-	indices[i_idx + 6] = i_vert + 2;
-	indices[i_idx + 7] = i_vert + 3;
-	indices[i_idx + 8] = i_vert + 5;
-	indices[i_idx + 9] = i_vert + 2;
-	indices[i_idx + 10] = i_vert + 5;
-	indices[i_idx + 11] = i_vert + 4;
 
-	i_vert += 6;
-	i_idx += 12;
+	i_vert += 4;
+	i_idx += 6;
 
 	theta = pi<float>() / 2;
 	n = theta * sqrtf(12160) + 3;
@@ -1951,24 +1941,24 @@ static void buildCarMesh()
 	glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "materials[6].shininess"), 0);
 
 	constexpr int VERT_SIZE = 884;
-	vec3 positions[VERT_SIZE] = { {POINT0},	{POINT1},	{POINT2},	{POINT3},	//×óÇ°µÆ
-									{POINT4},	{POINT5},	{POINT6},	{POINT7},	//ÓÒÇ°µÆ
-									{POINT8},	{POINT9},	{POINT10},	{POINT11},	//×óºóµÆ
-									{POINT12},	{POINT13},	{POINT14},	{POINT15},	//ÓÒºóµÆ
-									{POINT7},	{POINT2},	{POINT16},	{POINT17},	//Ç°ÉÏ
-									{POINT5},	{POINT0},	{POINT3},	{POINT6},	//Ç°ÖÐ
-									{POINT18},	{POINT19},	{POINT1},	{POINT4},	//Ç°ÏÂ
-									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ×
-									{POINT9},	{POINT12},	{POINT15},	{POINT10},	//ºóÉÏ
-									{POINT21},	{POINT20},	{POINT13},	{POINT8},	//ºóÏÂ
-									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//×ó
-									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//ÓÒ
-									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÒýÇæ¸Ç
-									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¶¥
-									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//Ç°²£Á§
-									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
-									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
-									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
+	vec3 positions[VERT_SIZE] = {	{POINT0},	{POINT1},	{POINT2},	{POINT3},	//左前灯
+									{POINT4},	{POINT5},	{POINT6},	{POINT7},	//右前灯
+									{POINT8},	{POINT9},	{POINT10},	{POINT11},	//左后灯
+									{POINT12},	{POINT13},	{POINT14},	{POINT15},	//右后灯
+									{POINT7},	{POINT2},	{POINT16},	{POINT17},	//前上
+									{POINT5},	{POINT0},	{POINT3},	{POINT6},	//前中
+									{POINT18},	{POINT19},	{POINT1},	{POINT4},	//前下
+									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//底
+									{POINT9},	{POINT12},	{POINT15},	{POINT10},	//后上
+									{POINT21},	{POINT20},	{POINT13},	{POINT8},	//后下
+									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//左
+									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//右
+									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//引擎盖
+									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//顶
+									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//前玻璃
+									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//后玻璃
+									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//左玻璃
+									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//右玻璃
 	vec3 normals[VERT_SIZE];
 	int material_idxs[VERT_SIZE];
 	GLuint indices[CAR_EBO_SIZE];
@@ -2155,17 +2145,17 @@ static void buildCarShadowMesh()
 {
 	constexpr int VERT_SIZE = 560;
 
-	vec3 positions[VERT_SIZE] = { {POINT16},	{POINT17},	{POINT18},	{POINT19},	//Ç°
-									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//µ×
-									{POINT21},	{POINT20},	{POINT14},	{POINT11},	//ºó
-									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//×ó
-									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//ÓÒ
-									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//ÒýÇæ¸Ç
-									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//¶¥
-									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//Ç°²£Á§
-									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//ºó²£Á§
-									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//×ó²£Á§
-									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//ÓÒ²£Á§
+	vec3 positions[VERT_SIZE] = {	{POINT16},	{POINT17},	{POINT18},	{POINT19},	//前
+									{POINT18},	{POINT20},	{POINT21},	{POINT19},	//底
+									{POINT21},	{POINT20},	{POINT14},	{POINT11},	//后
+									{POINT19},	{POINT21},	{POINT11},	{POINT16},	//左
+									{POINT20},	{POINT18},	{POINT17},	{POINT14},	//右
+									{POINT17},	{POINT16},	{POINT22},	{POINT23},	//引擎盖
+									{POINT24},	{POINT25},	{POINT26},	{POINT27},	//顶
+									{POINT23},	{POINT22},	{POINT25},	{POINT24},	//前玻璃
+									{POINT11},	{POINT14},	{POINT27},	{POINT26},	//后玻璃
+									{POINT22},	{POINT11},	{POINT26},	{POINT25},	//左玻璃
+									{POINT14},	{POINT23},	{POINT24},	{POINT27} };//右玻璃
 	GLuint indices[CAR_SHADOW_EBO_SIZE];
 
 	for (int i = 0; i < 11; i++)

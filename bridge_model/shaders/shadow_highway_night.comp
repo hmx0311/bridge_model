@@ -112,8 +112,8 @@ void main()
 			}
 			else if(pos[p].w < 0)
 			{
-				lt2 = min(lt2, 1.0);
 				a = test[p2];
+				lt2 = min(dot(a, a), 1.0);
 			}
 			float t = v.x * a.y - v.y * a.x;
 			isIn = lt2 < 1.0 || dot(v, a) < 0 && dot(v, v) > max(t * t, lt2 - 1);
