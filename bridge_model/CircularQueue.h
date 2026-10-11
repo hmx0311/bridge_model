@@ -674,7 +674,7 @@ private:
 	template <size_t ElementIndex, class T, class... Rest>
 	struct Element
 	{
-		static_assert(ElementIndex < sizeof...(Args), "Ìá¹©µÄÔªËØË÷Òı³¬³ö·¶Î§");
+		static_assert(ElementIndex < sizeof...(Args), "æä¾›çš„å…ƒç´ ç´¢å¼•è¶…å‡ºèŒƒå›´");
 		using Type = std::conditional_t<ElementIndex == 0, T, typename Element<ElementIndex - 1, Rest...>::Type>;
 	};
 
@@ -728,7 +728,7 @@ private:
 
 		static void CalcOffsets(size_t count, size_t* __restrict offsets)
 		{
-			static_assert(alignof(T) <= 16, "²»Ö§³Ö³¬¹ı16×Ö½ÚµÄ¶ÔÆë");
+			static_assert(alignof(T) <= 16, "ä¸æ”¯æŒè¶…è¿‡16å­—èŠ‚çš„å¯¹é½");
 			offsets[0] = (offsets[0] + alignof(T) - 1) & ~(alignof(T) - 1);
 			offsets[1] = offsets[0] + count * sizeof(T);
 			if constexpr (sizeof...(Rest) > 0)
@@ -1408,8 +1408,8 @@ public:
 	template<size_t... NumArgs, class... EmplaceArgs>
 	void emplace_front(EmplaceArgs&&... emplace_args)
 	{
-		static_assert(sizeof...(NumArgs) == sizeof...(Args), "Ìá¹©µÄ¹¹Ôì²ÎÊı¸öÊıµÄÊıÁ¿ÓëÒª¹¹ÔìµÄÔªËØÊıÁ¿²»·û");
-		static_assert(NumPack<NumArgs...>::Total == sizeof...(EmplaceArgs), "Ö¸¶¨µÄ¹¹Ôì²ÎÊı¸öÊıºÍÓëÌá¹©µÄ¹¹Ôì²ÎÊıÊıÁ¿²»·û");
+		static_assert(sizeof...(NumArgs) == sizeof...(Args), "æä¾›çš„æ„é€ å‚æ•°ä¸ªæ•°çš„æ•°é‡ä¸è¦æ„é€ çš„å…ƒç´ æ•°é‡ä¸ç¬¦");
+		static_assert(NumPack<NumArgs...>::Total == sizeof...(EmplaceArgs), "æŒ‡å®šçš„æ„é€ å‚æ•°ä¸ªæ•°å’Œä¸æä¾›çš„æ„é€ å‚æ•°æ•°é‡ä¸ç¬¦");
 		if (m_size == capacity())
 		{
 			inc_capacity(0);
@@ -1436,8 +1436,8 @@ public:
 	template<size_t... NumArgs, class... EmplaceArgs>
 	void emplace_back(EmplaceArgs&&... emplace_args)
 	{
-		static_assert(sizeof...(NumArgs) == sizeof...(Args), "Ìá¹©µÄ¹¹Ôì²ÎÊı¸öÊıµÄÊıÁ¿ÓëÒª¹¹ÔìµÄÔªËØÊıÁ¿²»·û");
-		static_assert(NumPack<NumArgs...>::Total == sizeof...(EmplaceArgs), "Ö¸¶¨µÄ¹¹Ôì²ÎÊı¸öÊıºÍÓëÌá¹©µÄ¹¹Ôì²ÎÊıÊıÁ¿²»·û");
+		static_assert(sizeof...(NumArgs) == sizeof...(Args), "æä¾›çš„æ„é€ å‚æ•°ä¸ªæ•°çš„æ•°é‡ä¸è¦æ„é€ çš„å…ƒç´ æ•°é‡ä¸ç¬¦");
+		static_assert(NumPack<NumArgs...>::Total == sizeof...(EmplaceArgs), "æŒ‡å®šçš„æ„é€ å‚æ•°ä¸ªæ•°å’Œä¸æä¾›çš„æ„é€ å‚æ•°æ•°é‡ä¸ç¬¦");
 		if (m_size == capacity())
 		{
 			inc_capacity(m_size);
@@ -1460,8 +1460,8 @@ public:
 	template<size_t... NumArgs, class... EmplaceArgs>
 	void emplace(size_t idx, EmplaceArgs&&... emplace_args)
 	{
-		static_assert(sizeof...(NumArgs) == sizeof...(Args), "Ìá¹©µÄ¹¹Ôì²ÎÊı¸öÊıµÄÊıÁ¿ÓëÒª¹¹ÔìµÄÔªËØÊıÁ¿²»·û");
-		static_assert(NumPack<NumArgs...>::Total == sizeof...(EmplaceArgs), "Ö¸¶¨µÄ¹¹Ôì²ÎÊı¸öÊıºÍÓëÌá¹©µÄ¹¹Ôì²ÎÊıÊıÁ¿²»·û");
+		static_assert(sizeof...(NumArgs) == sizeof...(Args), "æä¾›çš„æ„é€ å‚æ•°ä¸ªæ•°çš„æ•°é‡ä¸è¦æ„é€ çš„å…ƒç´ æ•°é‡ä¸ç¬¦");
+		static_assert(NumPack<NumArgs...>::Total == sizeof...(EmplaceArgs), "æŒ‡å®šçš„æ„é€ å‚æ•°ä¸ªæ•°å’Œä¸æä¾›çš„æ„é€ å‚æ•°æ•°é‡ä¸ç¬¦");
 		assert(idx <= m_size);
 		if (idx == 0)
 		{

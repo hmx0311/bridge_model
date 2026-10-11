@@ -10,18 +10,18 @@
 #define SHADOW_DAY_TEX_SIZE  (1 << SHADOW_DAY_TEX_SIZE_EXP)
 #define PCSS_MIP_LEVELS (SHADOW_DAY_TEX_SIZE_EXP - 1)
 
-UNIFORM_BUFFER_BEGIN(SunData, SUN_BUFFER_BINDING)
+UNIFORM_BUFFER(SunData, SUN_BUFFER_BINDING)
 {
 	vec4 light_dir_and_radius;
 	alignas(16) vec3 ambient;
 	alignas(16) vec3 diffuse_specular;
 	alignas(16) vec4 sky_color;
-}BUFFER_END(sun)
+}BUFFER_NAME(sun)
 
-UNIFORM_BUFFER_BEGIN(ShadowTransformData, SHADOW_TRANSFORM_BUFFER_BINDING)
+UNIFORM_BUFFER(ShadowTransformData, SHADOW_TRANSFORM_BUFFER_BINDING)
 {
 	mat4 view_proj[CSM_LEVELS];
 	mat4 tex[CSM_LEVELS];
-}BUFFER_END(sun_shadow)
+}BUFFER_NAME(sun_shadow)
 
 #endif // !LIGHTING_DAY_DEFINES_H

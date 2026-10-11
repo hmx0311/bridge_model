@@ -1,6 +1,4 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Visual C++ 生成的包含文件。
-// 供 bridge_model.rc 使用
 //
 #define IDR_VS_HIGHWAY                  highway.vert
 #define IDR_FS_HIGHWAY_DAY              highway_day.frag

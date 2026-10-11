@@ -15,6 +15,5 @@ void main()
 	modelPosView = ((camera.view) * vec4(vertex, 1.0)).xyz;
 	aNormal = normal;
 	aTexCoord = texCoord;
-	vec3 viewRay = camera.inv_view[3].xyz - modelPos;
 	gl_Position = camera.projection * vec4(modelPosView, 1.0);
 }

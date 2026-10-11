@@ -13,13 +13,13 @@ void main()
 	vec3 sun_color = 50.0 * sun.diffuse_specular;
 	if(gl_FragCoord.y < horizonY)
 	{
-		float sunPercentage = gl_FragCoord.y + 1 - horizonY;
-		if(sunPercentage < 0)
+		float percent = gl_FragCoord.y + 1 - horizonY;
+		if(percent < 0)
 		{
 			discard;
 		}
-		sun_color *= sunPercentage;
-		fragColor = sun_color + (1 - sunPercentage) * sun.sky_color.rgb;
+		sun_color *= percent;
+		fragColor = sun_color + (1 - percent) * sun.sky_color.rgb;
 	}
 	else
 	{

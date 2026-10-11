@@ -3,12 +3,12 @@
 #ifndef CAMERA_DEFINES_H
 #define CAMERA_DEFINES_H
 
-UNIFORM_BUFFER_BEGIN(CameraData, CAMERA_BUFFER_BINDING)
+UNIFORM_BUFFER(CameraData, CAMERA_BUFFER_BINDING)
 {
 	mat4 projection;
 	mat4 view;
 	mat4 view_proj;
 	mat4 inv_view;
-}BUFFER_END(camera)
+}BUFFER_NAME(camera)
 
 #endif // !CAMERA_DEFINES_H

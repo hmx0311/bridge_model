@@ -6,12 +6,12 @@ out vec3 fragColor;
 
 void main()
 {
-    ivec2 texCoord = ivec2(gl_FragCoord.yx);
-    vec3 result = texelFetch(image, texCoord, 0).rgb * weight[0];
+    ivec2 tex_coord = ivec2(gl_FragCoord.yx);
+    vec3 result = texelFetch(image, tex_coord, 0).rgb * weight[0];
     for(int i = 1; i < 12; i++)
     {
-        result += texelFetch(image, texCoord + ivec2(i, 0), 0).rgb * weight[i];
-        result += texelFetch(image, texCoord - ivec2(i, 0), 0).rgb * weight[i];
+        result += texelFetch(image, tex_coord + ivec2(i, 0), 0).rgb * weight[i];
+        result += texelFetch(image, tex_coord - ivec2(i, 0), 0).rgb * weight[i];
     }
     fragColor = result;
 }

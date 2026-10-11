@@ -46,18 +46,18 @@ void main()
 		for(int i = lightingOffset + 1; i < end; i++)
 		{
 			int idx = car_lighting.light_indices[i];
-			vec3 modelToLight = modelPos - vec3(tile_lights[idx].position);
-			float lightDistance = length(modelToLight);
-			modelToLight /= lightDistance;
-			float intensity = -dot(modelToLight, aNormal) / (lightDistance * lightDistance);
-			vec4 modelPosLight = tile_lights[idx].view_proj * vec4(modelPos, 1.0);
-			modelPosLight.xy /= modelPosLight.w;
-			float r = length(modelPosLight.xy);
-			if(lightDistance > 0.5 && intensity > 0 && -modelPosLight.w < modelPosLight.z && modelPosLight.z < modelPosLight.w && r < 1.0)
+			vec3 pos_to_light = modelPos - vec3(tile_lights[idx].position);
+			float light_distance = length(pos_to_light);
+			pos_to_light /= light_distance;
+			float intensity = -dot(pos_to_light, aNormal) / (light_distance * light_distance);
+			vec4 pos_in_light = tile_lights[idx].view_proj * vec4(modelPos, 1.0);
+			pos_in_light.xy /= pos_in_light.w;
+			float r = length(pos_in_light.xy);
+			if(light_distance > 0.5 && intensity > 0 && -pos_in_light.w < pos_in_light.z && pos_in_light.z < pos_in_light.w && r < 1.0)
 			{
 				if(material.shininess > 0)
 				{
-					vec3 halfway = normalize(-modelToLight + normalize(viewRay));
+					vec3 halfway = normalize(-pos_to_light + normalize(viewRay));
 					float HdotN = dot(halfway, aNormal);
 					if(HdotN > 0)
 					{
@@ -70,11 +70,11 @@ void main()
 				{
 					ivec2 cnt = tileLightShadowLayerSize(layer);
 					idx -= tileLightShadowLayerOffset(layer);
-					vec2 shadowMapPos = vec2(idx % cnt.x, idx / cnt.x) / cnt;
-					modelPosLight.xy = (modelPosLight.xy + 1.0) / (2 * cnt) + shadowMapPos;
-					modelPosLight.w = 0.5 * (modelPosLight.z / modelPosLight.w + 1.0);
-					modelPosLight.z = layer;
-					intensity *= texture(shadowTex, modelPosLight).x;
+					vec2 shadow_map_pos = vec2(idx % cnt.x, idx / cnt.x) / cnt;
+					pos_in_light.xy = (pos_in_light.xy + 1.0) / (2 * cnt) + shadow_map_pos;
+					pos_in_light.w = 0.5 * (pos_in_light.z / pos_in_light.w + 1.0);
+					pos_in_light.z = layer;
+					intensity *= texture(shadowTex, pos_in_light).x;
 				}
 				lighting += intensity * CAR_LIGHT_INTENSITY;
 			}
