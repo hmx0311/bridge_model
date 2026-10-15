@@ -7,7 +7,7 @@ layout(std430, binding = VERTEX_BUFFER_BINDING) buffer vertex_block
 
 layout(std430, binding = INDEX_BUFFER_BINDING) buffer index_block
 { 
-    uint indices[];
+    int indices[];
 };
 
 layout (local_size_x = 64) in;
@@ -16,17 +16,17 @@ uniform int num_triangles;
 
 void main()
 {
-    uint triangle_idx = gl_GlobalInvocationID.x;
+    int triangle_idx = int(gl_GlobalInvocationID.x);
 	if(triangle_idx >= num_triangles)
 	{
 		return;
 	}
 	vec3 positions[3];
-	uint vert_idx[3];
-	for(uint i = 0; i < 3; i++)
+	int vert_idx[3];
+	for(int i = 0; i < 3; i++)
 	{
 		vert_idx[i] = indices[3 * triangle_idx + i];
-		uint offset = 3 * vert_idx[i];
+		int offset = 3 * vert_idx[i];
 		positions[i] = vec3(vertices[offset], vertices[offset + 1], vertices[offset + 2]);
 	}
 	vec2 min_coord = positions[0].xy;
@@ -35,14 +35,14 @@ void main()
 	min_coord = min(min_coord, positions[2].xy);
 	max_coord = max(max_coord, positions[1].xy);
 	max_coord = max(max_coord, positions[2].xy);
-	ivec2 start_idx = ivec2(min_coord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) -1);
-	ivec2 end_idx = ivec2(max_coord / LIGHT_MAP_GRID_LENGTH + vec2(0.5 * LIGHT_MAP_SIZE_X, 0.5 * LIGHT_MAP_SIZE_Y) + 1);
+	ivec2 start_idx = ivec2(min_coord / TILE_LIGHT_POSITION_MAP_GRID_LENGTH + vec2(0.5 * TILE_LIGHT_POSITION_MAP_SIZE_X, 0.5 * TILE_LIGHT_POSITION_MAP_SIZE_Y) -1);
+	ivec2 end_idx = ivec2(max_coord / TILE_LIGHT_POSITION_MAP_GRID_LENGTH + vec2(0.5 * TILE_LIGHT_POSITION_MAP_SIZE_X, 0.5 * TILE_LIGHT_POSITION_MAP_SIZE_Y) + 1);
 
 	int i = start_idx.x;
 	int j = start_idx.y;
-	int gird_idx = i * LIGHT_MAP_SIZE_Y + j;
-	int k = tile_light_map.idx_range[gird_idx].x;
-	int end = min(tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS), tile_light_map.idx_range[gird_idx].y);
+	int gird_idx = i * TILE_LIGHT_POSITION_MAP_SIZE_Y + j;
+	int k = tile_light_position_map.light_idx_range[gird_idx].x;
+	int end = min(tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS), tile_light_position_map.light_idx_range[gird_idx].y);
 	for(;;k++)
 	{
 		while(k >= end)
@@ -57,9 +57,9 @@ void main()
 				}
 				j = start_idx.y;
 			}
-			gird_idx = i * LIGHT_MAP_SIZE_Y + j;
-			k = tile_light_map.idx_range[gird_idx].x;
-			end = min(tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS), tile_light_map.idx_range[gird_idx].y);
+			gird_idx = i * TILE_LIGHT_POSITION_MAP_SIZE_Y + j;
+			k = tile_light_position_map.light_idx_range[gird_idx].x;
+			end = min(tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS), tile_light_position_map.light_idx_range[gird_idx].y);
 		}
 		vec3 normal = cross(positions[1] - positions[0], positions[2] - positions[0]);
 		if(dot(normal, tile_lights[k].position.xyz - positions[0]) <= 0)
@@ -123,7 +123,7 @@ void main()
 		{
 			int layer = findTileLightShadowLayer(k);
 			int layer_triangle_idx = atomicAdd(tile_light_shadow_triangles.commands[layer].count, 3) / 3;
-			layer_triangle_idx += MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(layer);
+			layer_triangle_idx += MAX_AVERAGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(layer);
 			tile_light_shadow_triangles.triangles[layer_triangle_idx] = TileLightShadowTriangle(vert_idx, k);
 		}
 	}

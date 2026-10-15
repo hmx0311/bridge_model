@@ -5,7 +5,10 @@
 #define LIGHTING_NIGHT_DEFINES_H
 
 #define NUM_TILE_LIGHT_SHADOW_LAYERS 4
-#define MAX_AVERANGE_TRIANGLES_PER_LIGHT 4096
+#define MAX_AVERAGE_TRIANGLES_PER_LIGHT 4096
+#define MAX_AVERAGE_AFFECTED_GRIDS_PER_LIGHT (4 + int(\
+	0.2f * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH) * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH) + \
+	2.0f * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH)))
 
 INLINE int findTileLightShadowLayer(int idx)
 {
@@ -17,15 +20,15 @@ constexpr int tileLightShadowLayerOffset(int layer)
 	return ((8 << (2 * layer)) - 8) / 3;
 }
 
-INLINE ivec2 tileLightShadowLayerSize(int layer)
+constexpr ivec2 tileLightShadowLayerSize(int layer)
 {
 	return ivec2(2 << layer, 4 << layer);
 }
 
-STORAGE_BUFFER(TileLightMapData, TILE_LIGHT_MAP_BUFFER_BINDING)
+STORAGE_BUFFER(TileLightPositionMapData, TILE_LIGHT_POSITION_MAP_BUFFER_BINDING)
 {
-	ivec2 idx_range[LIGHT_MAP_SIZE_X * LIGHT_MAP_SIZE_Y];
-}BUFFER_NAME(tile_light_map)
+	ivec2 light_idx_range[TILE_LIGHT_POSITION_MAP_SIZE_X * TILE_LIGHT_POSITION_MAP_SIZE_Y];
+}BUFFER_NAME(tile_light_position_map)
 
 struct TileLight
 {
@@ -37,6 +40,12 @@ STORAGE_BUFFER(TileLightData, TILE_LIGHT_BUFFER_BINDING)
 {
 	TileLight tile_lights[2 * MAX_CAR_CNT];
 };
+
+STORAGE_BUFFER(TileLightAffectedMapData, TILE_LIGHT_AFFECTED_MAP_BUFFER_BINDING)
+{
+	ivec2 idx_range[TILE_LIGHT_AFFECTED_MAP_SIZE_X * TILE_LIGHT_AFFECTED_MAP_SIZE_Y];
+	int light_indices[2 * MAX_CAR_CNT * MAX_AVERAGE_AFFECTED_GRIDS_PER_LIGHT];
+}BUFFER_NAME(tile_light_affected_map);
 
 STORAGE_BUFFER(CarLightingData, CAR_LIGHTING_BUFFER_BINDING)
 {
@@ -53,7 +62,7 @@ struct DrawArraysIndirectCommand
 
 struct TileLightShadowTriangle
 {
-	uint vert_idx[3];
+	int vert_idx[3];
 	int light_idx;
 };
 

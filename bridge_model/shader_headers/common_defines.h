@@ -3,7 +3,6 @@
 
 #ifdef __cplusplus
 #include "glm.hpp"
-using glm::uint;
 using glm::ivec2;
 using glm::vec3;
 using glm::vec4;

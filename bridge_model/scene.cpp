@@ -95,11 +95,11 @@ void initScene()
 						max_height = std::max(max_height, HEIGHT_RANGE[0] + (1.0f - max_depth_data[m][n]) * (HEIGHT_RANGE[1] - HEIGHT_RANGE[0]));
 					}
 				}
-				g_scene_quad_tree[NUM_SCENE_GRID_LEVELS - 1][j][i].min_height = min_height;
-				g_scene_quad_tree[NUM_SCENE_GRID_LEVELS - 1][j][i].max_height = max_height + MAX_HEIGHT_OFFSET;
+				g_scene_quad_tree[MAX_SCENE_GRID_LEVEL][j][i].min_height = min_height;
+				g_scene_quad_tree[MAX_SCENE_GRID_LEVEL][j][i].max_height = max_height + MAX_HEIGHT_OFFSET;
 			}
 		}
-		for (int k = NUM_SCENE_GRID_LEVELS - 2; k >= 0; k--)
+		for (int k = MAX_SCENE_GRID_LEVEL - 1; k >= 0; k--)
 		{
 #pragma omp for
 			for (int i = 0; i < g_scene_quad_tree.LevelSizeX(k); i++)

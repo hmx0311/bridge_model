@@ -2,6 +2,7 @@
 #include <Windows.h>
 
 #include <thread>
+#include <unordered_map>
 
 #include "glad/glad.h"
 #include "glfw3.h"
@@ -51,7 +52,7 @@ constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
 
-float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 1000.0f;
+float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 150.0f;
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
 bool need_update_view = true;
@@ -96,25 +97,14 @@ GLintptr scene_UBO_offset1;
 */
 GLuint shadow_UBO;
 
-// binding = 3
-GLuint tile_light_map_SSBO;
-// binding = 4
+GLuint tile_light_position_map_SSBO;
 GLuint tile_lights_SSBO;
-// binding = 5
+GLuint tile_light_affected_map_SSBO;
 GLuint car_lighting_SSBO;
-// binding = 6
 GLuint highway_tile_light_shadow_triangles_SSBO;
 GLuint bridge_tile_light_shadow_triangles_SSBO;
 
-constexpr GLsizeiptr tile_light_shadow_triangles_SSBO_size = sizeof(TileLightShadowTriangleData) + tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS) * MAX_AVERANGE_TRIANGLES_PER_LIGHT * sizeof(TileLightShadowTriangle);
-
-CameraData camera;
-ShadowTransformData sun_shadow;
 const mat4 CAR_LIGHT_SHADOW_PROJ = perspective(CAR_LIGHT_V_RAD, CAR_LIGHT_ASPECT, CAR_LIGHT_NEAR, CAR_LIGHT_NEAR + CAR_LIGHT_RANGE);
-
-TileLightMapData tile_light_map;
-TileLightData tile_light_data;
-CarLightingData car_lightings;
 
 GLuint SP_highway_day;
 GLuint SP_highway_night;
@@ -217,25 +207,29 @@ static void init()
 	int UBO_offset_alignment;
 	glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &UBO_offset_alignment);
 
-	scene_UBO_offset1 = ((sizeof(camera) - 1) / UBO_offset_alignment + 1) * UBO_offset_alignment;
+	scene_UBO_offset1 = ((sizeof(CameraData) - 1) / UBO_offset_alignment + 1) * UBO_offset_alignment;
 	glCreateBuffers(1, &scene_UBO);
 	glNamedBufferData(scene_UBO, scene_UBO_offset1 + sizeof(SunData), nullptr, GL_DYNAMIC_DRAW);
 	glBindBufferRange(GL_UNIFORM_BUFFER, CAMERA_BUFFER_BINDING, scene_UBO, 0, sizeof(CameraData));
 	glBindBufferRange(GL_UNIFORM_BUFFER, SUN_BUFFER_BINDING, scene_UBO, scene_UBO_offset1, sizeof(SunData));
 
 	glCreateBuffers(1, &shadow_UBO);
-	glNamedBufferData(shadow_UBO, sizeof(sun_shadow), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_UNIFORM_BUFFER, SHADOW_TRANSFORM_BUFFER_BINDING, shadow_UBO, 0, sizeof(sun_shadow));
+	glNamedBufferData(shadow_UBO, sizeof(ShadowTransformData), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_UNIFORM_BUFFER, SHADOW_TRANSFORM_BUFFER_BINDING, shadow_UBO);
 
-	glCreateBuffers(1, &tile_light_map_SSBO);
-	glNamedBufferData(tile_light_map_SSBO, sizeof(tile_light_map), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_MAP_BUFFER_BINDING, tile_light_map_SSBO, 0, sizeof(tile_light_map));
+	glCreateBuffers(1, &tile_light_position_map_SSBO);
+	glNamedBufferData(tile_light_position_map_SSBO, sizeof(TileLightPositionMapData), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_POSITION_MAP_BUFFER_BINDING, tile_light_position_map_SSBO);
+	glCreateBuffers(1, &tile_light_affected_map_SSBO);
+	glNamedBufferData(tile_light_affected_map_SSBO, sizeof(TileLightAffectedMapData), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_AFFECTED_MAP_BUFFER_BINDING, tile_light_affected_map_SSBO);
 	glCreateBuffers(1, &tile_lights_SSBO);
-	glNamedBufferData(tile_lights_SSBO, sizeof(tile_light_data), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_BUFFER_BINDING, tile_lights_SSBO, 0, sizeof(tile_light_data));
+	glNamedBufferData(tile_lights_SSBO, sizeof(TileLightData), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_BUFFER_BINDING, tile_lights_SSBO);
 	glCreateBuffers(1, &car_lighting_SSBO);
-	glNamedBufferData(car_lighting_SSBO, sizeof(car_lightings), nullptr, GL_DYNAMIC_DRAW);
-	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, CAR_LIGHTING_BUFFER_BINDING, car_lighting_SSBO, 0, sizeof(car_lightings));
+	glNamedBufferData(car_lighting_SSBO, sizeof(CarLightingData), nullptr, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, CAR_LIGHTING_BUFFER_BINDING, car_lighting_SSBO);
+	constexpr GLsizeiptr tile_light_shadow_triangles_SSBO_size = sizeof(TileLightShadowTriangleData) + tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS) * MAX_AVERAGE_TRIANGLES_PER_LIGHT * sizeof(TileLightShadowTriangle);
 	glCreateBuffers(1, &highway_tile_light_shadow_triangles_SSBO);
 	glNamedBufferData(highway_tile_light_shadow_triangles_SSBO, tile_light_shadow_triangles_SSBO_size, nullptr, GL_DYNAMIC_DRAW);
 	glCreateBuffers(1, &bridge_tile_light_shadow_triangles_SSBO);
@@ -344,6 +338,13 @@ static void drawGraphics()
 	static float scene_z_far;
 	static vec3 focus(0);
 	static float horizon_y;
+
+	static CameraData camera;
+	static ShadowTransformData sun_shadow;
+	static TileLightData tile_light_data;
+	static TileLightPositionMapData tile_light_position_map;
+	static TileLightAffectedMapData tile_light_affected_map;
+	static CarLightingData car_lightings;
 	static std::vector<mat4> car_tile_light_shadow_transform[NUM_TILE_LIGHT_SHADOW_LAYERS];
 	static std::vector<int> car_tile_light_shadow_idx[NUM_TILE_LIGHT_SHADOW_LAYERS];
 
@@ -468,7 +469,7 @@ static void drawGraphics()
 			(eye.y - SCENE_GRID_AREA.y) / (SCENE_GRID_AREA.w - SCENE_GRID_AREA.y) * SCENE_GRID_SIZE_Y - 0.5f);
 		if (0 < height_map_coord.x && height_map_coord.x < SCENE_GRID_SIZE_X - 1 && 0 < height_map_coord.y && height_map_coord.y < SCENE_GRID_SIZE_Y - 1)
 		{
-			auto height_map = g_scene_quad_tree[NUM_SCENE_GRID_LEVELS - 1];
+			auto height_map = g_scene_quad_tree[MAX_SCENE_GRID_LEVEL];
 			float scene_height = height_map[int(height_map_coord.x)][int(height_map_coord.y)].max_height * (int(height_map_coord.x) + 1 - height_map_coord.x) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
 				height_map[int(height_map_coord.x)][int(height_map_coord.y) + 1].max_height * (int(height_map_coord.x) + 1 - height_map_coord.x) * (height_map_coord.y - int(height_map_coord.y)) +
 				height_map[int(height_map_coord.x) + 1][int(height_map_coord.y)].max_height * (height_map_coord.x - int(height_map_coord.x)) * (int(height_map_coord.y) + 1 - height_map_coord.y) +
@@ -522,7 +523,7 @@ static void drawGraphics()
 			{
 				continue;
 			}
-			if (level == NUM_SCENE_GRID_LEVELS - 1)
+			if (level == MAX_SCENE_GRID_LEVEL)
 			{
 				view_z_near = std::min(view_z_near, z_near);
 				scene_z_far = std::max(scene_z_far, z_far);
@@ -590,6 +591,7 @@ static void drawGraphics()
 	int num_visible_cars;
 	int num_visible_light_on_cars;
 	int num_visible_car_lights;
+	int total_tile_light_affected_map_indices_cnt;
 
 	if (sun.light_dir_and_radius.z > 0)
 	{
@@ -653,7 +655,7 @@ static void drawGraphics()
 					z_min = std::min(z_min, center.z - r.z);
 					continue;
 				}
-				if (level == NUM_SCENE_GRID_LEVELS - 1)
+				if (level == MAX_SCENE_GRID_LEVEL)
 				{
 					z_min = std::min(z_min, center.z - r.z);
 					x_mins[i] = std::min(x_mins[i], center.x - r.x);
@@ -752,7 +754,7 @@ static void drawGraphics()
 				{
 					continue;
 				}
-				if (result == INTERSECTION_TEST_INSIDE || level == NUM_SCENE_GRID_LEVELS - 1)
+				if (result == INTERSECTION_TEST_INSIDE || level == MAX_SCENE_GRID_LEVEL)
 				{
 					z_max = std::max(z_max, bound_z_max);
 					continue;
@@ -780,7 +782,7 @@ static void drawGraphics()
 		num_visible_cars = 0;
 		num_visible_light_on_cars = 0;
 		num_visible_car_lights = 0;
-		memset(&tile_light_map, 0, sizeof(tile_light_map));
+		memset(&tile_light_position_map, 0, sizeof(tile_light_position_map));
 		struct CarLightInfo
 		{
 			vec4 pos;
@@ -805,12 +807,12 @@ static void drawGraphics()
 			BoundEllipticFrustum bound{ mat4{ light_x, light_y, -light_dir, light_pos }, CAR_LIGHT_V_RAD, CAR_LIGHT_ASPECT , CAR_LIGHT_NEAR, CAR_LIGHT_NEAR + CAR_LIGHT_RANGE };
 			if (camera_frustum.cullingTest(bound))
 			{
-				constexpr float POS_OFFSET = CAR_LIGHT_NEAR + LIGHT_MAP_GRID_LENGTH;
+				constexpr float POS_OFFSET = CAR_LIGHT_NEAR + TILE_LIGHT_POSITION_MAP_GRID_LENGTH;
 				vec3 center_pos = light_pos + POS_OFFSET * light_dir;
-				ivec2 light_map_idx = ivec2{ 1.0f / LIGHT_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y) };
-				ivec2* light_map_grid = &tile_light_map.idx_range[light_map_idx.x * LIGHT_MAP_SIZE_Y + light_map_idx.y];
-				car_light_infos.push_back({ light_pos, light_dir, bound, length(center_pos - vec3(camera.inv_view[3])), light_map_grid });
-				light_map_grid->x++;
+				ivec2 light_pos_map_idx = ivec2{ 1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2(TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y) };
+				ivec2* light_pos_map_grid = &tile_light_position_map.light_idx_range[light_pos_map_idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + light_pos_map_idx.y];
+				car_light_infos.push_back({ light_pos, light_dir, bound, length(center_pos - vec3(camera.inv_view[3])), light_pos_map_grid });
+				light_pos_map_grid->x++;
 			}
 		}
 		std::sort(car_light_infos.begin(), car_light_infos.end(), [](const CarLightInfo& a, const CarLightInfo& b) { return a.distance_to_camera < b.distance_to_camera; });
@@ -827,6 +829,42 @@ static void drawGraphics()
 			tile_light_data.tile_lights[idx].view_proj = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
 			tile_light_bounds[idx] = car_light_info.bound;
 		}
+		memset(tile_light_affected_map.idx_range, 0, sizeof(tile_light_affected_map.idx_range));
+		constexpr int SEARCH_RANGE = int(0.9999f + 0.5f * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH));
+		static std::pair<int, int[(2 * SEARCH_RANGE + 1) * (2 * SEARCH_RANGE + 1)]> affected_grids[2 * MAX_CAR_CNT];
+		for (int i = 0; i < num_visible_car_lights; i++)
+		{
+			affected_grids[i].first = 0;
+			vec3 center_pos = 0.5f * (tile_light_bounds[i].center_near + tile_light_bounds[i].center_far);
+			ivec2 affected_map_idx = ivec2{ 1.0f / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2{ TILE_LIGHT_AFFECTED_MAP_SIZE_X, TILE_LIGHT_AFFECTED_MAP_SIZE_Y } };
+			for (int j = std::max(0, affected_map_idx.x - SEARCH_RANGE); j < std::min(TILE_LIGHT_AFFECTED_MAP_SIZE_X, affected_map_idx.x + SEARCH_RANGE + 1); j++)
+			{
+				for (int k = std::max(0, affected_map_idx.y - SEARCH_RANGE); k < std::min(TILE_LIGHT_AFFECTED_MAP_SIZE_Y, affected_map_idx.y + SEARCH_RANGE + 1); k++)
+				{
+					BoundAABB bound = sceneGridBound(TILE_LIGHT_AFFECTED_MAP_GRID_LEVEL, j, k);
+					if (intersectionTest(tile_light_bounds[i], bound))
+					{
+						tile_light_affected_map.idx_range[j * TILE_LIGHT_AFFECTED_MAP_SIZE_Y + k].x++;
+						affected_grids[i].second[affected_grids[i].first++] = j * TILE_LIGHT_AFFECTED_MAP_SIZE_Y + k;
+					}
+				}
+			}
+		}
+		total_tile_light_affected_map_indices_cnt = 0;
+		for (int i = 0; i < num_visible_car_lights; i++)
+		{
+			for (int j = 0; j < affected_grids[i].first; j++)
+			{
+				int idx = affected_grids[i].second[j];
+				if (tile_light_affected_map.idx_range[idx].y == 0)
+				{
+					tile_light_affected_map.idx_range[idx].y = total_tile_light_affected_map_indices_cnt;
+					total_tile_light_affected_map_indices_cnt += tile_light_affected_map.idx_range[idx].x;
+					tile_light_affected_map.idx_range[idx].x = tile_light_affected_map.idx_range[idx].y;
+				}
+				tile_light_affected_map.light_indices[tile_light_affected_map.idx_range[idx].y++] = i;
+			}
+		}
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
 			car_tile_light_shadow_idx[i].clear();
@@ -838,7 +876,7 @@ static void drawGraphics()
 				while (i < j)
 				{
 					mat4& transform = transforms[i];
-					ivec2 pos_idx = ivec2(1.0f / LIGHT_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(LIGHT_MAP_SIZE_X, LIGHT_MAP_SIZE_Y));
+					ivec2 pos_idx = ivec2(1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y));
 					BoundOBB car_bound{ car_local_bound, transform };
 					int num_lighting = 0;
 					for (int m = -1; m < 2; m++)
@@ -846,7 +884,7 @@ static void drawGraphics()
 						for (int n = -1; n < 2; n++)
 						{
 							ivec2 idx = pos_idx + ivec2(m, n);
-							for (int k = tile_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].x; k < tile_light_map.idx_range[idx.x * LIGHT_MAP_SIZE_Y + idx.y].y; k++)
+							for (int k = tile_light_position_map.light_idx_range[idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + idx.y].x; k < tile_light_position_map.light_idx_range[idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + idx.y].y; k++)
 							{
 								if (intersectionTest(tile_light_bounds[k], car_bound))
 								{
@@ -899,8 +937,9 @@ static void drawGraphics()
 	}
 	else
 	{
-		glNamedBufferSubData(tile_light_map_SSBO, 0, sizeof(tile_light_map), &tile_light_map);
+		glNamedBufferSubData(tile_light_position_map_SSBO, 0, sizeof(tile_light_position_map), &tile_light_position_map);
 		glNamedBufferSubData(tile_lights_SSBO, 0, num_visible_car_lights * sizeof(TileLight), &tile_light_data);
+		glNamedBufferSubData(tile_light_affected_map_SSBO, 0, sizeof(TileLightAffectedMapData::idx_range) + total_tile_light_affected_map_indices_cnt * sizeof(int), &tile_light_affected_map);
 		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_light_on_cars * sizeof(mat4), logical_data.car_transform);
 		glNamedBufferSubData(car_color_VBO, 0, num_visible_light_on_cars * sizeof(vec3), logical_data.car_color);
@@ -936,37 +975,22 @@ static void drawGraphics()
 		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
-		glUseProgram(SP_shadow_highway_day);
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glDisable(GL_CULL_FACE);
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
+			glUseProgram(SP_shadow_highway_day);
 			glProgramUniform1i(SP_shadow_highway_day, glGetUniformLocation(SP_shadow_highway_day, "csm_level"), i);
+			glDisable(GL_CULL_FACE);
 			Frustum shadow_frustum(sun_shadow.view_proj[i]);
 			drawTerrainMesh(shadow_frustum);
-		}
-		glEnable(GL_CULL_FACE);
-		glBindVertexArray(highway_VAO);
-		for (int i = 0; i < CSM_LEVELS; i++)
-		{
-			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
-			glProgramUniform1i(SP_shadow_highway_day, glGetUniformLocation(SP_shadow_highway_day, "csm_level"), i);
+			glEnable(GL_CULL_FACE);
+			glBindVertexArray(highway_VAO);
 			glDrawElements(GL_TRIANGLES, HIGHWAY_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		}
-		glBindVertexArray(bridge_VAO);
-		for (int i = 0; i < CSM_LEVELS; i++)
-		{
-			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
-			glProgramUniform1i(SP_shadow_highway_day, glGetUniformLocation(SP_shadow_highway_day, "csm_level"), i);
+			glBindVertexArray(bridge_VAO);
 			glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
-		}
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0);
-		glUseProgram(SP_shadow_car_day);
-		glBindVertexArray(car_shadow_day_VAO);
-		for (int i = 0; i < CSM_LEVELS; i++)
-		{
-			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
+			glUseProgram(SP_shadow_car_day);
+			glBindVertexArray(car_shadow_day_VAO);
 			glProgramUniform1i(SP_shadow_car_day, glGetUniformLocation(SP_shadow_car_day, "csm_level"), i);
 			glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 		}
@@ -991,12 +1015,13 @@ static void drawGraphics()
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-		glDrawBuffers(2, attachments);
 		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
 		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
 		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glUseProgram(SP_car_day);
+		glBindVertexArray(car_VAO);
+		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 		glUseProgram(SP_highway_day);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
@@ -1006,9 +1031,6 @@ static void drawGraphics()
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		drawTerrainMesh(camera_frustum);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		glUseProgram(SP_car_day);
-		glBindVertexArray(car_VAO);
-		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 		glBindSampler(1, 0);
 		glBindSampler(2, 0);
 	}
@@ -1029,7 +1051,7 @@ static void drawGraphics()
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
 			commands[i].instance_count = 1;
-			commands[i].first = 3 * MAX_AVERANGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(i);
+			commands[i].first = 3 * MAX_AVERAGE_TRIANGLES_PER_LIGHT * tileLightShadowLayerOffset(i);
 		}
 		glUseProgram(CSP_shadow_highway_night);
 		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
@@ -1037,43 +1059,38 @@ static void drawGraphics()
 		glNamedBufferSubData(bridge_tile_light_shadow_triangles_SSBO, 0, sizeof(TileLightShadowTriangleData::commands), commands);
 
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, highway_tile_light_shadow_triangles_SSBO);
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, highway_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, highway_tile_light_shadow_triangles_SSBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, highway_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), HIGHWAY_EBO_SIZE / 3);
 		glDispatchCompute((HIGHWAY_EBO_SIZE / 3 + 63) / 64, 1, 1);
 
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bridge_tile_light_shadow_triangles_SSBO);
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, bridge_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, bridge_tile_light_shadow_triangles_SSBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, INDEX_BUFFER_BINDING, bridge_EBO);
 		glProgramUniform1i(CSP_shadow_highway_night, glGetUniformLocation(CSP_shadow_highway_night, "num_triangles"), BRIDGE_EBO_SIZE / 3);
 		glDispatchCompute((BRIDGE_EBO_SIZE / 3 + 63) / 64, 1, 1);
 
-		glUseProgram(SP_shadow_highway_night);
-		glBindVertexArray(attri_less_VAO);
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
-		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
-		{
-			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
-
-			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, highway_tile_light_shadow_triangles_SSBO);
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, highway_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
-			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
-
-			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bridge_tile_light_shadow_triangles_SSBO);
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, bridge_tile_light_shadow_triangles_SSBO, 0, tile_light_shadow_triangles_SSBO_size);
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
-			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
-		}
-		glUseProgram(SP_shadow_car_night);
-		glBindVertexArray(car_shadow_night_VAO);
 		int car_tile_light_shadow_offset = 0;
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
-			int count = car_tile_light_shadow_transform[i].size();
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_night_tex, 0, i);
+
+			glUseProgram(SP_shadow_highway_night);
+			glBindVertexArray(attri_less_VAO);
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, highway_tile_light_shadow_triangles_SSBO);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, highway_tile_light_shadow_triangles_SSBO);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, highway_VBO);
+			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bridge_tile_light_shadow_triangles_SSBO);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, TILE_LIGHT_SHADOW_TRIANGLE_BUFFER_BINDING, bridge_tile_light_shadow_triangles_SSBO);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, VERTEX_BUFFER_BINDING, bridge_VBO);
+			glDrawArraysIndirect(GL_TRIANGLES, reinterpret_cast<void*>(i * sizeof(DrawArraysIndirectCommand)));
+			glUseProgram(SP_shadow_car_night);
+			glBindVertexArray(car_shadow_night_VAO);
+			int count = car_tile_light_shadow_transform[i].size();
 			glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_tile_light_shadow_offset);
 			car_tile_light_shadow_offset += count;
 		}
@@ -1085,8 +1102,6 @@ static void drawGraphics()
 
 		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
-		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-		glDrawBuffers(2, attachments);
 		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
 		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
@@ -1099,6 +1114,7 @@ static void drawGraphics()
 		glUseProgram(SP_terrain_night);
 		drawTerrainMesh(camera_frustum);
 		glUseProgram(SP_car_night);
+		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 		glDrawBuffers(2, attachments);
 		glBindVertexArray(car_VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
@@ -1450,7 +1466,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.6 * DAY_PERIOD)
+	while (logical_time < 0.2 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

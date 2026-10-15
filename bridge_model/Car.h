@@ -10,7 +10,6 @@ constexpr float CAR_LENGTH = 4.0f;
 constexpr float CAR_LIGHT_V_RAD = 0.51f;
 constexpr float CAR_LIGHT_ASPECT = 2.0f;
 constexpr float CAR_LIGHT_NEAR = 0.7f;
-constexpr float CAR_LIGHT_RANGE = 2 * LIGHT_MAP_GRID_LENGTH;
 
 constexpr glm::vec4 CAR_LEFT_LIGHT_POS(-0.56f, 1.5f, 0.81f, 1);
 constexpr glm::vec4 CAR_RIGHT_LIGHT_POS(0.56f, 1.5f, 0.81f, 1);
