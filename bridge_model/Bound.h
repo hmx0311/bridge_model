@@ -78,10 +78,11 @@ struct BoundEllipticFrustum
 	void biSupport(const glm::vec3& dir, glm::vec3& support_point, glm::vec3& rsupport_point) const;
 };
 
-bool intersectionTest(const BoundAABB& bound1, const BoundEllipticFrustum& bound2);
-bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundAABB& bound2);
-bool intersectionTest(const BoundOBB& bound1, const BoundEllipticFrustum& bound2);
-bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundOBB& bound2);
+bool intersectionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary);
+bool intersectionTest(const BoundEllipticFrustum& primary, const BoundAABB& secondary);
+void intersectionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds, int count, bool* results);
+bool intersectionTest(const BoundOBB& primary, const BoundEllipticFrustum& secondary);
+bool intersectionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondary);
 
 template<class T>
 concept HasSupport = requires(const T & t, const glm::vec3 & dir) { { t.support(dir) }->std::convertible_to<glm::vec3>; } ||

@@ -3,6 +3,7 @@
 
 #include <thread>
 #include <unordered_map>
+#include <omp.h>
 
 #include "glad/glad.h"
 #include "glfw3.h"
@@ -47,12 +48,12 @@ constexpr float FOV_Y = pi<float>() / 4;
 constexpr float MIN_VIEW_Z_NEAR = 0.6f;
 constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
-constexpr float MAX_VIEW_DISTANCE = 1000.0f;
+constexpr float MAX_VIEW_DISTANCE = 10000.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
 
-float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 150.0f;
+float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 5150.0f;
 uint32_t focus_move_dir = 0;
 bool show_fps = false;
 bool need_update_view = true;
@@ -249,7 +250,7 @@ static void init()
 	glCreateFramebuffers(1, &render_FBO);
 	glCreateFramebuffers(2, bloom_FBOs);
 
-	vec2 screen_coords[4] = { { 1, 1 },{ -1, 1 }, { -1, -1 }, { 1, -1 } };
+	vec2 screen_coords[4] = { { 1.0f, 1.0f },{ -1.0f, 1.0f }, { -1.0f, -1.0f }, { 1.0f, -1.0f } };
 	glGenVertexArrays(1, &tex_blit_VAO);
 	glBindVertexArray(tex_blit_VAO);
 	glGenBuffers(1, &tex_mapping_VBO);
@@ -465,8 +466,8 @@ static void drawGraphics()
 		vec3 view_dir(-cos(depression) * sin(azimuth), cos(depression) * cos(azimuth), -sin(depression));
 		focus.z = 0.0f;
 		vec3 eye = focus - view_distance * view_dir;
-		vec2 height_map_coord((eye.x - SCENE_GRID_AREA.x) / (SCENE_GRID_AREA.z - SCENE_GRID_AREA.x) * SCENE_GRID_SIZE_X - 0.5f,
-			(eye.y - SCENE_GRID_AREA.y) / (SCENE_GRID_AREA.w - SCENE_GRID_AREA.y) * SCENE_GRID_SIZE_Y - 0.5f);
+		vec2 height_map_coord{ (eye.x - SCENE_GRID_AREA.x) / (SCENE_GRID_AREA.z - SCENE_GRID_AREA.x) * SCENE_GRID_SIZE_X - 0.5f,
+			(eye.y - SCENE_GRID_AREA.y) / (SCENE_GRID_AREA.w - SCENE_GRID_AREA.y) * SCENE_GRID_SIZE_Y - 0.5f };
 		if (0 < height_map_coord.x && height_map_coord.x < SCENE_GRID_SIZE_X - 1 && 0 < height_map_coord.y && height_map_coord.y < SCENE_GRID_SIZE_Y - 1)
 		{
 			auto height_map = g_scene_quad_tree[MAX_SCENE_GRID_LEVEL];
@@ -550,8 +551,8 @@ static void drawGraphics()
 
 	LogicalData& logical_data = getLatestLogicalData();
 	SunData sun;
-	sun.light_dir_and_radius = vec4(logical_data.sun_dir, 1.0f);
-	sun.diffuse_specular = vec3(0.4);
+	sun.light_dir_and_radius = vec4{ logical_data.sun_dir, 1.0f };
+	sun.diffuse_specular = vec3{ 0.4f };
 	if (-SUN_RADIUS_DIST_RATIO < logical_data.sun_dir.z && logical_data.sun_dir.z < SUN_RADIUS_DIST_RATIO)
 	{
 		float x = -logical_data.sun_dir.z / SUN_RADIUS_DIST_RATIO;
@@ -573,17 +574,17 @@ static void drawGraphics()
 		}
 		sun.diffuse_specular *= area_percent;
 		sun.light_dir_and_radius.z += center * SUN_RADIUS_DIST_RATIO;
-		sun.light_dir_and_radius = vec4(normalize(vec3(sun.light_dir_and_radius)), sqrt(area_percent));
+		sun.light_dir_and_radius = vec4{ normalize(vec3{ sun.light_dir_and_radius }), sqrt(area_percent) };
 	}
 	constexpr float ATMOSPHERE = EARTH_RADIUS + 2e4f;
 	float absorb_factor = -1e-5f * (-EARTH_RADIUS * sun.light_dir_and_radius.z + sqrt(ATMOSPHERE * ATMOSPHERE - EARTH_RADIUS * EARTH_RADIUS * (1 - sun.light_dir_and_radius.z * sun.light_dir_and_radius.z)));
-	sun.diffuse_specular *= vec3(exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor));
+	sun.diffuse_specular *= vec3{ exp(0.2f * absorb_factor), exp(0.3f * absorb_factor), exp(1.1f * absorb_factor) };
 	sun.ambient = vec3(0.01f);
 	sun.sky_color = vec4(0.01f, 0.015f, 0.055f, 1.0f);
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
-		sun.ambient += vec3((sun.light_dir_and_radius.z + 0.2f) * 0.2f);
-		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec4(0.2f, 0.3f, 1.1f, 0.0f);
+		sun.ambient += (sun.light_dir_and_radius.z + 0.2f) * 0.2f;
+		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec4 { 0.2f, 0.3f, 1.1f, 0.0f };
 	}
 
 	Frustum camera_frustum{ camera.view_proj };
@@ -597,12 +598,12 @@ static void drawGraphics()
 	{
 		num_visible_cars = logical_data.num_cars;
 
-		mat4 sun_shadow_view = lookAt(vec3(0.0f), -vec3(sun.light_dir_and_radius), vec3(-sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z));
-		mat3 abs_sun_shadow_rot = abs(mat3(sun_shadow_view));
+		mat4 sun_shadow_view = lookAt(vec3{ 0.0f }, -vec3{ sun.light_dir_and_radius }, vec3{ -sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z });
+		mat3 abs_sun_shadow_rot = abs(mat3{ sun_shadow_view });
 		vec3 view_top(0.0f, tan(FOV_Y / 2), 0.0f);
-		vec3 view_left = vec3(view_top.y / window_height * window_width, 0.0f, 0.0f);
-		view_top = mat3(camera.inv_view) * view_top;
-		view_left = mat3(camera.inv_view) * view_left;
+		vec3 view_left = vec3{ view_top.y / window_height * window_width, 0.0f, 0.0f };
+		view_top = mat3{ camera.inv_view } *view_top;
+		view_left = mat3{ camera.inv_view } *view_left;
 		float z_min = FLT_MAX;
 		float x_maxs[CSM_LEVELS], x_mins[CSM_LEVELS], y_maxs[CSM_LEVELS], y_mins[CSM_LEVELS], z_mins[CSM_LEVELS];
 		float CSM_ratio = pow(scene_z_far / view_z_near, 1.0f / CSM_LEVELS);
@@ -770,11 +771,12 @@ static void drawGraphics()
 			float z_padding = std::max(x_padding / (x_maxs[i] - x_mins[i]), y_padding / (y_maxs[i] - y_mins[i])) * (z_max - z_mins[i]);
 			mat4 shadow_mat = ortho(x_mins[i] - x_padding, x_maxs[i] + x_padding, y_mins[i] - y_padding, y_maxs[i] + y_padding, -z_max, -z_mins[i] + z_padding) * sun_shadow_view;
 			sun_shadow.view_proj[i] = shadow_mat;
-			sun_shadow.tex[i] = mat4(
+			sun_shadow.tex[i] = mat4{
 				0.5f, 0.0f, 0.0f, 0.0f,
 				0.0f, 0.5f, 0.0f, 0.0f,
 				0.0f, 0.0f, 0.5f, 0.0f,
-				0.5f, 0.5f, 0.5f, 1.0f) * shadow_mat;
+				0.5f, 0.5f, 0.5f, 1.0f
+			} *shadow_mat;
 		}
 	}
 	else
@@ -809,9 +811,9 @@ static void drawGraphics()
 			{
 				constexpr float POS_OFFSET = CAR_LIGHT_NEAR + TILE_LIGHT_POSITION_MAP_GRID_LENGTH;
 				vec3 center_pos = light_pos + POS_OFFSET * light_dir;
-				ivec2 light_pos_map_idx = ivec2{ 1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2(TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y) };
+				ivec2 light_pos_map_idx = 1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2{ center_pos } + 0.5f * vec2{ TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y };
 				ivec2* light_pos_map_grid = &tile_light_position_map.light_idx_range[light_pos_map_idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + light_pos_map_idx.y];
-				car_light_infos.push_back({ light_pos, light_dir, bound, length(center_pos - vec3(camera.inv_view[3])), light_pos_map_grid });
+				car_light_infos.push_back({ light_pos, light_dir, bound, length(center_pos - vec3{ camera.inv_view[3] }), light_pos_map_grid });
 				light_pos_map_grid->x++;
 			}
 		}
@@ -826,28 +828,76 @@ static void drawGraphics()
 			}
 			int idx = car_light_info.light_map_grid->y++;
 			tile_light_data.tile_lights[idx].position = car_light_info.pos;
-			tile_light_data.tile_lights[idx].view_proj = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3(car_light_info.pos), vec3(car_light_info.pos) + vec3(car_light_info.dir), vec3(0.0f, 0.0f, 1.0f));
+			tile_light_data.tile_lights[idx].view_proj = CAR_LIGHT_SHADOW_PROJ * lookAt(vec3{ car_light_info.pos }, vec3{ car_light_info.pos + car_light_info.dir }, vec3{ 0.0f, 0.0f, 1.0f });
 			tile_light_bounds[idx] = car_light_info.bound;
 		}
-		memset(tile_light_affected_map.idx_range, 0, sizeof(tile_light_affected_map.idx_range));
 		constexpr int SEARCH_RANGE = int(0.9999f + 0.5f * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH));
 		static std::pair<int, int[(2 * SEARCH_RANGE + 1) * (2 * SEARCH_RANGE + 1)]> affected_grids[2 * MAX_CAR_CNT];
-		for (int i = 0; i < num_visible_car_lights; i++)
+#pragma omp parallel num_threads(omp_get_num_procs() - 2)
 		{
-			affected_grids[i].first = 0;
-			vec3 center_pos = 0.5f * (tile_light_bounds[i].center_near + tile_light_bounds[i].center_far);
-			ivec2 affected_map_idx = ivec2{ 1.0f / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH * vec2(center_pos) + 0.5f * vec2{ TILE_LIGHT_AFFECTED_MAP_SIZE_X, TILE_LIGHT_AFFECTED_MAP_SIZE_Y } };
-			for (int j = std::max(0, affected_map_idx.x - SEARCH_RANGE); j < std::min(TILE_LIGHT_AFFECTED_MAP_SIZE_X, affected_map_idx.x + SEARCH_RANGE + 1); j++)
+#pragma omp for schedule(guided) nowait
+			for (int i = 0; i < num_visible_car_lights; i++)
 			{
-				for (int k = std::max(0, affected_map_idx.y - SEARCH_RANGE); k < std::min(TILE_LIGHT_AFFECTED_MAP_SIZE_Y, affected_map_idx.y + SEARCH_RANGE + 1); k++)
+				affected_grids[i].first = 0;
+				const vec2 center_pos = 0.5f * (tile_light_bounds[i].center_near + tile_light_bounds[i].center_far);
+				const ivec2 affected_map_idx = 1.0f / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH * center_pos + 0.5f * vec2{ TILE_LIGHT_AFFECTED_MAP_SIZE_X, TILE_LIGHT_AFFECTED_MAP_SIZE_Y };
+				const ivec2 begin_idx = max(ivec2(0), affected_map_idx - SEARCH_RANGE);
+				const ivec2 end_idx = min(ivec2{ TILE_LIGHT_AFFECTED_MAP_SIZE_X, TILE_LIGHT_AFFECTED_MAP_SIZE_Y }, affected_map_idx + SEARCH_RANGE + 1);
+				BoundAABB bounds[(2 * SEARCH_RANGE + 1) * (2 * SEARCH_RANGE + 1)];
+				int count = 0;
+				for (int j = begin_idx.x; j < end_idx.x; j++)
 				{
-					BoundAABB bound = sceneGridBound(TILE_LIGHT_AFFECTED_MAP_GRID_LEVEL, j, k);
-					if (intersectionTest(tile_light_bounds[i], bound))
+					for (int k = begin_idx.y; k < end_idx.y; k++)
 					{
-						tile_light_affected_map.idx_range[j * TILE_LIGHT_AFFECTED_MAP_SIZE_Y + k].x++;
-						affected_grids[i].second[affected_grids[i].first++] = j * TILE_LIGHT_AFFECTED_MAP_SIZE_Y + k;
+						bounds[count++] = sceneGridBound(TILE_LIGHT_AFFECTED_MAP_GRID_LEVEL, j, k);
 					}
 				}
+				bool intersect_results[(2 * SEARCH_RANGE + 1) * (2 * SEARCH_RANGE + 1)];
+				intersectionTests(tile_light_bounds[i], bounds, count, intersect_results);
+				count = 0;
+				for (int j = begin_idx.x; j < end_idx.x; j++)
+				{
+					for (int k = begin_idx.y; k < end_idx.y; k++)
+					{
+						if (intersect_results[count++])
+						{
+							affected_grids[i].second[affected_grids[i].first++] = j * TILE_LIGHT_AFFECTED_MAP_SIZE_Y + k;
+						}
+					}
+				}
+			}
+#pragma omp for schedule(guided) 
+			for (int i = 0; i < logical_data.num_cars; i++)
+			{
+				mat4& transform = logical_data.car_transform[i];
+				ivec2 pos_idx = 1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2{ TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y };
+				BoundOBB car_bound{ car_local_bound, transform };
+				int num_lighting = 0;
+				for (int m = -1; m < 2; m++)
+				{
+					for (int n = -1; n < 2; n++)
+					{
+						ivec2 idx = pos_idx + ivec2{ m, n };
+						ivec2 light_idx_range = tile_light_position_map.light_idx_range[idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + idx.y];
+						for (int k = light_idx_range.x; k < light_idx_range.y; k++)
+						{
+							if (intersectionTest(tile_light_bounds[k], car_bound))
+							{
+								num_lighting++;
+								car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR + num_lighting] = k;
+							}
+						}
+					}
+				}
+				car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR] = num_lighting > 0 || camera_frustum.cullingTest(car_bound) ? num_lighting : -1;
+			}
+		}
+		memset(tile_light_affected_map.idx_range, 0, sizeof(tile_light_affected_map.idx_range));
+		for (int i = 0; i < num_visible_car_lights; i++)
+		{
+			for (int j = 0; j < affected_grids[i].first; j++)
+			{
+				tile_light_affected_map.idx_range[affected_grids[i].second[j]].x++;
 			}
 		}
 		total_tile_light_affected_map_indices_cnt = 0;
@@ -870,55 +920,39 @@ static void drawGraphics()
 			car_tile_light_shadow_idx[i].clear();
 			car_tile_light_shadow_transform[i].clear();
 		}
-		auto cullCars = [&camera_frustum](mat4* transforms, vec3* colors, int* light_indices, int size)->int
+		auto cnt_visible_cars = [](mat4* transforms, vec3* colors, int* light_indices, int size)->int
 			{
-				int i = 0, j = size;
-				while (i < j)
+				int visible_cnt = 0;
+				for (int i = 0; i < size; i++)
 				{
-					mat4& transform = transforms[i];
-					ivec2 pos_idx = ivec2(1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2(TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y));
-					BoundOBB car_bound{ car_local_bound, transform };
-					int num_lighting = 0;
-					for (int m = -1; m < 2; m++)
+					if (light_indices[i * LIGHTING_SIZE_PER_CAR] >= 0)
 					{
-						for (int n = -1; n < 2; n++)
+						if (i != visible_cnt)
 						{
-							ivec2 idx = pos_idx + ivec2(m, n);
-							for (int k = tile_light_position_map.light_idx_range[idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + idx.y].x; k < tile_light_position_map.light_idx_range[idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + idx.y].y; k++)
+							std::swap(transforms[visible_cnt], transforms[i]);
+							std::swap(colors[visible_cnt], colors[i]);
+							memcpy(light_indices + visible_cnt * LIGHTING_SIZE_PER_CAR, light_indices + i * LIGHTING_SIZE_PER_CAR, (light_indices[i * LIGHTING_SIZE_PER_CAR] + 1) * sizeof(*light_indices));
+						}
+						for (int j = 1; j <= light_indices[visible_cnt * LIGHTING_SIZE_PER_CAR]; j++)
+						{
+							int k = light_indices[visible_cnt * LIGHTING_SIZE_PER_CAR + j];
+							int layer = findTileLightShadowLayer(k);
+							if (layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 							{
-								if (intersectionTest(tile_light_bounds[k], car_bound))
-								{
-									num_lighting++;
-									int layer = findTileLightShadowLayer(k);
-									if (layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
-									{
-										car_tile_light_shadow_idx[layer].push_back(k);
-										car_tile_light_shadow_transform[layer].push_back(tile_light_data.tile_lights[k].view_proj * transform);
-									}
-									light_indices[i * LIGHTING_SIZE_PER_CAR + num_lighting] = k;
-								}
+								car_tile_light_shadow_idx[layer].push_back(k);
+								car_tile_light_shadow_transform[layer].push_back(tile_light_data.tile_lights[k].view_proj * transforms[visible_cnt]);
 							}
 						}
-					}
-					light_indices[i * LIGHTING_SIZE_PER_CAR] = num_lighting;
-					if (num_lighting > 0 || camera_frustum.cullingTest(BoundAABB{ car_local_bound, transform }))
-					{
-						i++;
-					}
-					else
-					{
-						j--;
-						std::swap(transform, transforms[j]);
-						std::swap(colors[i], colors[j]);
+						visible_cnt++;
 					}
 				}
-				return i;
+				return visible_cnt;
 			};
-		num_visible_light_on_cars += cullCars(logical_data.car_transform, logical_data.car_color, car_lightings.light_indices, logical_data.num_light_on_cars);
+		num_visible_light_on_cars += cnt_visible_cars(logical_data.car_transform, logical_data.car_color, car_lightings.light_indices, logical_data.num_light_on_cars);
 		num_visible_cars += num_visible_light_on_cars;
-		num_visible_cars += cullCars(&logical_data.car_transform[logical_data.num_light_on_cars],
+		num_visible_cars += cnt_visible_cars(&logical_data.car_transform[logical_data.num_light_on_cars],
 			&logical_data.car_color[logical_data.num_light_on_cars],
-			&car_lightings.light_indices[num_visible_light_on_cars * LIGHTING_SIZE_PER_CAR],
+			&car_lightings.light_indices[logical_data.num_light_on_cars * LIGHTING_SIZE_PER_CAR],
 			logical_data.num_cars - logical_data.num_light_on_cars);
 	}
 
@@ -940,9 +974,10 @@ static void drawGraphics()
 		glNamedBufferSubData(tile_light_position_map_SSBO, 0, sizeof(tile_light_position_map), &tile_light_position_map);
 		glNamedBufferSubData(tile_lights_SSBO, 0, num_visible_car_lights * sizeof(TileLight), &tile_light_data);
 		glNamedBufferSubData(tile_light_affected_map_SSBO, 0, sizeof(TileLightAffectedMapData::idx_range) + total_tile_light_affected_map_indices_cnt * sizeof(int), &tile_light_affected_map);
-		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
+		glNamedBufferSubData(car_lighting_SSBO, 0, num_visible_light_on_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
 		glNamedBufferSubData(car_transform_VBO, 0, num_visible_light_on_cars * sizeof(mat4), logical_data.car_transform);
 		glNamedBufferSubData(car_color_VBO, 0, num_visible_light_on_cars * sizeof(vec3), logical_data.car_color);
+		glNamedBufferSubData(car_lighting_SSBO, num_visible_light_on_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), (num_visible_cars - num_visible_light_on_cars) * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings.light_indices[logical_data.num_light_on_cars * LIGHTING_SIZE_PER_CAR]);
 		glNamedBufferSubData(car_transform_VBO, num_visible_light_on_cars * sizeof(mat4), (num_visible_cars - num_visible_light_on_cars) * sizeof(mat4), &logical_data.car_transform[logical_data.num_light_on_cars]);
 		glNamedBufferSubData(car_color_VBO, num_visible_light_on_cars * sizeof(vec3), (num_visible_cars - num_visible_light_on_cars) * sizeof(vec3), &logical_data.car_color[logical_data.num_light_on_cars]);
 		glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "numLightOnCars"), num_visible_light_on_cars);
@@ -1404,6 +1439,8 @@ static void onMouseButton(GLFWwindow* window, int button, int action, int mods)
 
 int main(int argc, char** argv)
 {
+	// vcomp 在加载时读取该变量，且忽略之后的 _putenv。延迟加载后，这里早于首次 OpenMP。
+	SetEnvironmentVariableW(L"OMP_WAIT_POLICY", L"PASSIVE");
 	ImmDisableIME(GetCurrentThreadId());
 
 	int width = 2400;
@@ -1466,7 +1503,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.2 * DAY_PERIOD)
+	while (logical_time < 0.6 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

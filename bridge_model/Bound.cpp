@@ -152,45 +152,45 @@ void BoundEllipticFrustum::biSupport(const glm::vec3& dir, glm::vec3& support_po
 	rsupport_point = dot(rsupport_near, dir) < dot(rsupport_far, dir) ? rsupport_near : rsupport_far;
 }
 
-bool intersectionTest(const BoundAABB& bound1, const BoundEllipticFrustum& bound2)
+bool intersectionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary)
 {
 	vec3 support_min, support_max;
-	bound2.biSupport(vec3{ 1.0f, 0.0f, 0.0f }, support_max, support_min);
-	if (support_max.x <= bound1.min.x || support_min.x >= bound1.max.x)
+	secondary.biSupport(vec3{ 1.0f, 0.0f, 0.0f }, support_max, support_min);
+	if (support_max.x <= primary.min.x || support_min.x >= primary.max.x)
 	{
 		return false;
 	}
-	bound2.biSupport(vec3{ 0.0f, 1.0f, 0.0f }, support_max, support_min);
-	if (support_max.y <= bound1.min.y || support_min.y >= bound1.max.y)
+	secondary.biSupport(vec3{ 0.0f, 1.0f, 0.0f }, support_max, support_min);
+	if (support_max.y <= primary.min.y || support_min.y >= primary.max.y)
 	{
 		return false;
 	}
-	bound2.biSupport(vec3{ 0.0f, 0.0f, 1.0f }, support_max, support_min);
-	if (support_max.z <= bound1.min.z || support_min.z >= bound1.max.z)
+	secondary.biSupport(vec3{ 0.0f, 0.0f, 1.0f }, support_max, support_min);
+	if (support_max.z <= primary.min.z || support_min.z >= primary.max.z)
 	{
 		return false;
 	}
 	return true;
 }
 
-bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundAABB& bound2)
+bool intersectionTest(const BoundEllipticFrustum& primary, const BoundAABB& secondary)
 {
-	vec3 box_center = bound2.center();
-	vec3 box_half_size = 0.5f * bound2.size();
-	vec3 frustum_dir = bound1.center_near - bound1.center_far;
+	vec3 box_center = secondary.center();
+	vec3 box_half_size = 0.5f * secondary.size();
+	vec3 frustum_dir = primary.center_near - primary.center_far;
 	float center_dist = length(frustum_dir);
 	frustum_dir *= 1.0f / center_dist;
 	float m = dot(frustum_dir, box_center);
 	float r = dot(abs(frustum_dir), box_half_size);
-	if (m + r <= dot(frustum_dir, bound1.center_far) || m - r >= dot(frustum_dir, bound1.center_near))
+	if (m + r <= dot(frustum_dir, primary.center_far) || m - r >= dot(frustum_dir, primary.center_near))
 	{
 		return false;
 	}
-	float x_far_len = length(bound1.x_far);
-	float y_far_len = length(bound1.y_far);
-	vec3 frustum_x = 1.0f / x_far_len * bound1.x_far;
-	vec3 frustum_y = 1.0f / y_far_len * bound1.y_far;
-	vec3 v = box_center - bound1.center_far;
+	float x_far_len = length(primary.x_far);
+	float y_far_len = length(primary.y_far);
+	vec3 frustum_x = 1.0f / x_far_len * primary.x_far;
+	vec3 frustum_y = 1.0f / y_far_len * primary.y_far;
+	vec3 v = box_center - primary.center_far;
 	float x = dot(v, frustum_x);
 	float y = dot(v, frustum_y);
 	float d = sqrt(x * x / (x_far_len * x_far_len) + y * y / (y_far_len * y_far_len));
@@ -198,10 +198,10 @@ bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundAABB& bound
 	{
 		x /= d;
 		y /= d;
-		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - bound1.near_far_ratio) / center_dist };
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - primary.near_far_ratio) / center_dist };
 		n = normalize(n);
 		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
-		float plane_d = dot(bound1.center_far + x * frustum_x + y * frustum_y, n);
+		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
 		if (dot(n, box_center) + dot(abs(n), box_half_size) <= plane_d)
 		{
 			return false;
@@ -210,44 +210,89 @@ bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundAABB& bound
 	return true;
 }
 
-bool intersectionTest(const BoundOBB& bound1, const BoundEllipticFrustum& bound2)
+void intersectionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds, int count, bool* results)
+{
+	vec3 frustum_dir = primary.center_near - primary.center_far;
+	float center_dist = length(frustum_dir);
+	frustum_dir *= 1.0f / center_dist;
+	vec3 abs_frustum_dir = abs(frustum_dir);
+	float ra = 1.0f / length(primary.x_far);
+	float rb = 1.0f / length(primary.y_far);
+	vec3 frustum_x = ra * primary.x_far;
+	vec3 frustum_y = rb * primary.y_far;
+	float d_far = dot(frustum_dir, primary.center_far);
+	float d_near = dot(frustum_dir, primary.center_near);
+	for (int i = 0; i < count; i++)
+	{
+		vec3 box_center = bounds[i].center();
+		vec3 box_half_size = 0.5f * bounds[i].size();
+		float m = dot(frustum_dir, box_center);
+		float r = dot(abs_frustum_dir, box_half_size);
+		if (m + r <= d_far || m - r >= d_near)
+		{
+			results[i] = false;
+			continue;
+		}
+		vec3 v = box_center - primary.center_far;
+		float x = dot(v, frustum_x);
+		float y = dot(v, frustum_y);
+		float d = sqrt(x * x * (ra * ra) + y * y * (rb * rb));
+		if (d > 0.0f)
+		{
+			x /= d;
+			y /= d;
+			vec3 n{ -x * (ra * ra), -y * (rb * rb), -(1 - primary.near_far_ratio) / center_dist };
+			n = normalize(n);
+			n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
+			float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
+			if (dot(n, box_center) + dot(abs(n), box_half_size) <= plane_d)
+			{
+				results[i] = false;
+				continue;
+			}
+		}
+		results[i] = true;
+	}
+}
+
+bool intersectionTest(const BoundOBB& primary, const BoundEllipticFrustum& secondary)
 {
 	vec3 support_min, support_max;
-	vec3 center_d = bound1.center * bound1.rotation;
-	bound2.biSupport(bound1.rotation[0], support_max, support_min);
-	if (dot(support_max, bound1.rotation[0]) <= center_d.x - bound1.half_size.x || dot(support_min, bound1.rotation[0]) >= center_d.x + bound1.half_size.x)
+	vec3 center_d = primary.center * primary.rotation;
+	secondary.biSupport(primary.rotation[0], support_max, support_min);
+	if (dot(support_max, primary.rotation[0]) <= center_d.x - primary.half_size.x || dot(support_min, primary.rotation[0]) >= center_d.x + primary.half_size.x)
 	{
 		return false;
 	}
-	bound2.biSupport(bound1.rotation[1], support_max, support_min);
-	if (dot(support_max, bound1.rotation[1]) <= center_d.y - bound1.half_size.y || dot(support_min, bound1.rotation[1]) >= center_d.y + bound1.half_size.y)
+	secondary.biSupport(primary.rotation[1], support_max, support_min);
+	if (dot(support_max, primary.rotation[1]) <= center_d.y - primary.half_size.y || dot(support_min, primary.rotation[1]) >= center_d.y + primary.half_size.y)
 	{
 		return false;
 	}
-	bound2.biSupport(bound1.rotation[2], support_max, support_min);
-	if (dot(support_max, bound1.rotation[2]) <= center_d.z - bound1.half_size.z || dot(support_min, bound1.rotation[2]) >= center_d.z + bound1.half_size.z)
+	secondary.biSupport(primary.rotation[2], support_max, support_min);
+	if (dot(support_max, primary.rotation[2]) <= center_d.z - primary.half_size.z || dot(support_min, primary.rotation[2]) >= center_d.z + primary.half_size.z)
 	{
 		return false;
 	}
 	return true;
 }
 
-bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundOBB& bound2)
+bool intersectionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondary)
 {
-	vec3 frustum_dir = bound1.center_near - bound1.center_far;
+	vec3 frustum_dir = primary.center_near - primary.center_far;
 	float center_dist = length(frustum_dir);
 	frustum_dir *= 1.0f / center_dist;
 	vec3 support_min, support_max;
-	bound2.biSupport(frustum_dir, support_max, support_min);
-	if (dot(frustum_dir, support_max) <= dot(frustum_dir, bound1.center_far) || dot(frustum_dir, support_min) >= dot(frustum_dir, bound1.center_near))
+	secondary.biSupport(frustum_dir, support_max, support_min);
+	if (dot(frustum_dir, support_max) <= dot(frustum_dir, primary.center_far) || dot(frustum_dir, support_min) >= dot(frustum_dir, primary.center_near))
 	{
 		return false;
 	}
-	float x_far_len = length(bound1.x_far);
-	float y_far_len = length(bound1.y_far);
-	vec3 frustum_x = 1.0f / x_far_len * bound1.x_far;
-	vec3 frustum_y = 1.0f / y_far_len * bound1.y_far;
-	vec3 v = bound2.center - bound1.center_far;
+	float x_far_len = length(primary.x_far);
+	float y_far_len = length(primary.y_far);
+	vec3 frustum_x = 1.0f / x_far_len * primary.x_far;
+	vec3 frustum_y = 1.0f / y_far_len * primary.y_far;
+	vec3 v = secondary.center - primary.center_far;
 	float x = dot(v, frustum_x);
 	float y = dot(v, frustum_y);
 	float d = sqrt(x * x / (x_far_len * x_far_len) + y * y / (y_far_len * y_far_len));
@@ -255,11 +300,11 @@ bool intersectionTest(const BoundEllipticFrustum& bound1, const BoundOBB& bound2
 	{
 		x /= d;
 		y /= d;
-		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - bound1.near_far_ratio) / center_dist };
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - primary.near_far_ratio) / center_dist };
 		n = normalize(n);
 		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
-		float plane_d = dot(bound1.center_far + x * frustum_x + y * frustum_y, n);
-		if (dot(n, bound2.support(n)) <= plane_d)
+		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
+		if (dot(n, secondary.support(n)) <= plane_d)
 		{
 			return false;
 		}

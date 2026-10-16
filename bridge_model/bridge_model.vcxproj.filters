@@ -13,32 +13,32 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="资源文件\shaders">
-      <UniqueIdentifier>{9544fae0-c0f2-45b5-a5af-6bf428cf0edb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shaders\draw">
-      <UniqueIdentifier>{470ac5df-d4ee-4760-a8a4-1aee4ef3014b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shaders\shadow">
-      <UniqueIdentifier>{24aa9d7c-2192-458d-a869-87235be33c18}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shaders\shadow\day">
-      <UniqueIdentifier>{da458e28-b8cd-411d-9a07-5cddbcfdb243}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shaders\shadow\night">
-      <UniqueIdentifier>{9b377ff0-018f-4a40-ac64-34ce6997ee6d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shaders\draw\day">
-      <UniqueIdentifier>{2719242b-2556-4865-8b8c-1f6b92815c4f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shaders\draw\night">
-      <UniqueIdentifier>{25cb70f5-f06b-474f-ba11-effa18e6b298}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="资源文件\shader_headers">
+    <Filter Include="shader_headers">
       <UniqueIdentifier>{0c56730f-f61e-449f-b9be-ebeafa266ec9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="资源文件\shader_headers\common_headers">
+    <Filter Include="shader_headers\common_headers">
       <UniqueIdentifier>{e04ed47e-6077-41cb-8012-43bfa4465dab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{9544fae0-c0f2-45b5-a5af-6bf428cf0edb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\draw">
+      <UniqueIdentifier>{470ac5df-d4ee-4760-a8a4-1aee4ef3014b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\draw\day">
+      <UniqueIdentifier>{2719242b-2556-4865-8b8c-1f6b92815c4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\draw\night">
+      <UniqueIdentifier>{25cb70f5-f06b-474f-ba11-effa18e6b298}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\shadow">
+      <UniqueIdentifier>{24aa9d7c-2192-458d-a869-87235be33c18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\shadow\day">
+      <UniqueIdentifier>{da458e28-b8cd-411d-9a07-5cddbcfdb243}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\shadow\night">
+      <UniqueIdentifier>{9b377ff0-018f-4a40-ac64-34ce6997ee6d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -105,25 +105,25 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\lighting_day.glslh">
-      <Filter>资源文件\shader_headers</Filter>
+      <Filter>shader_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\camera_defines.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\common_defines.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\lighting_day_defines.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\scene_constances.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\text_altas_constances.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\lighting_night_defines.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
     <ClInclude Include="terrain.h">
       <Filter>头文件</Filter>
@@ -144,7 +144,7 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="shader_headers\binding_points.h">
-      <Filter>资源文件\shader_headers\common_headers</Filter>
+      <Filter>shader_headers\common_headers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -154,55 +154,55 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="shaders\buffer2screen.frag">
-      <Filter>资源文件\shaders</Filter>
+      <Filter>shaders</Filter>
     </Text>
     <Text Include="shaders\gaussian_blur.frag">
-      <Filter>资源文件\shaders</Filter>
+      <Filter>shaders</Filter>
     </Text>
     <Text Include="shaders\tex_blit.frag">
-      <Filter>资源文件\shaders</Filter>
+      <Filter>shaders</Filter>
     </Text>
     <Text Include="shaders\tex_blit.vert">
-      <Filter>资源文件\shaders</Filter>
+      <Filter>shaders</Filter>
     </Text>
     <Text Include="shaders\sun.frag">
-      <Filter>资源文件\shaders\draw</Filter>
+      <Filter>shaders\draw</Filter>
     </Text>
     <Text Include="shaders\shadow.frag">
-      <Filter>资源文件\shaders\shadow</Filter>
+      <Filter>shaders\shadow</Filter>
     </Text>
     <Text Include="shaders\shadow_car_day.vert">
-      <Filter>资源文件\shaders\shadow\day</Filter>
+      <Filter>shaders\shadow\day</Filter>
     </Text>
     <Text Include="shaders\shadow_highway_day.vert">
-      <Filter>资源文件\shaders\shadow\day</Filter>
+      <Filter>shaders\shadow\day</Filter>
     </Text>
     <Text Include="shaders\shadow_highway_night.vert">
-      <Filter>资源文件\shaders\shadow\night</Filter>
+      <Filter>shaders\shadow\night</Filter>
     </Text>
     <Text Include="shaders\shadow_car_night.vert">
-      <Filter>资源文件\shaders\shadow\night</Filter>
+      <Filter>shaders\shadow\night</Filter>
     </Text>
     <Text Include="shaders\car.vert">
-      <Filter>资源文件\shaders\draw</Filter>
+      <Filter>shaders\draw</Filter>
     </Text>
     <Text Include="shaders\highway.vert">
-      <Filter>资源文件\shaders\draw</Filter>
+      <Filter>shaders\draw</Filter>
     </Text>
     <Text Include="shaders\car_day.frag">
-      <Filter>资源文件\shaders\draw\day</Filter>
+      <Filter>shaders\draw\day</Filter>
     </Text>
     <Text Include="shaders\highway_day.frag">
-      <Filter>资源文件\shaders\draw\day</Filter>
+      <Filter>shaders\draw\day</Filter>
     </Text>
     <Text Include="shaders\car_night.frag">
-      <Filter>资源文件\shaders\draw\night</Filter>
+      <Filter>shaders\draw\night</Filter>
     </Text>
     <Text Include="shaders\highway_night.frag">
-      <Filter>资源文件\shaders\draw\night</Filter>
+      <Filter>shaders\draw\night</Filter>
     </Text>
     <Text Include="shaders\sun.vert">
-      <Filter>资源文件\shaders\draw</Filter>
+      <Filter>shaders\draw</Filter>
     </Text>
   </ItemGroup>
   <ItemGroup>
@@ -210,28 +210,28 @@
       <Filter>资源文件</Filter>
     </None>
     <None Include="shaders\text.frag">
-      <Filter>资源文件\shaders</Filter>
+      <Filter>shaders</Filter>
     </None>
     <None Include="shader_headers\lighting_night.glslh">
-      <Filter>资源文件\shader_headers</Filter>
+      <Filter>shader_headers</Filter>
     </None>
     <None Include="shader_headers\fog.glslh">
-      <Filter>资源文件\shader_headers</Filter>
+      <Filter>shader_headers</Filter>
     </None>
     <None Include="shaders\gen_PCSS_mips.frag">
-      <Filter>资源文件\shaders\shadow\day</Filter>
+      <Filter>shaders\shadow\day</Filter>
     </None>
     <None Include="textures\terrain_height.r16">
       <Filter>资源文件</Filter>
     </None>
     <None Include="shaders\terrain_day.frag">
-      <Filter>资源文件\shaders\draw\day</Filter>
+      <Filter>shaders\draw\day</Filter>
     </None>
     <None Include="shaders\terrain_night.frag">
-      <Filter>资源文件\shaders\draw\night</Filter>
+      <Filter>shaders\draw\night</Filter>
     </None>
     <None Include="shaders\shadow_highway_night.comp">
-      <Filter>资源文件\shaders\shadow\night</Filter>
+      <Filter>shaders\shadow\night</Filter>
     </None>
   </ItemGroup>
 </Project>
