@@ -579,5 +579,4 @@ void drawTerrainMesh(const Frustum& frustum)
 		}
 	}
 	glMultiDrawElementsBaseVertex(GL_TRIANGLES, count, GL_UNSIGNED_INT, indicies, tile_cnt, basevertex);
-
 }

@@ -78,6 +78,15 @@
     <ClCompile Include="shader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="GPUTripleBuffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUTriple.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUTripleVertexArray.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Car.h">
@@ -145,6 +154,15 @@
     </ClInclude>
     <ClInclude Include="shader_headers\binding_points.h">
       <Filter>shader_headers\common_headers</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUTripleBuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUTriple.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUTripleVertexArray.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +250,9 @@
     </None>
     <None Include="shaders\shadow_highway_night.comp">
       <Filter>shaders\shadow\night</Filter>
+    </None>
+    <None Include="shaders\text.vert">
+      <Filter>shaders</Filter>
     </None>
   </ItemGroup>
 </Project>

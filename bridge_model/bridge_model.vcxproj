@@ -107,6 +107,9 @@
     <ClCompile Include="Car.cpp" />
     <ClCompile Include="Frustum.cpp" />
     <ClCompile Include="glad\src\glad.c" />
+    <ClCompile Include="GPUTripleBuffer.cpp" />
+    <ClCompile Include="GPUTriple.cpp" />
+    <ClCompile Include="GPUTripleVertexArray.cpp" />
     <ClCompile Include="Lane.cpp" />
     <ClCompile Include="logical_frame.cpp" />
     <ClCompile Include="mesh.cpp" />
@@ -121,6 +124,9 @@
     <ClInclude Include="CircularQueue.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="Frustum.h" />
+    <ClInclude Include="GPUTripleBuffer.h" />
+    <ClInclude Include="GPUTriple.h" />
+    <ClInclude Include="GPUTripleVertexArray.h" />
     <ClInclude Include="Lane.h" />
     <ClInclude Include="logical_frame.h" />
     <ClInclude Include="mesh.h" />
@@ -166,6 +172,7 @@
     <None Include="shaders\shadow_highway_night.comp" />
     <None Include="shaders\terrain_day.frag" />
     <None Include="shaders\terrain_night.frag" />
+    <None Include="shaders\text.vert" />
     <None Include="shader_headers\fog.glslh" />
     <None Include="shader_headers\lighting_night.glslh" />
     <None Include="textures\font_atlas_r8.raw" />
