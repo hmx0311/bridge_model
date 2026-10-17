@@ -1298,7 +1298,7 @@ static void onResize(GLFWwindow*, int width, int height)
 	}
 }
 
-static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
+static void onKey(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	if (action == GLFW_PRESS)
 	{
@@ -1342,6 +1342,27 @@ static void onKey(GLFWwindow*, int key, int scancode, int action, int mods)
 		case 'S':
 			focus_move_dir |= 0b1000;
 			return;
+		case GLFW_KEY_ENTER:
+			if (mods == GLFW_MOD_ALT)
+			{
+				static int old_pos_x, old_pos_y, old_width, old_height;
+				static bool is_full_screen = false;
+				if (is_full_screen)
+				{
+					glfwSetWindowMonitor(window, nullptr, old_pos_x, old_pos_y, old_width, old_height, 0);
+				}
+				else
+				{
+					glfwGetWindowPos(window, &old_pos_x, &old_pos_y);
+					glfwGetWindowSize(window, &old_width, &old_height);
+					GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+					const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+					glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+				}
+				is_full_screen = !is_full_screen;
+				return;
+			}
+			break;
 		}
 	}
 	else if (action == GLFW_RELEASE)
@@ -1442,14 +1463,22 @@ int main(int argc, char** argv)
 	SetEnvironmentVariableW(L"OMP_WAIT_POLICY", L"PASSIVE");
 	ImmDisableIME(GetCurrentThreadId());
 
-	int width = 2400;
-	int height = 1350;
-
 	if (!glfwInit())
 	{
 		return -1;
 	}
 
+	initLogic();
+	std::thread logical_thread(logicalFrame);
+	simulate_speed = 1000000;
+	while (logical_time < 0.6 * DAY_PERIOD)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	simulate_speed = 1;
+
+	int width = 2400;
+	int height = 1350;
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
@@ -1498,15 +1527,6 @@ int main(int argc, char** argv)
 
 	init();
 	onResize(window, width, height);
-
-	initLogic();
-	std::thread logical_thread(logicalFrame);
-	simulate_speed = 1000000;
-	while (logical_time < 0.6 * DAY_PERIOD)
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
-	simulate_speed = 1;
 
 	while (!glfwWindowShouldClose(window))
 	{
