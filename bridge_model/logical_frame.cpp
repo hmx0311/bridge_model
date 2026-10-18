@@ -492,14 +492,15 @@ void logicalFrame()
 			Car* car;
 			ivec2* pos_map_grids;
 		};
-		std::vector<CarPosInfo> car_pos_infos;
+		static std::vector<CarPosInfo> car_pos_infos;
+		car_pos_infos.clear();
 		for (auto iter = vehicles.begin(); iter != vehicles.end(); )
 		{
 			if (iter->update(logical_dt_s, sun.getDir().z))
 			{
-				const mat4& transform = iter->getModelMat();
-				vec2 car_xy_pos(transform[3]);
-				ivec2 pos_map_idx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * car_xy_pos + 0.5f * vec2(CAR_POS_MAP_SIZE));
+				const mat4& transform = iter->getTransform();
+				vec2 car_pos_xy{ transform[3] };
+				ivec2 pos_map_idx = 1.0f / CAR_POS_MAP_GRID_LENGTH * car_pos_xy + 0.5f * vec2{ CAR_POS_MAP_SIZE };
 				car_pos_infos.push_back(CarPosInfo{ &*iter, &car_pos_map[pos_map_idx.x][pos_map_idx.y] });
 				car_pos_map[pos_map_idx.x][pos_map_idx.y].x++;
 				iter++;
@@ -523,15 +524,20 @@ void logicalFrame()
 		}
 		for (Car& car : vehicles)
 		{
-			constexpr float POS_OFFSET = -0.30f / CAR_POS_MAP_GRID_LENGTH + 0.5f;
-			ivec2 pos_idx = ivec2(1.0f / CAR_POS_MAP_GRID_LENGTH * vec2(car.getModelMat()[3]) + POS_OFFSET * vec2(car.getDir()) + 0.5f * vec2(CAR_POS_MAP_SIZE) - 0.5f);
+			constexpr float POS_OFFSET = -0.5f * CAR_LENGTH + 0.5f * CAR_POS_MAP_GRID_LENGTH;
+			vec3 position = car.getTransform()[3];
+			ivec2 pos_idx = 1.0f / CAR_POS_MAP_GRID_LENGTH * (vec2{ position } + POS_OFFSET * vec2{ car.getTransform()[1] }) + 0.5f * vec2{ CAR_POS_MAP_SIZE } - 0.5f;
 			constexpr ivec2 OFFSET[4] = { { 0, 0 }, { 0, 1 }, { 1, 0 }, { 1, 1 } };
 			for (int i = 0; i < 4; i++)
 			{
 				ivec2 idx = pos_idx + OFFSET[i];
 				for (int k = car_pos_map[idx.x][idx.y].x; k < car_pos_map[idx.x][idx.y].y; k++)
 				{
-					car.collisionTest(car_pos[k]);
+					vec3 v = position - vec3{ car_pos[k]->getTransform()[3] };
+					if (dot(v, v) < CAR_POS_MAP_GRID_LENGTH * CAR_POS_MAP_GRID_LENGTH)
+					{
+						car.avoidCollisionWith(car_pos[k]);
+					}
 				}
 			}
 		}
@@ -542,7 +548,7 @@ void logicalFrame()
 			int num_cars = 0;
 			for (Car& car : vehicles)
 			{
-				logical_data[writing_data].car_transform[num_cars] = car.getModelMat();
+				logical_data[writing_data].car_transform[num_cars] = car.getTransform();
 				logical_data[writing_data].car_color[num_cars] = car.getColor();
 				num_cars++;
 			}
@@ -556,18 +562,18 @@ void logicalFrame()
 			{
 				if (car.isLightOn())
 				{
-					const mat4& transform = car.getModelMat();
+					const mat4& transform = car.getTransform();
 					logical_data[writing_data].car_light_pos[2 * num_light_on_cars] = transform * CAR_LEFT_LIGHT_POS;
 					logical_data[writing_data].car_light_dir[2 * num_light_on_cars] = transform * CAR_LEFT_LIGHT_DIR;
 					logical_data[writing_data].car_light_pos[2 * num_light_on_cars + 1] = transform * CAR_RIGHT_LIGHT_POS;
 					logical_data[writing_data].car_light_dir[2 * num_light_on_cars + 1] = transform * CAR_RIGHT_LIGHT_DIR;
-					logical_data[writing_data].car_transform[num_light_on_cars] = car.getModelMat();
+					logical_data[writing_data].car_transform[num_light_on_cars] = car.getTransform();
 					logical_data[writing_data].car_color[num_light_on_cars] = car.getColor();
 					num_light_on_cars++;
 				}
 				else
 				{
-					logical_data[writing_data].car_transform[vehicles.size() - num_light_off_cars - 1] = car.getModelMat();
+					logical_data[writing_data].car_transform[vehicles.size() - num_light_off_cars - 1] = car.getTransform();
 					logical_data[writing_data].car_color[vehicles.size() - num_light_off_cars - 1] = car.getColor();
 					num_light_off_cars++;
 				}

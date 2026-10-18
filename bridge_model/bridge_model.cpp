@@ -29,6 +29,11 @@
 #include "shader_headers/lighting_night_defines.h"
 #include "shader_headers/text_altas_constances.h"
 
+#ifdef _WIN32
+extern "C" __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+extern "C" __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+#endif
+
 using namespace glm;
 
 constexpr float TERRAIN_LOD_FACTOR = 2000.0f;
@@ -41,7 +46,7 @@ GLuint shadow_depth_sampler;
 GLuint shadow_mip_gen_FBO;
 GLuint shadow_mip_gen_sampler;
 
-constexpr int SHADOW_NIGHT_TEX_SIZE = 4096;
+constexpr int SHADOW_NIGHT_TEX_SIZE = 8192;
 GLuint shadow_night_FBO;
 GLuint shadow_night_tex;
 
@@ -49,7 +54,7 @@ constexpr float FOV_Y = pi<float>() / 4;
 constexpr float MIN_VIEW_Z_NEAR = 0.6f;
 constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
-constexpr float MAX_VIEW_DISTANCE = 1000.0f;
+constexpr float MAX_VIEW_DISTANCE = 800.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
@@ -201,6 +206,22 @@ static void initShader()
 
 static void init()
 {
+	printf("%s\n", glGetString(GL_VERSION));
+	printf("%s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+	GLint redBits, greenBits, blueBits;
+	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &redBits);
+	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, &greenBits);
+	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, &blueBits);
+
+	if (redBits == greenBits && redBits == blueBits)
+	{
+		printf("pixel format: RGB%d\n", redBits);
+	}
+	else
+	{
+		printf("pixel format: R%dG%dB%d\n", redBits, greenBits, blueBits);
+	}
+
 	initShader();
 
 	glPolygonOffset(1.0f, 1.0f);
@@ -808,7 +829,7 @@ static void drawGraphics()
 				vec3 center_pos = light_pos + POS_OFFSET * light_dir;
 				ivec2 light_pos_map_idx = 1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2{ center_pos } + 0.5f * vec2{ TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y };
 				ivec2* light_pos_map_grid = &tile_light_position_map.light_idx_range[light_pos_map_idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + light_pos_map_idx.y];
-				car_light_infos.push_back({ light_pos, light_dir, bound, length(center_pos - vec3{ camera.inv_view[3] }), light_pos_map_grid });
+				car_light_infos.push_back({ light_pos, light_dir, bound, length(vec3{ light_pos + CAR_LIGHT_NEAR * light_dir - camera.inv_view[3] }), light_pos_map_grid });
 				light_pos_map_grid->x++;
 			}
 		}
@@ -1308,15 +1329,15 @@ static void onKey(GLFWwindow* window, int key, int scancode, int action, int mod
 			is_paused = !is_paused;
 			return;
 		case '=':
-			if (simulate_speed < 5)
+			if (simulate_speed < 1 << 5)
 			{
-				simulate_speed++;
+				simulate_speed = simulate_speed << 1;
 			}
 			return;
 		case '-':
 			if (simulate_speed > 1)
 			{
-				simulate_speed--;
+				simulate_speed = simulate_speed >> 1;
 			}
 			return;
 		case '1':
@@ -1328,21 +1349,6 @@ static void onKey(GLFWwindow* window, int key, int scancode, int action, int mod
 			simulate_speed = 1 << (key - '1');
 			return;
 		case 'F':
-			show_fps = !show_fps;
-			return;
-		case 'A':
-			focus_move_dir |= 0b0001;
-			return;
-		case 'D':
-			focus_move_dir |= 0b0010;
-			return;
-		case 'W':
-			focus_move_dir |= 0b0100;
-			return;
-		case 'S':
-			focus_move_dir |= 0b1000;
-			return;
-		case GLFW_KEY_ENTER:
 			if (mods == GLFW_MOD_ALT)
 			{
 				static int old_pos_x, old_pos_y, old_width, old_height;
@@ -1360,9 +1366,24 @@ static void onKey(GLFWwindow* window, int key, int scancode, int action, int mod
 					glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
 				}
 				is_full_screen = !is_full_screen;
-				return;
 			}
-			break;
+			else
+			{
+				show_fps = !show_fps;
+			}
+			return;
+		case 'A':
+			focus_move_dir |= 0b0001;
+			return;
+		case 'D':
+			focus_move_dir |= 0b0010;
+			return;
+		case 'W':
+			focus_move_dir |= 0b0100;
+			return;
+		case 'S':
+			focus_move_dir |= 0b1000;
+			return;
 		}
 	}
 	else if (action == GLFW_RELEASE)
@@ -1486,47 +1507,32 @@ int main(int argc, char** argv)
 	glfwWindowHint(GLFW_GREEN_BITS, 10);
 	glfwWindowHint(GLFW_BLUE_BITS, 10);
 	glfwWindowHint(GLFW_ALPHA_BITS, 2);
-
 	GLFWwindow* window = glfwCreateWindow(width, height, "", nullptr, nullptr);
 	if (!window)
 	{
+		stopLogic();
 		glfwTerminate();
+		logical_thread.join();
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
-
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress)))
 	{
+		stopLogic();
 		glfwTerminate();
+		logical_thread.join();
 		return -1;
 	}
-
-	printf("%s\n", glGetString(GL_VERSION));
-	printf("%s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
-	GLint redBits, greenBits, blueBits;
-	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE, &redBits);
-	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE, &greenBits);
-	glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE, &blueBits);
-
-	if (redBits == greenBits && redBits == blueBits)
-	{
-		printf("pixel format: RGB%d\n", redBits);
-	}
-	else
-	{
-		printf("pixel format: R%dG%dB%d\n", redBits, greenBits, blueBits);
-	}
-
 	glfwSetWindowPos(window, 70, 40);
 	glfwSwapInterval(0);
+
+	init();
+	onResize(window, width, height);
 
 	glfwSetWindowSizeCallback(window, onResize);
 	glfwSetKeyCallback(window, onKey);
 	glfwSetMouseButtonCallback(window, onMouseButton);
 	glfwSetScrollCallback(window, onMouseWheel);
-
-	init();
-	onResize(window, width, height);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -1535,14 +1541,7 @@ int main(int argc, char** argv)
 		glfwPollEvents();
 	}
 	stopLogic();
-
 	glfwTerminate();
-
 	logical_thread.join();
 	return 0;
 }
-
-#ifdef _WIN32
-extern "C" __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
-extern "C" __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
-#endif

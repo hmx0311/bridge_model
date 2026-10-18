@@ -7,15 +7,17 @@
 
 using namespace glm;
 
-static constexpr float ACCELERATION = 2.0f;
-static constexpr float BREAK_INTENSITY = 4.0f;
-static constexpr float BREAK_DISTANCE = 120.0f;
+constexpr float ACCELERATION = 2.0f;
+constexpr float BREAK_INTENSITY = 4.0f;
+constexpr float BREAK_DISTANCE = 120.0f;
+constexpr float LANE_OFFSET_SIGMA = 0.1f;
+constexpr float MAX_LANE_OFFSET = 6.0f * LANE_OFFSET_SIGMA;
+constexpr float LANE_OFFSET_SPEED_RATIO = 0.002f;
 
 Car::Car(Lane* lane, float sun_height)
 {
-	std::uniform_real_distribution<float> distb(0.1f, 0.95f);
-	m_color = vec3(pow(distb(rd_eng), 2.2f), pow(distb(rd_eng), 2.2f), pow(distb(rd_eng), 2.2f));
-	m_s = 0;
+	std::uniform_real_distribution<float> color_distb(0.1f, 0.95f);
+	m_color = vec3(pow(color_distb(rd_eng), 2.2f), pow(color_distb(rd_eng), 2.2f), pow(color_distb(rd_eng), 2.2f));
 	m_speed = lane->speed_limit;
 	m_aim_speed = m_speed;
 	while (lane != nullptr)
@@ -24,8 +26,8 @@ Car::Car(Lane* lane, float sun_height)
 		lane = lane->getNextLane();
 	}
 
-	distb.param(decltype(distb)::param_type(-0.2f, 0.0f));
-	if (sun_height < distb(rd_eng))
+	std::uniform_real_distribution<float> light_distb(-0.2f, 0.0f);
+	if (sun_height < light_distb(rd_eng))
 	{
 		m_is_light_on = true;
 		m_was_day = false;
@@ -39,94 +41,105 @@ Car::Car(Lane* lane, float sun_height)
 
 bool Car::update(float dt, float sun_height)
 {
-	if (dt > 0)
+	if (m_speed > m_aim_speed)
 	{
-		if (m_speed > m_aim_speed)
+		if (m_speed - BREAK_INTENSITY * dt >= m_aim_speed)
 		{
-			if (m_speed - BREAK_INTENSITY * dt >= m_aim_speed)
-			{
-				m_s += m_speed * dt - BREAK_INTENSITY * dt * dt / 2;
-				m_speed = m_speed - BREAK_INTENSITY * dt;
-			}
-			else
-			{
-				float break_time = (m_speed - m_aim_speed) / BREAK_INTENSITY;
-				m_s += (m_speed + m_aim_speed) * break_time / 2 + m_aim_speed * (dt - break_time);
-				m_speed = m_aim_speed;
-			}
-		}
-		else if (m_speed < m_aim_speed)
-		{
-			if (m_speed + ACCELERATION * dt <= m_aim_speed)
-			{
-				m_s += m_speed * dt + ACCELERATION * dt * dt / 2;
-				m_speed = m_speed + ACCELERATION * dt;
-			}
-			else
-			{
-				float accelerate_time = (m_aim_speed - m_speed) / ACCELERATION;
-				m_s += (m_speed + m_aim_speed) * accelerate_time / 2 + m_aim_speed * (dt - accelerate_time);
-				m_speed = m_aim_speed;
-			}
+			m_s += m_speed * dt - BREAK_INTENSITY * dt * dt / 2;
+			m_speed = m_speed - BREAK_INTENSITY * dt;
 		}
 		else
 		{
-			m_s += m_speed * dt;
+			float break_time = (m_speed - m_aim_speed) / BREAK_INTENSITY;
+			m_s += (m_speed + m_aim_speed) * break_time / 2 + m_aim_speed * (dt - break_time);
+			m_speed = m_aim_speed;
 		}
-		Lane* cur_lane = m_path.front();
-		while (m_s > cur_lane->length)
+	}
+	else if (m_speed < m_aim_speed)
+	{
+		if (m_speed + ACCELERATION * dt <= m_aim_speed)
 		{
-			m_s -= cur_lane->length;
-			m_path.pop_front();
-			if (m_path.empty())
-			{
-				return false;
-			}
-			cur_lane = m_path.front();
+			m_s += m_speed * dt + ACCELERATION * dt * dt / 2;
+			m_speed = m_speed + ACCELERATION * dt;
 		}
-		m_aim_speed = cur_lane->speed_limit;
-		if (m_path.size() > 1)
+		else
 		{
-			Lane* next_lane = *std::next(m_path.begin());
-			if (next_lane->speed_limit < m_speed && (m_speed + next_lane->speed_limit) * (m_speed - next_lane->speed_limit) / (2 * BREAK_INTENSITY) > cur_lane->length - m_s)
-			{
-				m_aim_speed = next_lane->speed_limit;
-			}
+			float accelerate_time = (m_aim_speed - m_speed) / ACCELERATION;
+			m_s += (m_speed + m_aim_speed) * accelerate_time / 2 + m_aim_speed * (dt - accelerate_time);
+			m_speed = m_aim_speed;
 		}
-		m_transform = cur_lane->transform(m_s);
-		m_dir = (mat3)m_transform * vec3(0, 1, 0);
+	}
+	else
+	{
+		m_s += m_speed * dt;
+	}
+	Lane* cur_lane = m_path.front();
+	while (m_s > cur_lane->length)
+	{
+		m_s -= cur_lane->length;
+		m_path.pop_front();
+		if (m_path.empty())
+		{
+			return false;
+		}
+		cur_lane = m_path.front();
+	}
+	m_aim_speed = cur_lane->speed_limit;
+	if (m_path.size() > 1)
+	{
+		Lane* next_lane = *std::next(m_path.begin());
+		if (next_lane->speed_limit < m_speed && (m_speed + next_lane->speed_limit) * (m_speed - next_lane->speed_limit) / (2 * BREAK_INTENSITY) > cur_lane->length - m_s)
+		{
+			m_aim_speed = next_lane->speed_limit;
+		}
+	}
+	m_transform = cur_lane->transform(m_s);
 
-		if (sun_height > -SUN_RADIUS_DIST_RATIO)
+	if (abs(m_lane_offset - m_aim_lane_offset) < m_speed * dt * LANE_OFFSET_SPEED_RATIO)
+	{
+		std::normal_distribution<float> distb(0.0f, LANE_OFFSET_SIGMA);
+		m_aim_lane_offset = clamp(distb(rd_eng), -MAX_LANE_OFFSET, MAX_LANE_OFFSET);
+	}
+	if (m_lane_offset < m_aim_lane_offset)
+	{
+		m_lane_offset = std::min(m_lane_offset + m_speed * dt * LANE_OFFSET_SPEED_RATIO, m_aim_lane_offset);
+	}
+	else
+	{
+		m_lane_offset = std::max(m_lane_offset - m_speed * dt * LANE_OFFSET_SPEED_RATIO, m_aim_lane_offset);
+	}
+	m_transform[3] += m_lane_offset * m_transform[0];
+
+	if (sun_height > -SUN_RADIUS_DIST_RATIO)
+	{
+		m_was_day = true;
+		m_is_light_on = false;
+	}
+	else if (sun_height < -0.2f)
+	{
+		m_was_day = false;
+		m_is_light_on = true;
+	}
+	else if (m_was_day && !m_is_light_on)
+	{
+		std::uniform_real_distribution<float> distb(0, 0.3f);
+		if (distb(rd_eng) < dt * (-sun_height - SUN_RADIUS_DIST_RATIO))
 		{
-			m_was_day = true;
-			m_is_light_on = false;
-		}
-		else if (sun_height < -0.2f)
-		{
-			m_was_day = false;
 			m_is_light_on = true;
 		}
-		else if (m_was_day && !m_is_light_on)
+	}
+	else if (!m_was_day && m_is_light_on)
+	{
+		std::uniform_real_distribution<float> distb(0, 0.3f);
+		if (distb(rd_eng) < dt * (0.2f + sun_height))
 		{
-			std::uniform_real_distribution<float> distb(0, 0.3f);
-			if (distb(rd_eng) < dt * (-sun_height - SUN_RADIUS_DIST_RATIO))
-			{
-				m_is_light_on = true;
-			}
-		}
-		else if (!m_was_day && m_is_light_on)
-		{
-			std::uniform_real_distribution<float> distb(0, 0.3f);
-			if (distb(rd_eng) < dt * (0.2f + sun_height))
-			{
-				m_is_light_on = false;
-			}
+			m_is_light_on = false;
 		}
 	}
 	return true;
 }
 
-void Car::collisionTest(Car* test_car)
+void Car::avoidCollisionWith(Car* test_car)
 {
 	if (this == test_car || abs(m_transform[3].z - test_car->m_transform[3].z) > 2.0f)
 	{
@@ -197,12 +210,7 @@ const vec3& Car::getColor()
 	return m_color;
 }
 
-const mat4& Car::getModelMat()
+const mat4& Car::getTransform()
 {
 	return m_transform;
-}
-
-const vec3& Car::getDir()
-{
-	return m_dir;
 }

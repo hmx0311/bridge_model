@@ -6,7 +6,7 @@
 #include "shader_headers/scene_constances.h"
 
 constexpr float REACT_TIME = 0.8f;
-constexpr float CAR_LENGTH = 4.0f;
+constexpr float CAR_LENGTH = 3.8f;
 constexpr float CAR_LIGHT_V_RAD = 0.51f;
 constexpr float CAR_LIGHT_ASPECT = 2.0f;
 constexpr float CAR_LIGHT_NEAR = 0.7f;
@@ -21,22 +21,23 @@ class Lane;
 class Car
 {
 private:
-	float m_s;
+	float m_s = 0.0f;
 	float m_speed;
 	float m_aim_speed;
+	float m_lane_offset = 0.0f;
+	float m_aim_lane_offset = 0.0f;
 	bool m_is_light_on;
 	bool m_was_day;
 	std::list<Lane*> m_path;
 	glm::mat4 m_transform = glm::mat4(0);
-	glm::vec3 m_dir = glm::vec3(0);
 	glm::vec3 m_color;
 
 public:
 	Car(Lane* lane, float sun_height);
+
 	bool update(float dt, float sun_height);
-	void collisionTest(Car* car);
+	void avoidCollisionWith(Car* car);
 	bool isLightOn();
 	const glm::vec3& getColor();
-	const glm::mat4& getModelMat();
-	const glm::vec3& getDir();
+	const glm::mat4& getTransform();
 };

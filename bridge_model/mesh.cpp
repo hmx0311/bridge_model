@@ -2235,11 +2235,10 @@ static void buildCarShadowMesh()
 	i_vert += 4 * n;
 	i_idx += 4 * 3 * (n - 2);
 
-	glGenBuffers(1, &car_shadow_EBO);
+	glCreateBuffers(1, &car_shadow_EBO);
 	glNamedBufferData(car_shadow_EBO, sizeof(indices), indices, GL_STATIC_DRAW);
-	glGenBuffers(1, &car_shadow_VBO);
-	glNamedBufferData(car_shadow_VBO, sizeof(positions), nullptr, GL_STATIC_DRAW);
-	glNamedBufferSubData(car_shadow_VBO, 0, sizeof(positions), positions);
+	glCreateBuffers(1, &car_shadow_VBO);
+	glNamedBufferData(car_shadow_VBO, sizeof(positions), positions, GL_STATIC_DRAW);
 
 	car_shadow_day_VAO.create();
 	for (int i = 0; i < 3; i++)

@@ -4,7 +4,7 @@
 #ifndef LIGHTING_NIGHT_DEFINES_H
 #define LIGHTING_NIGHT_DEFINES_H
 
-#define NUM_TILE_LIGHT_SHADOW_LAYERS 4
+#define NUM_TILE_LIGHT_SHADOW_LAYERS 3
 #define MAX_AVERAGE_TRIANGLES_PER_LIGHT 4096
 #define MAX_AVERAGE_AFFECTED_GRIDS_PER_LIGHT (4 + int(\
 	0.2f * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH) * (CAR_LIGHT_RANGE / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH) + \
@@ -12,17 +12,17 @@
 
 INLINE int findTileLightShadowLayer(int idx)
 {
-	return findMSB((idx >> 3) * 3 + 1) >> 1;
+	return findMSB((idx >> 5) * 3 + 1) >> 1;
 }
 
 constexpr int tileLightShadowLayerOffset(int layer)
 {
-	return ((8 << (2 * layer)) - 8) / 3;
+	return ((32 << (2 * layer)) - 32) / 3;
 }
 
 constexpr ivec2 tileLightShadowLayerSize(int layer)
 {
-	return ivec2(2 << layer, 4 << layer);
+	return ivec2(4 << layer, 8 << layer);
 }
 
 STORAGE_BUFFER(TileLightPositionMapData, TILE_LIGHT_POSITION_MAP_BUFFER_BINDING)
