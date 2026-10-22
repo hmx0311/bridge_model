@@ -14,9 +14,10 @@ UNIFORM_BUFFER(CameraData, CAMERA_BUFFER_BINDING)
 	mat4 view_proj;
 	mat4 inv_delta_view;
 	vec4 delta_view_z;
-	vec2 taa_offset;
 	float z_near;
 	float old_z_near;
+	vec2 taa_offset;
+	int taa_phase;
 }BUFFER_NAME(camera)
 
 #endif // !CAMERA_DEFINES_H

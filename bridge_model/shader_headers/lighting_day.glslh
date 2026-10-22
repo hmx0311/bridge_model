@@ -1,7 +1,8 @@
 #include "scene_constances.h"
+#include "camera_defines.h"
 #include "lighting_day_defines.h"
 
-#define NUM_BLOCKER_SAMPLE 32
+#define NUM_BLOCKER_SAMPLE 16
 
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 layout(binding = 2) uniform sampler2DArray shadow_tex_depth;
@@ -37,8 +38,7 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 	vec2 duvdy = 0.5 * vec2(dot(u_dir, dpdy), dot(v_dir, dpdy));
 	float duvdx_len = length(duvdx);
 	float duvdy_len = length(duvdy);
-	float pixel_radius = min(max(duvdx_len, duvdy_len), min(tex_padding_u / shadow_scale_u, tex_padding_v / shadow_scale_v));
-	int mip_level = min(findMSB(int(ceil(2 * SHADOW_DAY_TEX_SIZE * max(MAX_PENUMBRA_RADIUS, pixel_radius) * max(shadow_scale_u, shadow_scale_v)) - 1)), PCSS_MIP_LEVELS);
+	int mip_level = min(findMSB(int(ceil(2 * SHADOW_DAY_TEX_SIZE * MAX_PENUMBRA_RADIUS * max(shadow_scale_u, shadow_scale_v)) - 1)), PCSS_MIP_LEVELS);
 	float nearest_depth = 1.0;
 	ivec2 mip_idx = ivec2(floor((SHADOW_DAY_TEX_SIZE >> mip_level) * shadow_coord.xy - 0.5));
 	nearest_depth = min(nearest_depth, texelFetch(shadow_tex_depth, ivec3(clamp(mip_idx, 0, (SHADOW_DAY_TEX_SIZE >> mip_level) - 1), level), mip_level).x);
@@ -62,13 +62,13 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 	int blocker_cnt = 0;
 	float block_dist = 0;
 	float total_weight = 0.0;
-	float blocker_search_r = max(pixel_radius, min((shadow_coord.z - nearest_depth) * shadow_inv_scale_z * penumbra_ratio, MAX_PENUMBRA_RADIUS));
+	float blocker_search_r = min((shadow_coord.z - nearest_depth) * shadow_inv_scale_z * penumbra_ratio, MAX_PENUMBRA_RADIUS);
 	float min_unblock_r = blocker_search_r;
 	uint pixel_seed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
 	for (int i = 0; i < NUM_BLOCKER_SAMPLE; i++)
 	{
 		float r = blocker_search_r * (i + 0.5) / NUM_BLOCKER_SAMPLE;
-		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed);
+		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed) + float(camera.taa_phase) / TAA_PERIOD);
 		vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
 		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * r);
 		float dist = shadow_coord.z - texture(shadow_tex_depth, vec3(shadow_coord.xy + coord_offset, level)).x;
@@ -92,54 +92,18 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 	}
 	block_dist /= total_weight;
 	float penumbra_radius = min(penumbra_ratio * block_dist, MAX_PENUMBRA_RADIUS);
-	if (min_unblock_r >= max(pixel_radius, min(blocker_search_r, penumbra_radius + 4.0 / NUM_BLOCKER_SAMPLE * blocker_search_r)))
+	if (min_unblock_r >= min(blocker_search_r, penumbra_radius + 4.0 / NUM_BLOCKER_SAMPLE * blocker_search_r))
 	{
 		return 0.0;
 	}
 	float shadow = 0.0;
-	vec2 offset_i = vec2(penumbra_radius, 0.0);
-	vec2 offset_j = vec2(0.0, penumbra_radius);
-	if (duvdx_len > penumbra_radius && duvdy_len > penumbra_radius)
-	{
-		offset_i = duvdx;
-		offset_j = duvdy;
-		float max_offset_u = sqrt(offset_i.x * offset_i.x + offset_j.x * offset_j.x) * shadow_scale_u;
-		float max_offset_v = sqrt(offset_i.y * offset_i.y + offset_j.y * offset_j.y) * shadow_scale_v;
-		if(max_offset_u > tex_padding_u)
-		{
-			offset_i.x *= tex_padding_u / max_offset_u;
-			offset_j.x *= tex_padding_u / max_offset_u;
-		}
-		if(max_offset_v > tex_padding_v)
-		{
-			offset_i.y *= tex_padding_v / max_offset_v;
-			offset_j.y *= tex_padding_v / max_offset_v;
-		}
-	}
-	else if (duvdx_len > penumbra_radius || duvdy_len > penumbra_radius)
-	{
-		offset_i = duvdx_len > duvdy_len ? duvdx : duvdy;
-		offset_j = penumbra_radius / duvdy_len * vec2(-offset_i.y, offset_i.x);
-		float max_offset_x2 = offset_i.x * offset_i.x + offset_j.x * offset_j.x;
-		float tex_padding_x2 = tex_padding_u * tex_padding_u / (shadow_scale_u * shadow_scale_u);
-		if(max_offset_x2 > tex_padding_x2)
-		{
-			offset_i *= sqrt(tex_padding_x2 -  offset_j.x * offset_j.x) / offset_i.x;
-		}
-		float max_offset_y2 = offset_i.y * offset_i.y + offset_j.y * offset_j.y;
-		float tex_padding_y2 = tex_padding_v * tex_padding_v / (shadow_scale_v * shadow_scale_v);
-		if(max_offset_y2 > tex_padding_y2)
-		{
-			offset_i *= sqrt(tex_padding_y2 -  offset_j.y * offset_j.y) / offset_i.y;
-		}
-	}
 	pixel_seed = (pixel_seed ^ 0x9e3779b9u) * 0x85ebca6bu;
-	int sample_cnt = max(8, int(20 * sample_cnt_factor * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
+	int sample_cnt = max(1, int(4 * sample_cnt_factor * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
 	for (int idx = 0; idx < sample_cnt; idx++)
 	{
-		float r = sqrt(max(0.0, (idx - 0.25) / (sample_cnt - 1)));
-		float angle = 2 * 3.1415927 * 2.3283064e-10 * bitfieldReverse(uint(idx) ^ pixel_seed);
-		vec2 coord_offset = (r * cos(angle) * offset_i + r * sin(angle) * offset_j) * vec2(shadow_scale_u, shadow_scale_v);
+		float r = sqrt((idx + float(camera.taa_phase) / TAA_PERIOD) / sample_cnt);
+		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(idx) ^ pixel_seed) + float(camera.taa_phase) / TAA_PERIOD);
+		vec2 coord_offset = r * penumbra_radius * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
 		vec2 coord = shadow_coord.xy + coord_offset;
 		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * penumbra_radius * r);
 		shadow += texture(shadowTex, vec4(coord.xy, level, shadow_coord.z + offset_z)).x;

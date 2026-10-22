@@ -55,7 +55,6 @@ constexpr float FOV_Y = pi<float>() / 4;
 constexpr float MIN_VIEW_Z_NEAR = 0.6f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
 constexpr float MAX_VIEW_DISTANCE = 800.0f;
-constexpr float MIN_SHADOW_FAR = 3.695f;
 
 GLint window_width, window_height;
 
@@ -629,7 +628,8 @@ static void drawGraphics()
 		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec4 { 0.2f, 0.3f, 1.1f, 0.0f };
 	}
 
-	camera.taa_offset = (2.0f * TAA_OFFSETS[frame_idx % TAA_PERIOD] - 1.0f) * vec2{ 1.0f / window_width, 1.0f / window_height };
+	camera.taa_phase = frame_idx % TAA_PERIOD;
+	camera.taa_offset = (2.0f * TAA_OFFSETS[camera.taa_phase] - 1.0f) * vec2{ 1.0f / window_width, 1.0f / window_height };
 	camera.projection = perspective(FOV_Y, float(window_width) / window_height, camera.z_near, VIEW_Z_FAR);
 	camera.view_proj = camera.projection * camera.view;
 	Frustum camera_frustum{ camera.view_proj };
@@ -1589,7 +1589,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.6 * DAY_PERIOD)
+	while (logical_time < 0.2 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
