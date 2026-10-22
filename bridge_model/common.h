@@ -7,8 +7,9 @@
 
 constexpr float EARTH_RADIUS = 6.371e6f;
 
-constexpr GLfloat COLOR_WHITE[4] = { 1.0f,1.0f,1.0f,1.0f };
-constexpr GLfloat COLOR_BLACK[4] = { 0.0f,0.0f,0.0f,1.0f };
+constexpr GLfloat COLOR_WHITE[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+constexpr GLfloat COLOR_BLACK[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+constexpr GLfloat ZERO_VEC[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
 extern GLuint scene_UBO;
 extern GLuint SP_car_day, SP_car_night;

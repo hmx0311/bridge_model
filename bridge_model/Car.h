@@ -1,6 +1,7 @@
 #pragma once
 #include <list>
 #include "glm.hpp"
+#include "gtx/transform.hpp"
 
 #include "Bound.h"
 #include "shader_headers/scene_constances.h"
@@ -20,6 +21,8 @@ class Lane;
 
 class Car
 {
+public:
+	const uint32_t id;
 private:
 	float m_s = 0.0f;
 	float m_speed;
@@ -29,11 +32,11 @@ private:
 	bool m_is_light_on;
 	bool m_was_day;
 	std::list<Lane*> m_path;
-	glm::mat4 m_transform = glm::mat4(0);
+	glm::mat4 m_transform = glm::identity<glm::mat4>();
 	glm::vec3 m_color;
 
 public:
-	Car(Lane* lane, float sun_height);
+	Car(uint32_t id, Lane* lane, float sun_height);
 
 	bool update(float dt, float sun_height);
 	void avoidCollisionWith(Car* car);

@@ -1,6 +1,7 @@
 #pragma comment(lib,"imm32.lib")
 #include <Windows.h>
 
+#include <numeric>
 #include <thread>
 #include <unordered_map>
 #include <omp.h>
@@ -52,7 +53,6 @@ GLuint shadow_night_tex;
 
 constexpr float FOV_Y = pi<float>() / 4;
 constexpr float MIN_VIEW_Z_NEAR = 0.6f;
-constexpr float VIEW_Z_FAR = 18000.0f;
 constexpr float MIN_VIEW_DISTANCE = 2.0f;
 constexpr float MAX_VIEW_DISTANCE = 800.0f;
 constexpr float MIN_SHADOW_FAR = 3.695f;
@@ -64,14 +64,17 @@ uint32_t focus_move_dir = 0;
 bool show_fps = false;
 bool need_update_view = true;
 
-constexpr float HEIGHT_RANGE[2] = { -10.0f, 646.0f };
-
-GLuint multisample_render_FBO;
-GLuint multisample_render_RBOs[2];
-GLuint depth_RBO;
-
 GLuint render_FBO;
-GLuint render_tex;
+GLuint render_texs[3];
+
+GLuint taa_FBOs[2];
+struct TAATextures
+{
+	GLuint color;
+	GLuint bloom;
+	GLuint depth;
+	GLuint stats[4];
+}taa_texs[2];
 
 constexpr int BLOOM_BUFFER_HEIGHT = 540;
 int bloom_buffer_width;
@@ -127,6 +130,7 @@ GLuint SP_shadow_car_day;
 GLuint SP_shadow_car_night;
 GLuint SP_gen_PCSS_mips;
 GLuint SP_tex_blit;
+GLuint SP_TAA;
 GLuint SP_gaussian_blur;
 GLuint SP_buffer_to_screen;
 GLuint SP_text;
@@ -188,6 +192,10 @@ static void initShader()
 	GLuint FS_tex_blit = loadShader(SHADER_NAME(IDR_FS_TEX_BLIT), GL_FRAGMENT_SHADER);
 	SP_tex_blit = linkShaderProgram(VS_tex_blit, FS_tex_blit);
 	glDeleteShader(FS_tex_blit);
+
+	GLuint FS_TAA = loadShader(SHADER_NAME(IDR_FS_TAA), GL_FRAGMENT_SHADER);
+	SP_TAA = linkShaderProgram(VS_tex_blit, FS_TAA);
+	glDeleteShader(FS_TAA);
 
 	GLuint FS_gaussian_blur = loadShader(SHADER_NAME(IDR_FS_GAUSSIAN_BLUR), GL_FRAGMENT_SHADER);
 	SP_gaussian_blur = linkShaderProgram(VS_tex_blit, FS_gaussian_blur);
@@ -252,28 +260,22 @@ static void init()
 	highway_tile_light_shadow_triangles_SSBO.create(tile_light_shadow_triangles_SSBO_size);
 	bridge_tile_light_shadow_triangles_SSBO.create(tile_light_shadow_triangles_SSBO_size);
 
-	glCreateFramebuffers(1, &multisample_render_FBO);
-	glCreateRenderbuffers(2, multisample_render_RBOs);
-	for (int i = 0; i < 2; i++)
-	{
-		glNamedFramebufferRenderbuffer(multisample_render_FBO, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, multisample_render_RBOs[i]);
-	}
-	glCreateRenderbuffers(1, &depth_RBO);
-	glNamedFramebufferRenderbuffer(multisample_render_FBO, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_RBO);
-	GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, attachments);
-
 	glCreateFramebuffers(1, &render_FBO);
+	glCreateFramebuffers(2, taa_FBOs);
+	GLuint attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5 };
+	glNamedFramebufferDrawBuffers(taa_FBOs[0], sizeof(attachments) / sizeof(GLuint), attachments);
+	glNamedFramebufferDrawBuffers(taa_FBOs[1], sizeof(attachments) / sizeof(GLuint), attachments);
+
 	glCreateFramebuffers(2, bloom_FBOs);
 
 	vec2 screen_coords[4] = { { 1.0f, 1.0f },{ -1.0f, 1.0f }, { -1.0f, -1.0f }, { 1.0f, -1.0f } };
+	glCreateBuffers(1, &tex_mapping_VBO);
+	glNamedBufferData(tex_mapping_VBO, sizeof(screen_coords), screen_coords, GL_STATIC_DRAW);
 	glGenVertexArrays(1, &tex_blit_VAO);
 	glBindVertexArray(tex_blit_VAO);
-	glGenBuffers(1, &tex_mapping_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, tex_mapping_VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(screen_coords), screen_coords, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glBindVertexArray(0);
 
 	glCreateFramebuffers(1, &shadow_day_FBO);
@@ -348,10 +350,21 @@ static void init()
 	initScene();
 }
 
+const vec2 TAA_OFFSETS[] =
+{
+	vec2(1.0f / 2.0f, 1.0f / 3.0f),
+	vec2(1.0f / 4.0f, 2.0f / 3.0f),
+	vec2(3.0f / 4.0f, 1.0f / 9.0f),
+	vec2(1.0f / 8.0f, 4.0f / 9.0f),
+	vec2(5.0f / 8.0f, 7.0f / 9.0f),
+	vec2(3.0f / 8.0f, 2.0f / 9.0f),
+	vec2(7.0f / 8.0f, 5.0f / 9.0f),
+	vec2(1.0f / 16.0f, 8.0f / 9.0f),
+};
+
 static void drawGraphics()
 {
 	static float azimuth = aim_azimuth, relative_depression = aim_relative_depression, view_distance = aim_view_distance;
-	static float view_z_near;
 	static float scene_z_far;
 	static vec3 focus(0);
 	static float horizon_y;
@@ -362,9 +375,15 @@ static void drawGraphics()
 	static TileLightPositionMapData tile_light_position_map;
 	static TileLightAffectedMapData tile_light_affected_map;
 	static CarLightingData car_lightings;
+	static vec3 visible_car_colors[MAX_CAR_CNT];
+	static mat4 visible_car_transforms[MAX_CAR_CNT];
+	static mat4 visible_car_old_transforms[MAX_CAR_CNT];
+	static std::unordered_map<uint32_t, std::pair<bool, mat4>> car_old_transforms;
+	static std::vector<mat4> car_sun_shadow_transform[CSM_LEVELS];
 	static std::vector<mat4> car_tile_light_shadow_transform[NUM_TILE_LIGHT_SHADOW_LAYERS];
 	static std::vector<int> car_tile_light_shadow_idx[NUM_TILE_LIGHT_SHADOW_LAYERS];
 
+	static uint64_t frame_idx = 0;
 	static uint64_t last_time_us = 0;
 	static float fps = -1.0f;
 	uint64_t time_us = getTimestampMicroseconds();
@@ -377,29 +396,29 @@ static void drawGraphics()
 
 	if (focus_move_dir != 0)
 	{
-		vec2 dir = vec2(0.0f);
+		vec2 dir = vec2{ 0.0f };
 		if ((focus_move_dir & 0b0011) == 0b0001)
 		{
-			dir += vec2(-cos(azimuth), -sin(azimuth));
+			dir += vec2{ -cos(azimuth), -sin(azimuth) };
 		}
 		if ((focus_move_dir & 0b0011) == 0b0010)
 		{
-			dir += vec2(cos(azimuth), sin(azimuth));
+			dir += vec2{ cos(azimuth), sin(azimuth) };
 		}
 		if ((focus_move_dir & 0b1100) == 0b0100)
 		{
-			dir += vec2(-sin(azimuth), cos(azimuth));
+			dir += vec2{ -sin(azimuth), cos(azimuth) };
 		}
 		if ((focus_move_dir & 0b1100) == 0b1000)
 		{
-			dir += vec2(sin(azimuth), -cos(azimuth));
+			dir += vec2{ sin(azimuth), -cos(azimuth) };
 		}
-		if (dir != vec2(0.0f))
+		if (dir != vec2{ 0.0f })
 		{
 			dir = normalize(dir);
 			float move_speed = 1.0f * view_distance + 10.0f;
 			float move_distance = move_speed * 1e-6f * dt_us;
-			vec3 new_focus = focus + vec3(dir.x * move_distance, dir.y * move_distance, 0);
+			vec3 new_focus = focus + vec3{ dir.x * move_distance, dir.y * move_distance, 0.0f };
 			new_focus.x = clamp(new_focus.x, -700.0f, 700.0f);
 			new_focus.y = clamp(new_focus.y, -200.0f, 200.0f);
 			if (focus != new_focus)
@@ -410,7 +429,13 @@ static void drawGraphics()
 		}
 	}
 	bool is_view_updated = need_update_view;
-	if (need_update_view)
+	camera.old_z_near = camera.z_near;
+	if (!need_update_view)
+	{
+		camera.delta_view_z = { 0.0f, 0.0f, 1.0f, 0.0f };
+		camera.inv_delta_view = identity<mat4>();
+	}
+	else
 	{
 		need_update_view = false;
 		if (azimuth != aim_azimuth)
@@ -498,15 +523,18 @@ static void drawGraphics()
 				focus.z += height_offset;
 			}
 		}
-		camera.view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
-		camera.inv_view = inverse(camera.view);
+		mat4 view = lookAt(eye, focus, vec3(-sin(azimuth), cos(azimuth), 0));
+		camera.inv_view = inverse(view);
+		camera.inv_delta_view = camera.view * camera.inv_view;
+		camera.delta_view_z = vec4{ vec3{ camera.inv_delta_view[2] }, -dot(vec3{camera.inv_delta_view[2]}, vec3{camera.inv_delta_view[3]}) };
+		camera.view = view;
 		horizon_y = (tan(depression - acos(EARTH_RADIUS / (focus.z + EARTH_RADIUS))) / tan(FOV_Y / 2) + 1) * window_height / 2;
 
 		updateTerrainLOD(TERRAIN_LOD_FACTOR, eye);
 
 		Frustum camera_frustum(camera.view, FOV_Y, float(window_width) / window_height, MIN_VIEW_Z_NEAR, VIEW_Z_FAR);
 		static CircularQueue<QuadTreeIdx> grids_to_calc(5);
-		view_z_near = VIEW_Z_FAR;
+		camera.z_near = VIEW_Z_FAR;
 		scene_z_far = MIN_VIEW_Z_NEAR;
 		for (int i = 0; i < NUM_SCENE_GRID_ROOTS_X; i++)
 		{
@@ -531,7 +559,7 @@ static void drawGraphics()
 			float m_far = dot(p_far.normal, bound.center()) + p_far.d;
 			float z_near = MIN_VIEW_Z_NEAR + m_near - r;
 			float z_far = VIEW_Z_FAR - m_far + r;
-			if (z_near >= view_z_near && z_far <= scene_z_far)
+			if (z_near >= camera.z_near && z_far <= scene_z_far)
 			{
 				continue;
 			}
@@ -542,7 +570,7 @@ static void drawGraphics()
 			}
 			if (level == MAX_SCENE_GRID_LEVEL)
 			{
-				view_z_near = std::min(view_z_near, z_near);
+				camera.z_near = std::min(camera.z_near, z_near);
 				scene_z_far = std::max(scene_z_far, z_far);
 				continue;
 			}
@@ -551,7 +579,7 @@ static void drawGraphics()
 				vec3 v = abs_noraml * half_size;
 				float r_separate = std::max(v.x, std::max(v.y, v.z)) / (v.x + v.y + v.z);
 				r_separate = 2.0f * r * (1.0f - r_separate);
-				view_z_near = std::min(view_z_near, z_near + r_separate);
+				camera.z_near = std::min(camera.z_near, z_near + r_separate);
 				scene_z_far = std::max(scene_z_far, z_far - r_separate);
 			}
 			grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y);
@@ -559,13 +587,11 @@ static void drawGraphics()
 			grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
 			grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
 		}
-		view_z_near = std::max(view_z_near, MIN_VIEW_Z_NEAR);
+		camera.z_near = std::max(camera.z_near, MIN_VIEW_Z_NEAR);
 		scene_z_far = std::min(scene_z_far, VIEW_Z_FAR);
-		camera.projection = perspective(FOV_Y, float(window_width) / window_height, view_z_near, VIEW_Z_FAR);
-		camera.view_proj = camera.projection * camera.view;
 	}
 
-	LogicalData& logical_data = getLatestLogicalData();
+	const LogicalData& logical_data = getLatestLogicalData();
 	SunData sun;
 	sun.light_dir_and_radius = vec4{ logical_data.sun_dir, 1.0f };
 	sun.diffuse_specular = vec3{ 0.4f };
@@ -573,7 +599,7 @@ static void drawGraphics()
 	{
 		float x = -logical_data.sun_dir.z / SUN_RADIUS_DIST_RATIO;
 		float sqrt_one_minus_x2 = sqrt(1 - x * x);
-		float area_unit = 0.5 * pi<float>() - (sqrt_one_minus_x2 * x + asin(x));
+		float area_unit = 0.5f * pi<float>() - (sqrt_one_minus_x2 * x + asin(x));
 		if (area_unit < sqrt_one_minus_x2 * (1 - x))
 		{
 			area_unit = sqrt_one_minus_x2 * (1 - x);
@@ -603,17 +629,32 @@ static void drawGraphics()
 		sun.sky_color += (sun.light_dir_and_radius.z + 0.2f) * vec4 { 0.2f, 0.3f, 1.1f, 0.0f };
 	}
 
+	camera.taa_offset = (2.0f * TAA_OFFSETS[frame_idx % TAA_PERIOD] - 1.0f) * vec2{ 1.0f / window_width, 1.0f / window_height };
+	camera.projection = perspective(FOV_Y, float(window_width) / window_height, camera.z_near, VIEW_Z_FAR);
+	camera.view_proj = camera.projection * camera.view;
 	Frustum camera_frustum{ camera.view_proj };
 
-	int num_visible_cars;
+	int num_visible_cars = 0;
 	int num_visible_light_on_cars;
 	int num_visible_car_lights;
 	int total_tile_light_affected_map_indices_cnt;
 
+	auto add_visible_car = [&num_visible_cars, &logical_data](int i)
+		{
+			auto [old_transform, is_new] = car_old_transforms.try_emplace(logical_data.car_ids[i], true, logical_data.car_transform[i]);
+			visible_car_old_transforms[num_visible_cars] = old_transform->second.second;
+			if (!is_new)
+			{
+				old_transform->second.first = true;
+				old_transform->second.second = logical_data.car_transform[i];
+			}
+			visible_car_colors[num_visible_cars] = logical_data.car_color[i];
+			visible_car_transforms[num_visible_cars] = logical_data.car_transform[i];
+			num_visible_cars++;
+		};
+
 	if (sun.light_dir_and_radius.z > 0)
 	{
-		num_visible_cars = logical_data.num_cars;
-
 		mat4 sun_shadow_view = lookAt(vec3{ 0.0f }, -vec3{ sun.light_dir_and_radius }, vec3{ -sun.light_dir_and_radius.x, -sun.light_dir_and_radius.y, sun.light_dir_and_radius.z });
 		mat3 abs_sun_shadow_rot = abs(mat3{ sun_shadow_view });
 		vec3 view_top(0.0f, tan(FOV_Y / 2), 0.0f);
@@ -622,7 +663,7 @@ static void drawGraphics()
 		view_left = mat3{ camera.inv_view } *view_left;
 		float z_min = FLT_MAX;
 		float x_maxs[CSM_LEVELS], x_mins[CSM_LEVELS], y_maxs[CSM_LEVELS], y_mins[CSM_LEVELS], z_mins[CSM_LEVELS];
-		float CSM_ratio = pow(scene_z_far / view_z_near, 1.0f / CSM_LEVELS);
+		float CSM_ratio = pow(scene_z_far / camera.z_near, 1.0f / CSM_LEVELS);
 		float camera_z_far = scene_z_far;
 		for (int i = CSM_LEVELS - 1; i >= 0; i--)
 		{
@@ -794,10 +835,31 @@ static void drawGraphics()
 				0.5f, 0.5f, 0.5f, 1.0f
 			} *shadow_mat;
 		}
+		Frustum shadow_frustums[CSM_LEVELS];
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			shadow_frustums[i] = Frustum{ sun_shadow.view_proj[i] };
+			car_sun_shadow_transform[i].clear();
+		}
+		int num_invisible‌_cars = 0;
+		for (int i = 0; i < logical_data.num_cars; i++)
+		{
+			BoundAABB car_bound{ car_local_bound, logical_data.car_transform[i] };
+			for (int j = 0; j < CSM_LEVELS; j++)
+			{
+				if (shadow_frustums[j].cullingTestNoNearFar(car_bound))
+				{
+					car_sun_shadow_transform[j].push_back(logical_data.car_transform[i]);
+				}
+			}
+			if (camera_frustum.cullingTest(car_bound))
+			{
+				add_visible_car(i);
+			}
+		}
 	}
 	else
 	{
-		num_visible_cars = 0;
 		num_visible_light_on_cars = 0;
 		num_visible_car_lights = 0;
 		memset(&tile_light_position_map, 0, sizeof(tile_light_position_map));
@@ -814,7 +876,7 @@ static void drawGraphics()
 		car_light_infos.clear();
 		int num_car_lights = 2 * logical_data.num_light_on_cars;
 		int cnt = 0;
-		BoundFrustum camera_bound{ camera.inv_view, FOV_Y, float(window_width) / window_height, view_z_near, VIEW_Z_FAR };
+		BoundFrustum camera_bound{ camera.inv_view, FOV_Y, float(window_width) / window_height, camera.z_near, VIEW_Z_FAR };
 		for (int i = 0; i < num_car_lights; i++)
 		{
 			const vec4& light_pos = logical_data.car_light_pos[i];
@@ -851,7 +913,7 @@ static void drawGraphics()
 		static std::pair<int, int[(2 * SEARCH_RANGE + 1) * (2 * SEARCH_RANGE + 1)]> affected_grids[2 * MAX_CAR_CNT];
 #pragma omp parallel num_threads(omp_get_num_procs() - 2)
 		{
-#pragma omp for schedule(guided, 16) nowait
+#pragma omp for nowait
 			for (int i = 0; i < num_visible_car_lights; i++)
 			{
 				affected_grids[i].first = 0;
@@ -869,7 +931,7 @@ static void drawGraphics()
 					}
 				}
 				bool intersect_results[(2 * SEARCH_RANGE + 1) * (2 * SEARCH_RANGE + 1)];
-				intersectionTests(tile_light_bounds[i], bounds, count, intersect_results);
+				collisionTests(tile_light_bounds[i], bounds, count, intersect_results);
 				count = 0;
 				for (int j = begin_idx.x; j < end_idx.x; j++)
 				{
@@ -882,10 +944,10 @@ static void drawGraphics()
 					}
 				}
 			}
-#pragma omp for schedule(guided, 4) 
+#pragma omp for schedule(guided, 4)
 			for (int i = 0; i < logical_data.num_cars; i++)
 			{
-				mat4& transform = logical_data.car_transform[i];
+				const mat4& transform = logical_data.car_transform[i];
 				ivec2 pos_idx = 1.0f / TILE_LIGHT_POSITION_MAP_GRID_LENGTH * vec2(transform[3]) + 0.5f * vec2{ TILE_LIGHT_POSITION_MAP_SIZE_X, TILE_LIGHT_POSITION_MAP_SIZE_Y };
 				BoundOBB car_bound{ car_local_bound, transform };
 				int num_lighting = 0;
@@ -897,7 +959,7 @@ static void drawGraphics()
 						ivec2 light_idx_range = tile_light_position_map.light_idx_range[idx.x * TILE_LIGHT_POSITION_MAP_SIZE_Y + idx.y];
 						for (int k = light_idx_range.x; k < light_idx_range.y; k++)
 						{
-							if (intersectionTest(tile_light_bounds[k], car_bound))
+							if (collisionTest(tile_light_bounds[k], car_bound))
 							{
 								num_lighting++;
 								car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR + num_lighting] = k;
@@ -936,87 +998,93 @@ static void drawGraphics()
 			car_tile_light_shadow_idx[i].clear();
 			car_tile_light_shadow_transform[i].clear();
 		}
-		auto cnt_visible_cars = [](mat4* transforms, vec3* colors, int* light_indices, int size)->int
+		for (int i = 0; i < logical_data.num_cars; i++)
+		{
+			if (car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR] < 0)
 			{
-				int visible_cnt = 0;
-				for (int i = 0; i < size; i++)
+				continue;
+			}
+			car_lightings.light_indices[num_visible_cars * LIGHTING_SIZE_PER_CAR] = car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR];
+			for (int j = 1; j <= car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR]; j++)
+			{
+				int k = car_lightings.light_indices[i * LIGHTING_SIZE_PER_CAR + j];
+				car_lightings.light_indices[num_visible_cars * LIGHTING_SIZE_PER_CAR + j] = k;
+				int layer = findTileLightShadowLayer(k);
+				if (layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 				{
-					if (light_indices[i * LIGHTING_SIZE_PER_CAR] >= 0)
-					{
-						if (i != visible_cnt)
-						{
-							std::swap(transforms[visible_cnt], transforms[i]);
-							std::swap(colors[visible_cnt], colors[i]);
-							memcpy(light_indices + visible_cnt * LIGHTING_SIZE_PER_CAR, light_indices + i * LIGHTING_SIZE_PER_CAR, (light_indices[i * LIGHTING_SIZE_PER_CAR] + 1) * sizeof(*light_indices));
-						}
-						for (int j = 1; j <= light_indices[visible_cnt * LIGHTING_SIZE_PER_CAR]; j++)
-						{
-							int k = light_indices[visible_cnt * LIGHTING_SIZE_PER_CAR + j];
-							int layer = findTileLightShadowLayer(k);
-							if (layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
-							{
-								car_tile_light_shadow_idx[layer].push_back(k);
-								car_tile_light_shadow_transform[layer].push_back(tile_light_data.tile_lights[k].view_proj * transforms[visible_cnt]);
-							}
-						}
-						visible_cnt++;
-					}
+					car_tile_light_shadow_idx[layer].push_back(k);
+					car_tile_light_shadow_transform[layer].push_back(tile_light_data.tile_lights[k].view_proj * logical_data.car_transform[i]);
 				}
-				return visible_cnt;
-			};
-		num_visible_light_on_cars += cnt_visible_cars(logical_data.car_transform, logical_data.car_color, car_lightings.light_indices, logical_data.num_light_on_cars);
-		num_visible_cars += num_visible_light_on_cars;
-		num_visible_cars += cnt_visible_cars(&logical_data.car_transform[logical_data.num_light_on_cars],
-			&logical_data.car_color[logical_data.num_light_on_cars],
-			&car_lightings.light_indices[logical_data.num_light_on_cars * LIGHTING_SIZE_PER_CAR],
-			logical_data.num_cars - logical_data.num_light_on_cars);
+			}
+			add_visible_car(i);
+			if (i < logical_data.num_light_on_cars)
+			{
+				num_visible_light_on_cars++;
+			}
+		}
+	}
+	for (auto iter = car_old_transforms.begin(); iter != car_old_transforms.end();)
+	{
+		if (!iter->second.first)
+		{
+			iter = car_old_transforms.erase(iter);
+		}
+		else
+		{
+			iter->second.first = false;
+			++iter;
+		}
 	}
 
 	if (is_view_updated)
 	{
-		glNamedBufferSubData(scene_UBO, 0, sizeof(camera), &camera);
 		glProgramUniform1f(SP_sun, glGetUniformLocation(SP_sun, "horizonY"), horizon_y);
 	}
-
+	glNamedBufferSubData(scene_UBO, 0, sizeof(camera), &camera);
 	glNamedBufferSubData(scene_UBO, scene_UBO_offset1, sizeof(SunData), &sun);
+	car_color_VBO.updateData(0, num_visible_cars * sizeof(vec3), visible_car_colors);
+	car_transform_VBO.updateData(0, num_visible_cars * sizeof(mat4), visible_car_transforms);
+	car_old_transform_VBO.updateData(0, num_visible_cars * sizeof(mat4), visible_car_old_transforms);
 	if (sun.light_dir_and_radius.z > 0)
 	{
 		glNamedBufferSubData(shadow_UBO, 0, sizeof(sun_shadow), &sun_shadow);
-		car_transform_VBO.updateData(0, num_visible_cars * sizeof(mat4), logical_data.car_transform);
-		car_color_VBO.updateData(0, num_visible_cars * sizeof(vec3), logical_data.car_color);
+		int car_sun_shadow_transform_offset = 0;
+		for (int i = 0; i < CSM_LEVELS; i++)
+		{
+			int count = car_sun_shadow_transform[i].size();
+			car_shadow_transform_VBO.updateData(car_sun_shadow_transform_offset * sizeof(mat4), count * sizeof(mat4), car_sun_shadow_transform[i].data());
+			car_sun_shadow_transform_offset += count;
+		}
 	}
 	else
 	{
 		tile_light_position_map_SSBO.updateData(0, sizeof(tile_light_position_map), &tile_light_position_map);
 		tile_lights_SSBO.updateData(0, num_visible_car_lights * sizeof(TileLight), &tile_light_data);
 		tile_light_affected_map_SSBO.updateData(0, sizeof(TileLightAffectedMapData::idx_range) + total_tile_light_affected_map_indices_cnt * sizeof(int), &tile_light_affected_map);
-		car_lighting_SSBO.updateData(0, num_visible_light_on_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
-		car_transform_VBO.updateData(0, num_visible_light_on_cars * sizeof(mat4), logical_data.car_transform);
-		car_color_VBO.updateData(0, num_visible_light_on_cars * sizeof(vec3), logical_data.car_color);
-		int num_light_off_cars = num_visible_cars - num_visible_light_on_cars;
-		car_lighting_SSBO.updateData(num_visible_light_on_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), num_light_off_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings.light_indices[logical_data.num_light_on_cars * LIGHTING_SIZE_PER_CAR]);
-		car_transform_VBO.updateData(num_visible_light_on_cars * sizeof(mat4), num_light_off_cars * sizeof(mat4), &logical_data.car_transform[logical_data.num_light_on_cars]);
-		car_color_VBO.updateData(num_visible_light_on_cars * sizeof(vec3), num_light_off_cars * sizeof(vec3), &logical_data.car_color[logical_data.num_light_on_cars]);
+		car_lighting_SSBO.updateData(0, num_visible_cars * LIGHTING_SIZE_PER_CAR * sizeof(int), &car_lightings);
 		glProgramUniform1i(SP_car_night, glGetUniformLocation(SP_car_night, "numLightOnCars"), num_visible_light_on_cars);
 		int car_tile_light_shadow_offset = 0;
 		for (int i = 0; i < NUM_TILE_LIGHT_SHADOW_LAYERS; i++)
 		{
 			int count = car_tile_light_shadow_transform[i].size();
-			car_tile_light_shadow_transform_VBO.updateData(car_tile_light_shadow_offset * sizeof(mat4), count * sizeof(mat4), car_tile_light_shadow_transform[i].data());
+			car_shadow_transform_VBO.updateData(car_tile_light_shadow_offset * sizeof(mat4), count * sizeof(mat4), car_tile_light_shadow_transform[i].data());
 			car_tile_light_shadow_idx_VBO.updateData(car_tile_light_shadow_offset * sizeof(int), count * sizeof(int), car_tile_light_shadow_idx[i].data());
 			car_tile_light_shadow_offset += count;
 		}
 	}
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
-		mat4 transform = rotate(acos(sun.light_dir_and_radius.z), vec3(-sun.light_dir_and_radius.y, sun.light_dir_and_radius.x, 0));
-		transform[3] = vec4(20.0f / SUN_RADIUS_DIST_RATIO * logical_data.sun_dir, 1.0f);
+		static mat4 transform = identity<mat4>();
+		glProgramUniformMatrix4fv(SP_sun, glGetUniformLocation(SP_sun, "old_transform"), 1, GL_FALSE, (GLfloat*)&transform);
+		transform = rotate(acos(sun.light_dir_and_radius.z), vec3(-sun.light_dir_and_radius.y, sun.light_dir_and_radius.x, 0));
+		transform[3] = vec4(0.99f * VIEW_Z_FAR * logical_data.sun_dir, 0.0f) + camera.inv_view[3];
 		glProgramUniformMatrix4fv(SP_sun, glGetUniformLocation(SP_sun, "transform"), 1, GL_FALSE, (GLfloat*)&transform);
 	}
 
 	glBindTextureUnit(0, highway_tex);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	glNamedFramebufferTexture(render_FBO, GL_DEPTH_ATTACHMENT, taa_texs[frame_idx & 1].depth, 0);
 	if (sun.light_dir_and_radius.z > 0)
 	{
 		glBindTextureUnit(1, shadow_day_tex);
@@ -1028,6 +1096,7 @@ static void drawGraphics()
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, SHADOW_DAY_TEX_SIZE, SHADOW_DAY_TEX_SIZE);
 		glEnable(GL_POLYGON_OFFSET_FILL);
+		int car_sun_shadow_offset = 0;
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
 			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, 0, i);
@@ -1044,7 +1113,9 @@ static void drawGraphics()
 			glUseProgram(SP_shadow_car_day);
 			car_shadow_day_VAO.bindCurrent();
 			glProgramUniform1i(SP_shadow_car_day, glGetUniformLocation(SP_shadow_car_day, "csm_level"), i);
-			glDrawElementsInstanced(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
+			int count = car_sun_shadow_transform[i].size();
+			glDrawElementsInstancedBaseInstance(GL_TRIANGLES, CAR_SHADOW_EBO_SIZE, GL_UNSIGNED_INT, 0, count, car_sun_shadow_offset);
+			car_sun_shadow_offset += count;
 		}
 		glDisable(GL_POLYGON_OFFSET_FILL);
 
@@ -1055,22 +1126,23 @@ static void drawGraphics()
 		for (int i = 0; i < PCSS_MIP_LEVELS; i++)
 		{
 			glProgramUniform1i(SP_gen_PCSS_mips, glGetUniformLocation(SP_gen_PCSS_mips, "mip_level"), i);
+			glViewport(0, 0, SHADOW_DAY_TEX_SIZE >> (i + 1), SHADOW_DAY_TEX_SIZE >> (i + 1));
 			for (int j = 0; j < CSM_LEVELS; j++)
 			{
 				glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_day_tex, i + 1, j);
-				glViewport(0, 0, SHADOW_DAY_TEX_SIZE >> (i + 1), SHADOW_DAY_TEX_SIZE >> (i + 1));
 				glProgramUniform1i(SP_gen_PCSS_mips, glGetUniformLocation(SP_gen_PCSS_mips, "layer"), j);
 				glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 			}
 		}
 		glDepthFunc(GL_LESS);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
+		glBindFramebuffer(GL_FRAMEBUFFER, render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
 		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
-		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_NONE, GL_COLOR_ATTACHMENT2 };
+		glDrawBuffers(3, attachments);
 		glUseProgram(SP_car_day);
 		car_VAO.bindCurrent();
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
@@ -1152,12 +1224,14 @@ static void drawGraphics()
 		}
 		glDisable(GL_POLYGON_OFFSET_FILL);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, multisample_render_FBO);
+		glBindFramebuffer(GL_FRAMEBUFFER, render_FBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
 		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
+		glClearBufferfv(GL_COLOR, 2, ZERO_VEC);
 		glViewport(0, 0, window_width, window_height);
-		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_NONE, GL_COLOR_ATTACHMENT2 };
+		glDrawBuffers(3, attachments);
 		glUseProgram(SP_highway_night);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
@@ -1166,56 +1240,58 @@ static void drawGraphics()
 		glUseProgram(SP_terrain_night);
 		drawTerrainMesh(camera_frustum);
 		glUseProgram(SP_car_night);
-		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-		glDrawBuffers(2, attachments);
+		attachments[1] = GL_COLOR_ATTACHMENT1;
+		glDrawBuffers(3, attachments);
 		car_VAO.bindCurrent();
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 	}
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
 		glUseProgram(SP_sun);
-		GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-		glDrawBuffers(2, attachments);
+		GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+		glDrawBuffers(3, attachments);
 		glBindVertexArray(sun_VAO);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, SUN_VBO_SIZE);
 	}
 
 	glDisable(GL_DEPTH_TEST);
-	glReadBuffer(GL_COLOR_ATTACHMENT1);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, render_FBO);
-	glDrawBuffer(GL_COLOR_ATTACHMENT0);
-	glBlitFramebuffer(0, 0, window_width, window_height, 0, 0, window_width, window_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bloom_FBOs[0]);
 	glBindVertexArray(tex_blit_VAO);
-	glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	glBindFramebuffer(GL_FRAMEBUFFER, taa_FBOs[frame_idx & 1]);
+	glBindTextureUnit(0, render_texs[0]);
+	glBindTextureUnit(1, taa_texs[1 - (frame_idx & 1)].color);
+	glBindTextureUnit(2, render_texs[1]);
+	glBindTextureUnit(3, taa_texs[1 - (frame_idx & 1)].bloom);
+	glBindTextureUnit(4, taa_texs[frame_idx & 1].depth);
+	glBindTextureUnit(5, taa_texs[1 - (frame_idx & 1)].depth);
+	glBindTextureUnit(6, render_texs[2]);
+	for (int i = 0; i < 4; i++)
+	{
+		glBindTextureUnit(7 + i, taa_texs[1 - (frame_idx & 1)].stats[i]);
+	}
+	glUseProgram(SP_TAA);
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, bloom_FBOs[0]);
 	glViewport(0, 0, bloom_buffer_width, BLOOM_BUFFER_HEIGHT);
-	glBindTextureUnit(0, render_tex);
+	glBindTextureUnit(0, taa_texs[frame_idx & 1].bloom);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glUseProgram(SP_tex_blit);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bloom_FBOs[1]);
+	glBindFramebuffer(GL_FRAMEBUFFER, bloom_FBOs[1]);
 	glUseProgram(SP_gaussian_blur);
-	glDrawBuffer(GL_COLOR_ATTACHMENT0);
 	glViewport(0, 0, BLOOM_BUFFER_HEIGHT, bloom_buffer_width);
 	glBindTextureUnit(0, bloom_texs[0]);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, bloom_FBOs[0]);
-	glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	glBindFramebuffer(GL_FRAMEBUFFER, bloom_FBOs[0]);
 	glViewport(0, 0, bloom_buffer_width, BLOOM_BUFFER_HEIGHT);
 	glBindTextureUnit(0, bloom_texs[1]);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, multisample_render_FBO);
-	glReadBuffer(GL_COLOR_ATTACHMENT0);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, render_FBO);
-	glDrawBuffer(GL_COLOR_ATTACHMENT0);
-	glBlitFramebuffer(0, 0, window_width, window_height, 0, 0, window_width, window_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, window_width, window_height);
-	glBindTextureUnit(0, render_tex);
+	glBindTextureUnit(0, taa_texs[frame_idx & 1].color);
 	glBindTextureUnit(1, bloom_texs[0]);
 	glUseProgram(SP_buffer_to_screen);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -1273,6 +1349,7 @@ static void drawGraphics()
 
 	GPUTriple::Lock();
 	GPUTriple::Swap();
+	frame_idx++;
 }
 
 static void onResize(GLFWwindow*, int width, int height)
@@ -1285,30 +1362,50 @@ static void onResize(GLFWwindow*, int width, int height)
 	window_height = height;
 	need_update_view = true;
 
+	float tan_half_fov_y = tan(0.5f * FOV_Y);
+	float tan_half_fov_x = tan_half_fov_y * width / height;
+	glProgramUniform2f(SP_TAA, glGetUniformLocation(SP_TAA, "tan_half_fov"), tan_half_fov_x, tan_half_fov_y);
+
 	GLint max_tex_size;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
 	bloom_buffer_width = std::min(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
 
-	int MSAA_level = 8;
+	glDeleteTextures(3, render_texs);
+	glCreateTextures(GL_TEXTURE_2D, 3, render_texs);
+	for (int i = 0; i < 3; i++)
+	{
+		glTextureStorage2D(render_texs[i], 1, GL_RGBA16F, width, height);
+		glNamedFramebufferTexture(render_FBO, GL_COLOR_ATTACHMENT0 + i, render_texs[i], 0);
+	}
+
+	glDeleteTextures(sizeof(taa_texs) / sizeof(GLuint), &taa_texs[0].color);
+	glCreateTextures(GL_TEXTURE_2D, sizeof(taa_texs) / sizeof(GLuint), &taa_texs[0].color);
 	for (int i = 0; i < 2; i++)
 	{
-		glNamedRenderbufferStorageMultisample(multisample_render_RBOs[i], MSAA_level, GL_RGB16F, width, height);
+		glTextureStorage2D(taa_texs[i].color, 1, GL_RGBA16F, width, height);
+		glTextureParameteri(taa_texs[i].color, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(taa_texs[i].color, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT0, taa_texs[i].color, 0);
+		glTextureStorage2D(taa_texs[i].bloom, 4, GL_RGBA16F, width, height);
+		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT1, taa_texs[i].bloom, 0);
+		glTextureStorage2D(taa_texs[i].depth, 1, GL_DEPTH_COMPONENT24, width, height);
+		glTextureParameteri(taa_texs[i].depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteri(taa_texs[i].depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		for (int j = 0; j < sizeof(TAATextures::stats) / sizeof(GLuint); j++)
+		{
+			glTextureStorage2D(taa_texs[i].stats[j], 1, GL_RGBA16F, width, height);
+			glTextureParameteri(taa_texs[i].stats[j], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(taa_texs[i].stats[j], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT2 + j, taa_texs[i].stats[j], 0);
+		}
 	}
-	glNamedRenderbufferStorageMultisample(depth_RBO, MSAA_level, GL_DEPTH_COMPONENT32, width, height);
-
-	glDeleteTextures(1, &render_tex);
-	glCreateTextures(GL_TEXTURE_2D, 1, &render_tex);
-	glTextureStorage2D(render_tex, 4, GL_RGB16F, width, height);
-	glTextureParameteri(render_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTextureParameteri(render_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTextureParameteri(render_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(render_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glNamedFramebufferTexture(render_FBO, GL_COLOR_ATTACHMENT0, render_tex, 0);
 
 	glDeleteTextures(2, bloom_texs);
 	glCreateTextures(GL_TEXTURE_2D, 2, bloom_texs);
-	glTextureStorage2D(bloom_texs[0], 1, GL_RGB16F, bloom_buffer_width, BLOOM_BUFFER_HEIGHT);
-	glTextureStorage2D(bloom_texs[1], 1, GL_RGB16F, BLOOM_BUFFER_HEIGHT, bloom_buffer_width);
+	glTextureStorage2D(bloom_texs[0], 1, GL_RGBA16F, bloom_buffer_width, BLOOM_BUFFER_HEIGHT);
+	glTextureStorage2D(bloom_texs[1], 1, GL_RGBA16F, BLOOM_BUFFER_HEIGHT, bloom_buffer_width);
 	for (int i = 0; i < 2; i++)
 	{
 		glTextureParameteri(bloom_texs[i], GL_TEXTURE_MAG_FILTER, GL_LINEAR);

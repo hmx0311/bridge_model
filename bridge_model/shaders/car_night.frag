@@ -13,8 +13,8 @@ uniform Material materials[7];
 
 layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 
-in vec3 modelPos;
-in vec3 viewRay;
+in vec3 world_position;
+in vec3 delta_position_in_view;
 in vec3 aNormal;
 in flat int aMaterialIdx;
 in flat vec3 carColor;
@@ -22,10 +22,11 @@ in flat int instanceId;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 bloomColor;
-
+layout(location = 2) out vec3 delta_position;
 
 void main()
 {
+	vec3 view_dir = normalize(camera.inv_view[3].xyz - world_position);
 	Material material;
 	if(aMaterialIdx < 0)
 	{
@@ -46,18 +47,18 @@ void main()
 		for(int i = lightingOffset + 1; i < end; i++)
 		{
 			int idx = car_lighting.light_indices[i];
-			vec3 pos_to_light = modelPos - vec3(tile_lights[idx].position);
-			float light_distance = length(pos_to_light);
-			pos_to_light /= light_distance;
-			float intensity = -dot(pos_to_light, aNormal) / (light_distance * light_distance);
-			vec4 pos_in_light = tile_lights[idx].view_proj * vec4(modelPos, 1.0);
+			vec3 light_dir = world_position - vec3(tile_lights[idx].position);
+			float light_distance = length(light_dir);
+			light_dir /= light_distance;
+			float intensity = -dot(light_dir, aNormal) / (light_distance * light_distance);
+			vec4 pos_in_light = tile_lights[idx].view_proj * vec4(world_position, 1.0);
 			pos_in_light.xy /= pos_in_light.w;
 			float r = length(pos_in_light.xy);
 			if(light_distance > 0.5 && intensity > 0 && -pos_in_light.w < pos_in_light.z && pos_in_light.z < pos_in_light.w && r < 1.0)
 			{
 				if(material.shininess > 0)
 				{
-					vec3 halfway = normalize(-pos_to_light + normalize(viewRay));
+					vec3 halfway = normalize(-light_dir + view_dir);
 					float HdotN = dot(halfway, aNormal);
 					if(HdotN > 0)
 					{
@@ -82,8 +83,9 @@ void main()
 		color *= lighting;
 	}
 
-	float fog_factor = fogFactor(modelPos);
+	float fog_factor = fogFactor(world_position);
 	color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
 	fragColor = color;
 	bloomColor = maxColor > 1 ? color : vec3(0.0);
+	delta_position = delta_position_in_view;
 }

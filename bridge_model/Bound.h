@@ -59,6 +59,8 @@ struct BoundFrustum
 	BoundFrustum() = default;
 	BoundFrustum(const glm::mat4& transform, float fov_y, float aspect, float z_near, float z_far);
 
+	glm::vec3 center() const;
+
 	glm::vec3 support(const glm::vec3& dir) const;
 	void biSupport(const glm::vec3& dir, glm::vec3& support_point, glm::vec3& rsupport_point) const;
 };
@@ -78,11 +80,12 @@ struct BoundEllipticFrustum
 	void biSupport(const glm::vec3& dir, glm::vec3& support_point, glm::vec3& rsupport_point) const;
 };
 
-bool intersectionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary);
-bool intersectionTest(const BoundEllipticFrustum& primary, const BoundAABB& secondary);
-void intersectionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds, int count, bool* results);
-bool intersectionTest(const BoundOBB& primary, const BoundEllipticFrustum& secondary);
-bool intersectionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondary);
+bool collisionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary);
+bool collisionTest(const BoundEllipticFrustum& primary, const BoundAABB& secondary);
+void collisionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds, int count, bool* results);
+bool collisionTest(const BoundOBB& primary, const BoundEllipticFrustum& secondary);
+bool collisionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondary);
+bool collisionTest(const BoundEllipticFrustum& primary, const BoundFrustum& secondary);
 
 template<class T>
 concept HasSupport = requires(const T & t, const glm::vec3 & dir) { { t.support(dir) }->std::convertible_to<glm::vec3>; } ||

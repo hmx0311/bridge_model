@@ -176,6 +176,19 @@ INTERSECTION_TEST_RESULT Frustum::intersectionTest(const BoundOBB& bound) const
 	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
 }
 
+bool Frustum::cullingTestNoNearFar(const BoundOBB& bound) const
+{
+	for (int i = 0; i < 4; i++)
+	{
+		auto& p = m_planes[i];
+		if (dot(bound.support(p.normal), p.normal) + p.d < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 bool Frustum::cullingTest(const BoundSphere& bound) const
 {
 	for (int i = 0; i < 6; i++)

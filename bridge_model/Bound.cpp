@@ -73,6 +73,11 @@ BoundFrustum::BoundFrustum(const mat4& transform, float fov_y, float aspect, flo
 	points[7] = transform[3] + z_far * (-transform[2] + vec4((-top - left), 0.0f));
 }
 
+vec3 BoundFrustum::center() const
+{
+	return 0.125f * (points[0] + points[1] + points[2] + points[3] + points[4] + points[5] + points[6] + points[7]);
+}
+
 vec3 BoundFrustum::support(const vec3& dir) const
 {
 	float max_support = dot(points[0], dir);
@@ -152,7 +157,7 @@ void BoundEllipticFrustum::biSupport(const glm::vec3& dir, glm::vec3& support_po
 	rsupport_point = dot(rsupport_near, dir) < dot(rsupport_far, dir) ? rsupport_near : rsupport_far;
 }
 
-bool intersectionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary)
+bool collisionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary)
 {
 	vec3 support_min, support_max;
 	secondary.biSupport(vec3{ 1.0f, 0.0f, 0.0f }, support_max, support_min);
@@ -173,7 +178,7 @@ bool intersectionTest(const BoundAABB& primary, const BoundEllipticFrustum& seco
 	return true;
 }
 
-bool intersectionTest(const BoundEllipticFrustum& primary, const BoundAABB& secondary)
+bool collisionTest(const BoundEllipticFrustum& primary, const BoundAABB& secondary)
 {
 	vec3 box_center = secondary.center();
 	vec3 box_half_size = 0.5f * secondary.size();
@@ -210,7 +215,7 @@ bool intersectionTest(const BoundEllipticFrustum& primary, const BoundAABB& seco
 	return true;
 }
 
-void intersectionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds, int count, bool* results)
+void collisionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds, int count, bool* results)
 {
 	vec3 frustum_dir = primary.center_near - primary.center_far;
 	float center_dist = length(frustum_dir);
@@ -255,7 +260,7 @@ void intersectionTests(const BoundEllipticFrustum& primary, const BoundAABB* bou
 	}
 }
 
-bool intersectionTest(const BoundOBB& primary, const BoundEllipticFrustum& secondary)
+bool collisionTest(const BoundOBB& primary, const BoundEllipticFrustum& secondary)
 {
 	vec3 support_min, support_max;
 	vec3 center_d = primary.center * primary.rotation;
@@ -277,7 +282,7 @@ bool intersectionTest(const BoundOBB& primary, const BoundEllipticFrustum& secon
 	return true;
 }
 
-bool intersectionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondary)
+bool collisionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondary)
 {
 	vec3 frustum_dir = primary.center_near - primary.center_far;
 	float center_dist = length(frustum_dir);
@@ -293,6 +298,41 @@ bool intersectionTest(const BoundEllipticFrustum& primary, const BoundOBB& secon
 	vec3 frustum_x = 1.0f / x_far_len * primary.x_far;
 	vec3 frustum_y = 1.0f / y_far_len * primary.y_far;
 	vec3 v = secondary.center - primary.center_far;
+	float x = dot(v, frustum_x);
+	float y = dot(v, frustum_y);
+	float d = sqrt(x * x / (x_far_len * x_far_len) + y * y / (y_far_len * y_far_len));
+	if (d > 0.0f)
+	{
+		x /= d;
+		y /= d;
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - primary.near_far_ratio) / center_dist };
+		n = normalize(n);
+		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
+		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
+		if (dot(n, secondary.support(n)) <= plane_d)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool collisionTest(const BoundEllipticFrustum& primary, const BoundFrustum& secondary)
+{
+	vec3 frustum_dir = primary.center_near - primary.center_far;
+	float center_dist = length(frustum_dir);
+	frustum_dir *= 1.0f / center_dist;
+	vec3 support_min, support_max;
+	secondary.biSupport(frustum_dir, support_max, support_min);
+	if (dot(frustum_dir, support_max) <= dot(frustum_dir, primary.center_far) || dot(frustum_dir, support_min) >= dot(frustum_dir, primary.center_near))
+	{
+		return false;
+	}
+	float x_far_len = length(primary.x_far);
+	float y_far_len = length(primary.y_far);
+	vec3 frustum_x = 1.0f / x_far_len * primary.x_far;
+	vec3 frustum_y = 1.0f / y_far_len * primary.y_far;
+	vec3 v = secondary.center() - primary.center_far;
 	float x = dot(v, frustum_x);
 	float y = dot(v, frustum_y);
 	float d = sqrt(x * x / (x_far_len * x_far_len) + y * y / (y_far_len * y_far_len));

@@ -164,6 +164,9 @@
     <ClInclude Include="GPUTripleVertexArray.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="shader_headers\car_attrib_locations.h">
+      <Filter>shader_headers\common_headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="bridge_model.rc">
@@ -251,7 +254,7 @@
     <None Include="shaders\shadow_highway_night.comp">
       <Filter>shaders\shadow\night</Filter>
     </None>
-    <None Include="shaders\text.vert">
+    <None Include="shaders\TAA.frag">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

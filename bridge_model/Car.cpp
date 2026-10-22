@@ -14,7 +14,8 @@ constexpr float LANE_OFFSET_SIGMA = 0.1f;
 constexpr float MAX_LANE_OFFSET = 6.0f * LANE_OFFSET_SIGMA;
 constexpr float LANE_OFFSET_SPEED_RATIO = 0.002f;
 
-Car::Car(Lane* lane, float sun_height)
+Car::Car(uint32_t id, Lane* lane, float sun_height) :
+	id(id)
 {
 	std::uniform_real_distribution<float> color_distb(0.1f, 0.95f);
 	m_color = vec3(pow(color_distb(rd_eng), 2.2f), pow(color_distb(rd_eng), 2.2f), pow(color_distb(rd_eng), 2.2f));

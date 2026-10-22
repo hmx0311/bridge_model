@@ -8,7 +8,10 @@
 #include "terrain.h"
 
 #include "shader_headers/scene_constances.h"
+#include "shader_headers/camera_defines.h"
+#include "shader_headers/lighting_day_defines.h"
 #include "shader_headers/lighting_night_defines.h"
+#include "shader_headers/car_attrib_locations.h"
 
 using namespace glm;
 
@@ -20,10 +23,10 @@ GLuint highway_VAO, highway_VBO, highway_EBO;
 GLuint bridge_VAO, bridge_VBO, bridge_EBO;
 GPUTripleVertexArray car_VAO;
 GLuint car_VBO, car_EBO;
-GPUTripleBuffer car_transform_VBO, car_color_VBO;
+GPUTripleBuffer car_color_VBO, car_transform_VBO, car_old_transform_VBO;
 GPUTripleVertexArray car_shadow_day_VAO, car_shadow_night_VAO;
 GLuint car_shadow_VBO, car_shadow_EBO;
-GPUTripleBuffer car_tile_light_shadow_transform_VBO, car_tile_light_shadow_idx_VBO;
+GPUTripleBuffer car_shadow_transform_VBO, car_tile_light_shadow_idx_VBO;
 GLuint sun_VAO, sun_VBO;
 
 GLuint highway_tex;
@@ -1107,23 +1110,27 @@ static void buildHighwayMesh()
 	i_vert += 2 * berm_n;
 	i_idx += 6 * (berm_n - 1);
 
+	glCreateBuffers(1, &highway_VBO);
+	glNamedBufferData(highway_VBO, VERT_SIZE * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
+	glNamedBufferSubData(highway_VBO, 0, VERT_SIZE * sizeof(vec3), positions.get());
+	glNamedBufferSubData(highway_VBO, VERT_SIZE * sizeof(vec3), VERT_SIZE * sizeof(vec3), normals.get());
+	glNamedBufferSubData(highway_VBO, VERT_SIZE * (sizeof(vec3) + sizeof(vec3)), VERT_SIZE * sizeof(vec2), tex_coords.get());
+
+	glCreateBuffers(1, &highway_EBO);
+	glNamedBufferData(highway_EBO, HIGHWAY_EBO_SIZE * sizeof(GLuint), indices.get(), GL_STATIC_DRAW);
+
 	glGenVertexArrays(1, &highway_VAO);
 	glBindVertexArray(highway_VAO);
-	glGenBuffers(1, &highway_VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, highway_VBO);
-	glBufferData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, VERT_SIZE * sizeof(vec3), positions.get());
-	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * sizeof(vec3), VERT_SIZE * sizeof(vec3), normals.get());
-	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3)), VERT_SIZE * sizeof(vec2), tex_coords.get());
-	glGenBuffers(1, &highway_EBO);
+
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, highway_EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, HIGHWAY_EBO_SIZE * sizeof(GLuint), indices.get(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
+
+	glBindBuffer(GL_ARRAY_BUFFER, highway_VBO);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * sizeof(vec3)));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * (sizeof(vec3) + sizeof(vec3))));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * sizeof(vec3)));
 	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * (sizeof(vec3) + sizeof(vec3))));
 	glBindVertexArray(0);
 }
 
@@ -1833,24 +1840,25 @@ static void buildBridgeMesh()
 			i_idx += 6 * n;
 		}
 	}
+	glCreateBuffers(1, &bridge_VBO);
+	glNamedBufferData(bridge_VBO, VERT_SIZE* (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
+	glNamedBufferSubData(bridge_VBO, 0, VERT_SIZE * sizeof(vec3), positions.get());
+	glNamedBufferSubData(bridge_VBO, VERT_SIZE * sizeof(vec3), VERT_SIZE * sizeof(vec3), normals.get());
+	glNamedBufferSubData(bridge_VBO, VERT_SIZE* (sizeof(vec3) + sizeof(vec3)), VERT_SIZE * sizeof(vec2), tex_coords.get());
+
+	glCreateBuffers(1, &bridge_EBO);
+	glNamedBufferData(bridge_EBO, BRIDGE_EBO_SIZE * sizeof(GLuint), indices.get(), GL_STATIC_DRAW);
 
 	glGenVertexArrays(1, &bridge_VAO);
 	glBindVertexArray(bridge_VAO);
-	glGenBuffers(1, &bridge_VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, bridge_VBO);
-	glBufferData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, VERT_SIZE * sizeof(vec3), positions.get());
-	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * sizeof(vec3), VERT_SIZE * sizeof(vec3), normals.get());
-	glBufferSubData(GL_ARRAY_BUFFER, VERT_SIZE * (sizeof(vec3) + sizeof(vec3)), VERT_SIZE * sizeof(vec2), tex_coords.get());
-	glGenBuffers(1, &bridge_EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bridge_EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, BRIDGE_EBO_SIZE * sizeof(GLuint), indices.get(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
+	glBindBuffer(GL_ARRAY_BUFFER, bridge_VBO);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * sizeof(vec3)));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * (sizeof(vec3) + sizeof(vec3))));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * sizeof(vec3)));
 	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(VERT_SIZE * (sizeof(vec3) + sizeof(vec3))));
 	glBindVertexArray(0);
 }
 
@@ -2110,38 +2118,41 @@ static void buildCarMesh()
 	glNamedBufferData(car_EBO, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	car_VAO.create();
-	car_transform_VBO.create(MAX_CAR_CNT * sizeof(mat4));
 	car_color_VBO.create(MAX_CAR_CNT * sizeof(vec3));
+	car_transform_VBO.create(MAX_CAR_CNT * sizeof(mat4));
+	car_old_transform_VBO.create(MAX_CAR_CNT * sizeof(mat4));
 	for (int i = 0; i < 3; i++)
 	{
 		car_VAO.bindSlot(i);
-		glBindBuffer(GL_ARRAY_BUFFER, car_VBO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_EBO);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(sizeof(positions)));
-		glEnableVertexAttribArray(1);
-		glVertexAttribIPointer(2, 1, GL_INT, sizeof(int), reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
-		glEnableVertexAttribArray(2);
 
-		car_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
-		glVertexAttribDivisor(3, 1);
-		glEnableVertexAttribArray(4);
-		glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(sizeof(vec4)));
-		glVertexAttribDivisor(4, 1);
-		glEnableVertexAttribArray(5);
-		glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(2 * sizeof(vec4)));
-		glVertexAttribDivisor(5, 1);
-		glEnableVertexAttribArray(6);
-		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(3 * sizeof(vec4)));
-		glVertexAttribDivisor(6, 1);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_EBO);
+
+		glBindBuffer(GL_ARRAY_BUFFER, car_VBO);
+		glEnableVertexAttribArray(CAR_ATTRIB_VERTEX_LOCATION);
+		glVertexAttribPointer(CAR_ATTRIB_VERTEX_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
+		glEnableVertexAttribArray(CAR_ATTRIB_NORMAL_LOCATION);
+		glVertexAttribPointer(CAR_ATTRIB_NORMAL_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(sizeof(positions)));
+		glEnableVertexAttribArray(CAR_ATTRIB_MATERIAL_INDEX_LOCATION);
+		glVertexAttribIPointer(CAR_ATTRIB_MATERIAL_INDEX_LOCATION, 1, GL_INT, sizeof(int), reinterpret_cast<void*>(sizeof(positions) + sizeof(normals)));
 
 		car_color_VBO.bindSlot(GL_ARRAY_BUFFER, i);
-		glEnableVertexAttribArray(7);
-		glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
-		glVertexAttribDivisor(7, 1);
+		glEnableVertexAttribArray(CAR_ATTRIB_COLOR_LOCATION);
+		glVertexAttribPointer(CAR_ATTRIB_COLOR_LOCATION, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), reinterpret_cast<void*>(0));
+		glVertexAttribDivisor(CAR_ATTRIB_COLOR_LOCATION, 1);
+		car_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
+		for (int j = 0; j < 4; j++)
+		{
+			glEnableVertexAttribArray(CAR_ATTRIB_TRANSFORM_LOCATION + j);
+			glVertexAttribPointer(CAR_ATTRIB_TRANSFORM_LOCATION + j, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(j * sizeof(vec4)));
+			glVertexAttribDivisor(CAR_ATTRIB_TRANSFORM_LOCATION + j, 1);
+		}
+		car_old_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
+		for (int j = 0; j < 4; j++)
+		{
+			glEnableVertexAttribArray(CAR_ATTRIB_OLD_TRANSFORM_LOCATION + j);
+			glVertexAttribPointer(CAR_ATTRIB_OLD_TRANSFORM_LOCATION + j, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(j * sizeof(vec4)));
+			glVertexAttribDivisor(CAR_ATTRIB_OLD_TRANSFORM_LOCATION + j, 1);
+		}
 	}
 
 	glBindVertexArray(0);
@@ -2240,6 +2251,11 @@ static void buildCarShadowMesh()
 	glCreateBuffers(1, &car_shadow_VBO);
 	glNamedBufferData(car_shadow_VBO, sizeof(positions), positions, GL_STATIC_DRAW);
 
+	constexpr int MAX_CAR_TILE_LIGHT_SHADOW_SIZE = 32 * NUM_TILE_LIGHT_SHADOW_LAYERS + 4 * tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS);
+	constexpr int MAX_CAR_SHADOW_TRANSFORM_SIZE = std::max(CSM_LEVELS * MAX_CAR_CNT, MAX_CAR_TILE_LIGHT_SHADOW_SIZE);
+
+	car_shadow_transform_VBO.create(MAX_CAR_SHADOW_TRANSFORM_SIZE * sizeof(mat4));
+
 	car_shadow_day_VAO.create();
 	for (int i = 0; i < 3; i++)
 	{
@@ -2248,55 +2264,41 @@ static void buildCarShadowMesh()
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_shadow_EBO);
 
 		glBindBuffer(GL_ARRAY_BUFFER, car_shadow_VBO);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
-		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(CAR_ATTRIB_VERTEX_LOCATION);
+		glVertexAttribPointer(CAR_ATTRIB_VERTEX_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
 
-		car_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
-		glVertexAttribDivisor(3, 1);
-		glEnableVertexAttribArray(4);
-		glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(sizeof(vec4)));
-		glVertexAttribDivisor(4, 1);
-		glEnableVertexAttribArray(5);
-		glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(2 * sizeof(vec4)));
-		glVertexAttribDivisor(5, 1);
-		glEnableVertexAttribArray(6);
-		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(3 * sizeof(vec4)));
-		glVertexAttribDivisor(6, 1);
+		car_shadow_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
+		for (int j = 0; j < 4; j++)
+		{
+			glEnableVertexAttribArray(CAR_ATTRIB_TRANSFORM_LOCATION + j);
+			glVertexAttribPointer(CAR_ATTRIB_TRANSFORM_LOCATION + j, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(j * sizeof(vec4)));
+			glVertexAttribDivisor(CAR_ATTRIB_TRANSFORM_LOCATION + j, 1);
+		}
 	}
 
 	car_shadow_night_VAO.create();
-	constexpr int MAX_CAR_TILE_LIGHT_SHADOW_SIZE = 32 * NUM_TILE_LIGHT_SHADOW_LAYERS + 4 * tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS);
 	car_tile_light_shadow_idx_VBO.create(MAX_CAR_TILE_LIGHT_SHADOW_SIZE * sizeof(int));
-	car_tile_light_shadow_transform_VBO.create(MAX_CAR_TILE_LIGHT_SHADOW_SIZE * sizeof(mat4));
 	for (int i = 0; i < 3; i++)
 	{
 		car_shadow_night_VAO.bindSlot(i);
+
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, car_shadow_EBO);
 
 		glBindBuffer(GL_ARRAY_BUFFER, car_shadow_VBO);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
-		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(CAR_ATTRIB_VERTEX_LOCATION);
+		glVertexAttribPointer(CAR_ATTRIB_VERTEX_LOCATION, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), reinterpret_cast<void*>(0));
 
 		car_tile_light_shadow_idx_VBO.bindSlot(GL_ARRAY_BUFFER, i);
-		glVertexAttribIPointer(2, 1, GL_INT, sizeof(int), reinterpret_cast<void*>(0));
-		glVertexAttribDivisor(2, 1);
-		glEnableVertexAttribArray(2);
-
-		car_tile_light_shadow_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
-		glEnableVertexAttribArray(3);
-		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(0));
-		glVertexAttribDivisor(3, 1);
-		glEnableVertexAttribArray(4);
-		glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(sizeof(vec4)));
-		glVertexAttribDivisor(4, 1);
-		glEnableVertexAttribArray(5);
-		glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(2 * sizeof(vec4)));
-		glVertexAttribDivisor(5, 1);
-		glEnableVertexAttribArray(6);
-		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(3 * sizeof(vec4)));
-		glVertexAttribDivisor(6, 1);
+		glEnableVertexAttribArray(CAR_ATTRIB_LIGHT_SHADOW_INDEX_LOCATION);
+		glVertexAttribIPointer(CAR_ATTRIB_LIGHT_SHADOW_INDEX_LOCATION, 1, GL_INT, sizeof(int), reinterpret_cast<void*>(0));
+		glVertexAttribDivisor(CAR_ATTRIB_LIGHT_SHADOW_INDEX_LOCATION, 1);
+		car_shadow_transform_VBO.bindSlot(GL_ARRAY_BUFFER, i);
+		for (int j = 0; j < 4; j++)
+		{
+			glEnableVertexAttribArray(CAR_ATTRIB_TRANSFORM_LOCATION + j);
+			glVertexAttribPointer(CAR_ATTRIB_TRANSFORM_LOCATION + j, 4, GL_FLOAT, GL_FALSE, sizeof(mat4), reinterpret_cast<void*>(j * sizeof(vec4)));
+			glVertexAttribDivisor(CAR_ATTRIB_TRANSFORM_LOCATION + j, 1);
+		}
 	}
 
 	glBindVertexArray(0);
@@ -2309,18 +2311,17 @@ static void buildSunMesh()
 	float dtheta = 2 * pi<float>() / n;
 	for (int i = 0; i < n; i++)
 	{
-		positions[i] = vec2(20.0f * cos(i * dtheta), -20.0f * sin(i * dtheta));
+		positions[i] = 0.99f * VIEW_Z_FAR * SUN_RADIUS_DIST_RATIO * vec2(cos(i * dtheta), -sin(i * dtheta));
 	}
+	glCreateBuffers(1, &sun_VBO);
+	glNamedBufferData(sun_VBO, sizeof(positions), nullptr, GL_STATIC_DRAW);
+	glNamedBufferSubData(sun_VBO, 0, sizeof(positions), positions);
 
 	glGenVertexArrays(1, &sun_VAO);
 	glBindVertexArray(sun_VAO);
-	glGenBuffers(1, &sun_VBO);
 	glBindBuffer(GL_ARRAY_BUFFER, sun_VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), nullptr, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(positions), positions);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2), reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(0);
-
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2), reinterpret_cast<void*>(0));
 	glBindVertexArray(0);
 }
 

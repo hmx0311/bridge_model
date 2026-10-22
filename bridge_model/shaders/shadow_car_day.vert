@@ -1,7 +1,8 @@
+#include "car_attrib_locations.h"
 #include "lighting_day_defines.h"
 
-layout(location = 0) in vec3 vertex;
-layout(location = 3) in mat4 transform;
+layout(location = CAR_ATTRIB_VERTEX_LOCATION)		in vec3 vertex;
+layout(location = CAR_ATTRIB_TRANSFORM_LOCATION)	in mat4 transform;
 
 uniform int csm_level;
 

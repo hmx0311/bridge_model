@@ -28,6 +28,7 @@ private:
 	Plane m_planes[6];
 
 public:
+	Frustum() = default;
 	Frustum(const glm::mat4& vp);
 	Frustum(const glm::mat4& view, float fov_y, float aspect, float z_near, float z_far);
 	Frustum(const glm::mat4& view, float left, float right, float bottom, float top, float z_near, float z_far);
@@ -39,6 +40,7 @@ public:
 
 	bool cullingTest(const BoundOBB& bound) const;
 	INTERSECTION_TEST_RESULT intersectionTest(const BoundOBB& bound) const;
+	bool cullingTestNoNearFar(const BoundOBB& bound) const;
 
 	bool cullingTest(const BoundSphere& bound) const;
 	INTERSECTION_TEST_RESULT intersectionTest(const BoundSphere& bound) const;

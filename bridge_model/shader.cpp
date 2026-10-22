@@ -214,10 +214,9 @@ GLuint loadShader(const char* shader_name, GLenum type)
 		}
 		int len;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-		char* log = new char[len];
-		glGetShaderInfoLog(shader, len, nullptr, log);
-		printf("%s", log);
-		delete[] log;
+		auto log = std::make_unique<char[]>(len);
+		glGetShaderInfoLog(shader, len, nullptr, log.get());
+		printf("%s", log.get());
 	}
 	return shader;
 }
@@ -235,7 +234,7 @@ GLuint linkShaderProgram(GLuint vert, GLuint frag)
 		printf("\nERROR: Shader Program %d Link Error\n", program);
 		int len;
 		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
-		auto log = std::make_unique<char>(len);
+		auto log = std::make_unique<char[]>(len);
 		glGetProgramInfoLog(program, len, nullptr, log.get());
 		printf("%s", log.get());
 	}
@@ -257,10 +256,9 @@ GLuint loadComputeProgram(const char* shader_name)
 		printf("\nERROR: Shader Program %d Link Error\n", program);
 		int len;
 		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
-		char* log = new char[len];
-		glGetProgramInfoLog(program, len, nullptr, log);
-		printf("%s", log);
-		delete[] log;
+		auto log = std::make_unique<char[]>(len);
+		glGetProgramInfoLog(program, len, nullptr, log.get());
+		printf("%s", log.get());
 	}
 	glDetachShader(program, compute_shader);
 	glDeleteShader(compute_shader);

@@ -120,11 +120,8 @@ void buildTerrainMesh()
 	constexpr size_t POSITION_SIZE = TOATAL_NUM_VERTICES * sizeof(vec3);
 	constexpr size_t NORMAL_SIZE = TOATAL_NUM_VERTICES * sizeof(vec3);
 
-	glGenVertexArrays(1, &terrain_VAO);
-	glBindVertexArray(terrain_VAO);
-	glGenBuffers(1, &terrain_VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, terrain_VBO);
-	glBufferData(GL_ARRAY_BUFFER, TOATAL_NUM_VERTICES * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
+	glCreateBuffers(1, &terrain_VBO);
+	glNamedBufferData(terrain_VBO, TOATAL_NUM_VERTICES * (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)), nullptr, GL_STATIC_DRAW);
 
 	size_t data_offset = tiles.LevelOffset() - 1;
 	for (int k = NUM_TERRAIN_LOD - 1; k >= 0; k--)
@@ -191,9 +188,9 @@ void buildTerrainMesh()
 				tiles[k][i][j].min_height = min_height;
 				tiles[k][i][j].max_height = max_height;
 				tiles[k][i][j].max_curvature = max_curvature;
-				glBufferSubData(GL_ARRAY_BUFFER, data_offset * NUM_VERTICES_PER_TILE * sizeof(vec3), NUM_VERTICES_PER_TILE * sizeof(vec3), tile_positions);
-				glBufferSubData(GL_ARRAY_BUFFER, POSITION_SIZE + data_offset * NUM_VERTICES_PER_TILE * sizeof(vec3), NUM_VERTICES_PER_TILE * sizeof(vec3), tile_normals);
-				glBufferSubData(GL_ARRAY_BUFFER, POSITION_SIZE + NORMAL_SIZE + data_offset * NUM_VERTICES_PER_TILE * sizeof(vec2), NUM_VERTICES_PER_TILE * sizeof(vec2), tile_tex_coords);
+				glNamedBufferSubData(terrain_VBO, data_offset * NUM_VERTICES_PER_TILE * sizeof(vec3), NUM_VERTICES_PER_TILE * sizeof(vec3), tile_positions);
+				glNamedBufferSubData(terrain_VBO, POSITION_SIZE + data_offset * NUM_VERTICES_PER_TILE * sizeof(vec3), NUM_VERTICES_PER_TILE * sizeof(vec3), tile_normals);
+				glNamedBufferSubData(terrain_VBO, POSITION_SIZE + NORMAL_SIZE + data_offset * NUM_VERTICES_PER_TILE * sizeof(vec2), NUM_VERTICES_PER_TILE * sizeof(vec2), tile_tex_coords);
 				data_offset--;
 			}
 		}
@@ -230,9 +227,8 @@ void buildTerrainMesh()
 		}
 	}
 
-	glGenBuffers(1, &terrain_EBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain_EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDICES_OFFSET() * sizeof(int), nullptr, GL_STATIC_DRAW);
+	glCreateBuffers(1, &terrain_EBO);
+	glNamedBufferData(terrain_EBO, INDICES_OFFSET() * sizeof(int), nullptr, GL_STATIC_DRAW);
 
 	for (int i = 0; i < 16; i++)
 	{
@@ -324,7 +320,7 @@ void buildTerrainMesh()
 				}
 			}
 		}
-		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, INDICES_OFFSET(i) * sizeof(int), NUM_INDICES(i) * sizeof(int), indices);
+		glNamedBufferSubData(terrain_EBO, INDICES_OFFSET(i) * sizeof(int), NUM_INDICES(i) * sizeof(int), indices);
 	}
 
 	{
@@ -352,15 +348,19 @@ void buildTerrainMesh()
 				idx += 3;
 			}
 		}
-		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, INDICES_OFFSET(STITCHING_HALF) * sizeof(int), NUM_INDICES(STITCHING_HALF) * sizeof(int), indices);
+		glNamedBufferSubData(terrain_EBO, INDICES_OFFSET(STITCHING_HALF) * sizeof(int), NUM_INDICES(STITCHING_HALF) * sizeof(int), indices);
 	}
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
+	glGenVertexArrays(1, &terrain_VAO);
+	glBindVertexArray(terrain_VAO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain_EBO);
+	glBindBuffer(GL_ARRAY_BUFFER, terrain_VBO);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(POSITION_SIZE));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(0));
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(POSITION_SIZE + NORMAL_SIZE));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(POSITION_SIZE));
 	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, reinterpret_cast<void*>(POSITION_SIZE + NORMAL_SIZE));
 	glBindVertexArray(0);
 }
 

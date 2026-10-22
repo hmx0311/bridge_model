@@ -19,8 +19,9 @@
 #define IDR_FS_GEN_PCSS_MIPS			gen_PCSS_mips.frag
 #define IDR_VS_TEX_BLIT                 tex_blit.vert
 #define IDR_FS_TEX_BLIT                 tex_blit.frag
-#define IDR_FS_BUFFER_TO_SCREEN         buffer_to_screen.frag
+#define IDR_FS_TAA						TAA.frag
 #define IDR_FS_GAUSSIAN_BLUR            gaussian_blur.frag
+#define IDR_FS_BUFFER_TO_SCREEN         buffer_to_screen.frag
 #define IDR_FS_TEXT						text.frag
 
 #define IDR_TEXT_ATLAS					101

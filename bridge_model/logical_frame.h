@@ -20,8 +20,9 @@ struct LogicalData
 	glm::vec3 sun_dir{ 0.0f, 0.0f, 0.0f };
 	int num_cars = 0;
 	int num_light_on_cars = 0;
-	glm::mat4 car_transform[MAX_CAR_CNT];
+	uint32_t car_ids[MAX_CAR_CNT];
 	glm::vec3 car_color[MAX_CAR_CNT];
+	glm::mat4 car_transform[MAX_CAR_CNT];
 	glm::vec4 car_light_pos[2 * MAX_CAR_CNT];
 	glm::vec4 car_light_dir[2 * MAX_CAR_CNT];
 };
@@ -29,6 +30,6 @@ struct LogicalData
 void initLogic();
 void stopLogic();
 
-LogicalData& getLatestLogicalData();
+const LogicalData& getLatestLogicalData();
 
 void logicalFrame();

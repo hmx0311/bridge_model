@@ -439,7 +439,7 @@ void stopLogic()
 	is_running = false;
 }
 
-LogicalData& getLatestLogicalData()
+const LogicalData& getLatestLogicalData()
 {
 	reading_data = static_cast<int>(latest_data);
 	return logical_data[reading_data];
@@ -454,6 +454,7 @@ void logicalFrame()
 	{
 		next_car_time[i] = logical_time + spawn_distb(rd_eng);
 	}
+	uint32_t next_id = 0;
 	std::list<Car> vehicles;
 	while (is_running)
 	{
@@ -482,7 +483,7 @@ void logicalFrame()
 		{
 			if (logical_time > next_car_time[i])
 			{
-				vehicles.emplace_back(lanes[i], sun.getDir().z);
+				vehicles.emplace_back(next_id++, lanes[i], sun.getDir().z);
 				next_car_time[i] += (i < 4 ? 1 : 8) * spawn_distb(rd_eng) + REACT_TIME + CAR_LENGTH / lanes[i]->speed_limit;
 			}
 		}
@@ -548,6 +549,7 @@ void logicalFrame()
 			int num_cars = 0;
 			for (Car& car : vehicles)
 			{
+				logical_data[writing_data].car_ids[num_cars] = car.id;
 				logical_data[writing_data].car_transform[num_cars] = car.getTransform();
 				logical_data[writing_data].car_color[num_cars] = car.getColor();
 				num_cars++;
@@ -567,12 +569,14 @@ void logicalFrame()
 					logical_data[writing_data].car_light_dir[2 * num_light_on_cars] = transform * CAR_LEFT_LIGHT_DIR;
 					logical_data[writing_data].car_light_pos[2 * num_light_on_cars + 1] = transform * CAR_RIGHT_LIGHT_POS;
 					logical_data[writing_data].car_light_dir[2 * num_light_on_cars + 1] = transform * CAR_RIGHT_LIGHT_DIR;
+					logical_data[writing_data].car_ids[num_light_on_cars] = car.id;
 					logical_data[writing_data].car_transform[num_light_on_cars] = car.getTransform();
 					logical_data[writing_data].car_color[num_light_on_cars] = car.getColor();
 					num_light_on_cars++;
 				}
 				else
 				{
+					logical_data[writing_data].car_ids[vehicles.size() - num_light_off_cars - 1] = car.id;
 					logical_data[writing_data].car_transform[vehicles.size() - num_light_off_cars - 1] = car.getTransform();
 					logical_data[writing_data].car_color[vehicles.size() - num_light_off_cars - 1] = car.getColor();
 					num_light_off_cars++;

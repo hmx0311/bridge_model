@@ -1,8 +1,9 @@
+#include "car_attrib_locations.h"
 #include "lighting_night_defines.h"
 
-layout(location = 0) in vec3 vertex;
-layout(location = 2) in int light_idx;
-layout(location = 3) in mat4 mvp_mat;
+layout(location = CAR_ATTRIB_VERTEX_LOCATION)				in vec3 vertex;
+layout(location = CAR_ATTRIB_LIGHT_SHADOW_INDEX_LOCATION)	in int light_idx;
+layout(location = CAR_ATTRIB_TRANSFORM_LOCATION)			in mat4 mvp_mat;
 
 out float gl_ClipDistance[4];
 

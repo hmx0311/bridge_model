@@ -4,9 +4,11 @@ uniform float horizonY;
 
 layout(pixel_center_integer) in vec4 gl_FragCoord;
 
+in vec3 a_delta_position;
+
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 brightColor;
-
+layout(location = 2) out vec3 delta_position;
 
 void main()
 {
@@ -26,4 +28,5 @@ void main()
 		fragColor = sun_color;
 	}
 	brightColor = sun_color;
+	delta_position = a_delta_position;
 }
