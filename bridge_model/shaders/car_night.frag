@@ -11,8 +11,6 @@ struct Material
 };
 uniform Material materials[7];
 
-layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
-
 in vec3 world_position;
 in vec3 delta_position_in_view;
 in vec3 aNormal;
@@ -46,17 +44,14 @@ void main()
 		int end = lightingOffset + 1 + car_lighting.light_indices[lightingOffset];
 		for(int i = lightingOffset + 1; i < end; i++)
 		{
-			int idx = car_lighting.light_indices[i];
-			vec3 light_dir = world_position - vec3(tile_lights[idx].position);
+			int light_idx = car_lighting.light_indices[i];
+			vec3 light_dir = world_position - vec3(tile_lights[light_idx].position);
 			float light_distance = length(light_dir);
 			light_dir /= light_distance;
 			float intensity = -dot(light_dir, aNormal) / (light_distance * light_distance);
-			vec4 pos_in_light = tile_lights[idx].view_proj * vec4(world_position, 1.0);
-			pos_in_light.xy /= pos_in_light.w;
-			float r = length(pos_in_light.xy);
-			if(light_distance > 0.5 && intensity > 0 && -pos_in_light.w < pos_in_light.z && pos_in_light.z < pos_in_light.w && r < 1.0)
+			if(intensity > 0.0)
 			{
-				if(material.shininess > 0)
+				if(material.shininess > 0.0)
 				{
 					vec3 halfway = normalize(-light_dir + view_dir);
 					float HdotN = dot(halfway, aNormal);
@@ -65,18 +60,7 @@ void main()
 						intensity += pow(HdotN, material.shininess);
 					}
 				}
-				intensity *= lightSmooth(r);
-				int layer = findTileLightShadowLayer(idx);
-				if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
-				{
-					ivec2 cnt = tileLightShadowLayerSize(layer);
-					idx -= tileLightShadowLayerOffset(layer);
-					vec2 shadow_map_pos = vec2(idx % cnt.x, idx / cnt.x) / cnt;
-					pos_in_light.xy = (pos_in_light.xy + 1.0) / (2 * cnt) + shadow_map_pos;
-					pos_in_light.w = 0.5 * (pos_in_light.z / pos_in_light.w + 1.0);
-					pos_in_light.z = layer;
-					intensity *= texture(shadowTex, pos_in_light).x;
-				}
+				intensity *= lightCoverage(world_position, light_idx);
 				lighting += intensity * CAR_LIGHT_INTENSITY;
 			}
 		}

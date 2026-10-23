@@ -8,14 +8,14 @@
 
 constexpr float REACT_TIME = 0.8f;
 constexpr float CAR_LENGTH = 3.8f;
-constexpr float CAR_LIGHT_V_RAD = 0.51f;
+constexpr float CAR_LIGHT_V_RAD = 0.8f;
 constexpr float CAR_LIGHT_ASPECT = 2.0f;
 constexpr float CAR_LIGHT_NEAR = 0.7f;
 
-constexpr glm::vec4 CAR_LEFT_LIGHT_POS(-0.56f, 1.5f, 0.81f, 1);
-constexpr glm::vec4 CAR_RIGHT_LIGHT_POS(0.56f, 1.5f, 0.81f, 1);
-constexpr glm::vec4 CAR_LEFT_LIGHT_DIR(-0.096f, 0.9584f, -0.2688f, 0);
-constexpr glm::vec4 CAR_RIGHT_LIGHT_DIR(0.096f, 0.9584f, -0.2688f, 0);
+constexpr glm::vec4 CAR_LEFT_LIGHT_POS(-0.65f, 1.5f, 0.81f, 1);
+constexpr glm::vec4 CAR_RIGHT_LIGHT_POS(0.65f, 1.5f, 0.81f, 1);
+constexpr glm::vec4 CAR_LEFT_LIGHT_DIR(0.0f, 0.96f, -0.28f, 0);
+constexpr glm::vec4 CAR_RIGHT_LIGHT_DIR(0.0f, 0.96f, -0.28f, 0);
 
 class Lane;
 

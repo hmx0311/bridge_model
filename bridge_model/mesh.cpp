@@ -1862,7 +1862,7 @@ static void buildBridgeMesh()
 	glBindVertexArray(0);
 }
 
-#define X1 0.4f
+#define X1 0.5f
 #define X2 0.8f
 #define X3 0.6f
 #define X4 0.7f
@@ -2251,7 +2251,7 @@ static void buildCarShadowMesh()
 	glCreateBuffers(1, &car_shadow_VBO);
 	glNamedBufferData(car_shadow_VBO, sizeof(positions), positions, GL_STATIC_DRAW);
 
-	constexpr int MAX_CAR_TILE_LIGHT_SHADOW_SIZE = 32 * NUM_TILE_LIGHT_SHADOW_LAYERS + 4 * tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS);
+	constexpr int MAX_CAR_TILE_LIGHT_SHADOW_SIZE = MAX_AVERAGE_AFFECTED_CARS_PER_LIGHT * tileLightShadowLayerOffset(NUM_TILE_LIGHT_SHADOW_LAYERS);
 	constexpr int MAX_CAR_SHADOW_TRANSFORM_SIZE = std::max(CSM_LEVELS * MAX_CAR_CNT, MAX_CAR_TILE_LIGHT_SHADOW_SIZE);
 
 	car_shadow_transform_VBO.create(MAX_CAR_SHADOW_TRANSFORM_SIZE * sizeof(mat4));

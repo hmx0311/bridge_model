@@ -4,7 +4,6 @@
 #include "fog.glslh"
 
 layout(binding = 0) uniform sampler2D albedo;
-layout(binding = 1) uniform sampler2DArrayShadow shadowTex;
 
 in vec3 world_position;
 in vec3 position_in_view;
@@ -25,29 +24,13 @@ void main()
 	for(int i = idx_range.x; i < idx_range.y; i++)
 	{
 		int light_idx = tile_light_affected_map.light_indices[i];
-		int layer = findTileLightShadowLayer(light_idx);
-		ivec2 shadow_map_cnt = tileLightShadowLayerSize(layer);
-		int shadow_map_idx = light_idx - tileLightShadowLayerOffset(layer);
-		vec2 shadow_map_pos = vec2(shadow_map_idx % shadow_map_cnt.x, shadow_map_idx / shadow_map_cnt.x) / shadow_map_cnt;
-		vec4 pos_in_light = tile_lights[light_idx].view_proj * vec4(world_position, 1.0);
 		vec3 pos_to_light = world_position - vec3(tile_lights[light_idx].position);
 		float light_distance = length(pos_to_light);
 		pos_to_light /= light_distance;
 		float intensity = -dot(pos_to_light, aNormal) / (light_distance * light_distance);
-		vec4 coord = pos_in_light;
-		coord.xy /= coord.w;
-		float r = length(coord.xy);
-		if(intensity > 0 && -coord.w < coord.z && coord.z < coord.w && r < 1.0)
+		if(intensity > 0.0)
 		{
-			intensity *= lightSmooth(r);
-			if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
-			{
-				coord.xy = (coord.xy + 1.0) / (2 * shadow_map_cnt) + shadow_map_pos;
-				coord.w = 0.5 * (coord.z / coord.w + 1.0);
-				coord.z = layer;
-				float shadow = texture(shadowTex, coord).x;
-				intensity *= shadow;
-			}
+			intensity *= lightCoverage(world_position, light_idx);
 			lighting += intensity * CAR_LIGHT_INTENSITY;
 		}
 	}

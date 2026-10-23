@@ -629,7 +629,7 @@ static void drawGraphics()
 	}
 
 	camera.taa_phase = frame_idx % TAA_PERIOD;
-	camera.taa_offset = (2.0f * TAA_OFFSETS[camera.taa_phase] - 1.0f) * vec2{ 1.0f / window_width, 1.0f / window_height };
+	camera.taa_offset = (2.0f * TAA_OFFSETS[camera.taa_phase] - 1.0f) / vec2{ window_width, window_height };
 	camera.projection = perspective(FOV_Y, float(window_width) / window_height, camera.z_near, VIEW_Z_FAR);
 	camera.view_proj = camera.projection * camera.view;
 	Frustum camera_frustum{ camera.view_proj };
@@ -1589,7 +1589,7 @@ int main(int argc, char** argv)
 	initLogic();
 	std::thread logical_thread(logicalFrame);
 	simulate_speed = 1000000;
-	while (logical_time < 0.2 * DAY_PERIOD)
+	while (logical_time < 0.6 * DAY_PERIOD)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}

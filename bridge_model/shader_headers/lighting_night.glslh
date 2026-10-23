@@ -1,16 +1,31 @@
 #include "lighting_night_defines.h"
 
+layout(binding = 1) uniform sampler2DArrayShadow shadow_tex;
+
 const vec3 CAR_LIGHT_INTENSITY = 15 * vec3(1.0, 1.0, 0.9);
 
-float lightSmooth(float radius)
+float lightCoverage(vec3 position, int light_idx)
 {
-	if(radius > 0.6)
+	int layer = findTileLightShadowLayer(light_idx);
+	ivec2 shadow_map_cnt = tileLightShadowLayerSize(layer);
+	int shadow_map_idx = light_idx - tileLightShadowLayerOffset(layer);
+	vec2 shadow_map_pos = vec2(shadow_map_idx % shadow_map_cnt.x, shadow_map_idx / shadow_map_cnt.x) / shadow_map_cnt;
+	vec4 pos_in_light = tile_lights[light_idx].view_proj * vec4(position, 1.0);
+	vec4 coord = pos_in_light;
+	coord.xy /= coord.w;
+	float r = length(coord.xy);
+	if(coord.z <= -coord.w  || coord.z >= coord.w || r >= 1.0)
 	{
-		float t = (1.0 - radius) / 0.4;
-		return (3 - 2 * t) * t * t;
+		return 0.0;
 	}
-	else
+	float coverage = 1.0 - max(smoothstep(0.6, 1.0, r), smoothstep(0.55, 0.6, coord.y - clamp(coord.x, -0.02, 0.02)));
+	if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 	{
-		return 1;
+		coord.xy = (coord.xy + 1.0) / (2 * shadow_map_cnt) + shadow_map_pos;
+		coord.w = 0.5 * (coord.z / coord.w + 1.0);
+		coord.z = layer;
+		float shadow = texture(shadow_tex, coord).x;
+		coverage *= shadow;
 	}
+	return coverage;
 }
