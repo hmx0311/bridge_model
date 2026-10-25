@@ -21,6 +21,7 @@ float lightCoverage(vec3 position, int light_idx)
 	float coverage = 1.0 - max(smoothstep(0.6, 1.0, r), smoothstep(0.55, 0.6, coord.y - clamp(coord.x, -0.02, 0.02)));
 	if(layer < NUM_TILE_LIGHT_SHADOW_LAYERS)
 	{
+		coord.y = 2.0 / (1.0 + CAR_LIGHT_UP_CLIP) * (coord.y + 1.0) - 1.0;
 		coord.xy = (coord.xy + 1.0) / (2 * shadow_map_cnt) + shadow_map_pos;
 		coord.w = 0.5 * (coord.z / coord.w + 1.0);
 		coord.z = layer;

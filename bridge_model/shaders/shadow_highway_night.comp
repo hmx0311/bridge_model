@@ -73,7 +73,7 @@ void main()
 		}
 		if(pos[0].x >= pos[0].w && pos[1].x >= pos[1].w && pos[2].x >= pos[2].w ||
 			pos[0].x <= -pos[0].w && pos[1].x <= -pos[1].w && pos[2].x <= -pos[2].w ||
-			pos[0].y >= pos[0].w && pos[1].y >= pos[1].w && pos[2].y >= pos[2].w ||
+			pos[0].y >= CAR_LIGHT_UP_CLIP * pos[0].w && pos[1].y >= CAR_LIGHT_UP_CLIP * pos[1].w && pos[2].y >= CAR_LIGHT_UP_CLIP * pos[2].w ||
 			pos[0].y <= -pos[0].w && pos[1].y <= -pos[1].w && pos[2].y <= -pos[2].w ||
 			pos[0].z >= pos[0].w && pos[1].z >= pos[1].w && pos[2].z >= pos[2].w ||
 			pos[0].z <= -pos[0].w && pos[1].z <= -pos[1].w && pos[2].z <= -pos[2].w)

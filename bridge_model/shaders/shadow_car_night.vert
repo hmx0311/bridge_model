@@ -14,6 +14,7 @@ void main()
 	int idx = light_idx - tileLightShadowLayerOffset(layer);
 	vec2 shadow_map_pos = vec2(idx % layer_size.x, idx / layer_size.x) / (0.5 * layer_size) - 1.0;
 	gl_Position = mvp_mat * vec4(vertex, 1.0);
+	gl_Position.y = 2.0 / (1.0 + CAR_LIGHT_UP_CLIP) * (gl_Position.y + gl_Position.w) - gl_Position.w;
 	gl_ClipDistance[0] = gl_Position.w + gl_Position.x;
 	gl_ClipDistance[1] = gl_Position.w - gl_Position.x;
 	gl_ClipDistance[2] = gl_Position.w + gl_Position.y;
