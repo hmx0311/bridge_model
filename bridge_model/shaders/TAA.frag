@@ -24,12 +24,12 @@ layout(binding = 10) uniform sampler2D stats_tex3;
 
 in vec2 texCoord;
 
-layout(location = 0) out vec4 fragColor;
-layout(location = 1) out vec4 bloomColor;
-layout(location = 2) out vec4 stats0;
-layout(location = 3) out vec4 stats1;
-layout(location = 4) out vec4 stats2;
-layout(location = 5) out vec4 stats3;
+layout(location = 0) out vec4 frag_color;
+layout(location = 1) out vec4 frag_bloom;
+layout(location = 2) out vec4 frag_stats0;
+layout(location = 3) out vec4 frag_stats1;
+layout(location = 4) out vec4 frag_stats2;
+layout(location = 5) out vec4 frag_stats3;
 
 const float frame_count = 20.0;
 
@@ -179,12 +179,12 @@ void main()
 	vec2 uv_motion_nearest;
 	if(!reprojection(position_nearest, delta_position_nearest, uv_motion_nearest))
 	{
-		fragColor = color;
-		bloomColor = bloom;
-		stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		stats2 = vec4(INVALID_Y, rgb2YCoCg(color.rgb).x, 0.0, 0.0);
-		stats3 = vec4(1.0, 0.0, 0.0, 0.0);
+		frag_color = color;
+		frag_bloom = bloom;
+		frag_stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
+		frag_stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
+		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(color.rgb).x, 0.0, 0.0);
+		frag_stats3 = vec4(1.0, 0.0, 0.0, 0.0);
 		return;
 	}
 	
@@ -216,12 +216,12 @@ void main()
 	if(old_z_in_cur_farthest > 0.99 * (position_nearest.z - delta_position_nearest.z)
 		|| position_farthest.z - delta_position_farthest.z > 0.99 * old_z_in_cur_nearest)
 	{
-		fragColor = color;
-		bloomColor = bloom;
-		stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		stats2 = vec4(INVALID_Y, rgb2YCoCg(color.rgb).x, 0.0, 0.0);
-		stats3 = vec4(1.0, 0.0, 0.0, 0.0);
+		frag_color = color;
+		frag_bloom = bloom;
+		frag_stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
+		frag_stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
+		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(color.rgb).x, 0.0, 0.0);
+		frag_stats3 = vec4(1.0, 0.0, 0.0, 0.0);
 		return;
 	}
 	
@@ -463,10 +463,10 @@ void main()
 	
 	chroma_variance = mix(chroma_variance, chroma_diff_length * chroma_diff_length, 1.0 / TAA_PERIOD);
 	
-	fragColor = vec4(yCoCg2RGB(mix(ycc_old, ycc, blend_factor)), mix(color_old.a, color.a, blend_factor));
-	bloomColor = mix(old_bloom, bloom, blend_factor);
-	stats0 = vec4(Y_history[1], Y_history[2], Y_history[3], Y_history[4]);
-	stats1 = vec4(Y_history[5], Y_history[6], Y_history[7], Y_history[8]);
-	stats2 = vec4(Y_history[9], ycc.x, 0.0, 0.0);
-	stats3 = vec4(blend_factor, 0.0, chroma_variance, motion_diff);
+	frag_color = vec4(yCoCg2RGB(mix(ycc_old, ycc, blend_factor)), mix(color_old.a, color.a, blend_factor));
+	frag_bloom = mix(old_bloom, bloom, blend_factor);
+	frag_stats0 = vec4(Y_history[1], Y_history[2], Y_history[3], Y_history[4]);
+	frag_stats1 = vec4(Y_history[5], Y_history[6], Y_history[7], Y_history[8]);
+	frag_stats2 = vec4(Y_history[9], ycc.x, 0.0, 0.0);
+	frag_stats3 = vec4(blend_factor, 0.0, chroma_variance, motion_diff);
 }

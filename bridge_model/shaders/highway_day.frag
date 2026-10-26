@@ -1,19 +1,21 @@
 #include "lighting_day.glslh"
 #include "fog.glslh"
 
-layout(binding = 0) uniform sampler2D albedo;
+layout(binding = 0) uniform sampler2D albedo_tex;
 
 in vec3 world_position;
 in vec3 position_in_view;
 in vec3 aNormal;
 in vec2 aTexCoord;
 
-layout(location = 0) out vec3 fragColor;
-layout(location = 2) out vec3 delta_position;
+layout(location = RENDER_TARGET_COLOR) out vec3 frag_color;
+layout(location = RENDER_TARGET_DELTA_POSITION) out vec3 frag_delta_position;
+layout(location = RENDER_TARGET_ALBEDO) out vec3 frag_albedo;
 
 void main()
 {
-	vec3 color = texture(albedo, aTexCoord).rgb;
+	vec3 color = texture(albedo_tex, aTexCoord).rgb;
+	frag_albedo = color;
 	vec3 lighting = sun.ambient;
 	vec3 normal = normalize(aNormal);
 	float LdotN = dot(sun.light_dir_and_radius.xyz, normal);
@@ -33,6 +35,6 @@ void main()
 	}
 	color *= lighting;
 	float fog_factor = fogFactor(world_position);
-	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
-	delta_position = vec3(0.0);
+	frag_color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
+	frag_delta_position = vec3(0.0);
 }

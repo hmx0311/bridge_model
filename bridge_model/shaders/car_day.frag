@@ -16,8 +16,9 @@ in vec3 aNormal;
 in flat int aMaterialIdx;
 in flat vec3 carColor;
 
-layout(location = 0) out vec3 fragColor;
-layout(location = 2) out vec3 delta_position;
+layout(location = RENDER_TARGET_COLOR) out vec3 frag_color;
+layout(location = RENDER_TARGET_DELTA_POSITION) out vec3 frag_delta_position;
+layout(location = RENDER_TARGET_ALBEDO) out vec3 frag_albedo;
 
 void main()
 {
@@ -32,6 +33,7 @@ void main()
 	{
 		material = materials[aMaterialIdx];
 	}
+	frag_albedo = material.albedo;
 	vec3 color = material.albedo * sun.ambient;
 	float view_dist = length(position_in_view);
 	float LdotN = dot(sun.light_dir_and_radius.xyz, aNormal);
@@ -55,6 +57,6 @@ void main()
 	}
 	
 	float fog_factor = fogFactor(world_position);
-	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
-	delta_position = delta_position_in_view;
+	frag_color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
+	frag_delta_position = delta_position_in_view;
 }

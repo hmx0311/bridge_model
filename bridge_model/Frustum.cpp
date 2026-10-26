@@ -252,3 +252,16 @@ INTERSECTION_TEST_RESULT Frustum::intersectionTest(const BoundEllipticFrustum& b
 	return inside ? INTERSECTION_TEST_INSIDE : INTERSECTION_TEST_INTERSECT;
 }
 
+bool Frustum::cullingTest(const BoundCarLight& bound) const
+{
+	for (int i = 0; i < 6; i++)
+	{
+		auto& p = m_planes[i];
+		if (dot(bound.support(p.normal), p.normal) + p.d < 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+

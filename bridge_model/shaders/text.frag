@@ -6,9 +6,9 @@ layout(binding = 0) uniform sampler2D tex;
 
 in vec2 texCoord;
 
-out vec4 fragColor;
+out vec4 frag_color;
 
 void main()
 {
-    fragColor = vec4(1.0, 1.0, 1.0, texture(tex, vec2(texCoord.x / TEXT_ALTAS_CNT_X, (1.0 - texCoord.y) / TEXT_ALTAS_CNT_Y) + tex_offset).r);
+    frag_color = vec4(1.0, 1.0, 1.0, texture(tex, vec2(texCoord.x / TEXT_ALTAS_CNT_X, (1.0 - texCoord.y) / TEXT_ALTAS_CNT_Y) + tex_offset).r);
 }

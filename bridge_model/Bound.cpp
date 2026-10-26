@@ -4,6 +4,8 @@
 
 #include "ext/matrix_common.hpp"
 
+#include "Car.h"
+
 using namespace glm;
 
 BoundAABB::BoundAABB(const BoundAABB& local, const mat4& transform)
@@ -59,7 +61,7 @@ void BoundOBB::biSupport(const glm::vec3& dir, glm::vec3& support_point, glm::ve
 
 BoundFrustum::BoundFrustum(const mat4& transform, float fov_y, float aspect, float z_near, float z_far)
 {
-	vec3 top(0.0f, tanf(fov_y / 2), 0.0f);
+	vec3 top(0.0f, tan(fov_y / 2), 0.0f);
 	vec3 left = vec3(aspect * top.y, 0.0f, 0.0f);
 	top = mat3(transform) * top;
 	left = mat3(transform) * left;
@@ -121,7 +123,7 @@ void BoundFrustum::biSupport(const glm::vec3& dir, glm::vec3& support_point, glm
 BoundEllipticFrustum::BoundEllipticFrustum(const mat4& transform, float fov_y, float aspect, float z_near, float z_far)
 {
 	near_far_ratio = z_near / z_far;
-	vec3 y = vec3{ 0.0f, tanf(fov_y / 2), 0.0f };
+	vec3 y = vec3{ 0.0f, tan(fov_y / 2), 0.0f };
 	vec3 x = vec3{ aspect * y.y, 0.0f, 0.0f };
 	mat3 rot{ transform };
 	y = rot * y;
@@ -155,6 +157,43 @@ void BoundEllipticFrustum::biSupport(const glm::vec3& dir, glm::vec3& support_po
 	vec3 rsupport_far = center_far - r_far;
 	vec3 rsupport_near = center_near - near_far_ratio * r_far;
 	rsupport_point = dot(rsupport_near, dir) < dot(rsupport_far, dir) ? rsupport_near : rsupport_far;
+}
+
+BoundCarLight::BoundCarLight(const glm::mat4& transform)
+{
+	vec3 up_plane_n = normalize(vec3{ 0.0f, -1.0f, -CAR_LIGHT_UP_CLIP * tan(CAR_LIGHT_V_RAD / 2) });
+	vec3 y = vec3{ 0.0f, tan(CAR_LIGHT_V_RAD / 2), 0.0f };
+	vec3 x = vec3{ CAR_LIGHT_ASPECT * y.y, 0.0f, 0.0f };
+	mat3 rot{ transform };
+	up_plane.normal = rot * up_plane_n;
+	up_plane.d = -dot(up_plane.normal, vec3{ transform[3] });
+	y = rot * y;
+	x = rot * x;
+	x_far = (CAR_LIGHT_NEAR + CAR_LIGHT_RANGE) * x;
+	y_far = (CAR_LIGHT_NEAR + CAR_LIGHT_RANGE) * y;
+	center_near = transform[3] - CAR_LIGHT_NEAR * transform[2];
+	center_far = transform[3] - (CAR_LIGHT_NEAR + CAR_LIGHT_RANGE) * transform[2];
+}
+
+vec3 BoundCarLight::support(const vec3& dir) const
+{
+	float x = dot(x_far, dir);
+	float y = dot(y_far, dir);
+	float len = sqrt(x * x + y * y);
+	if (len > 0.0f)
+	{
+		x /= len;
+		y /= len;
+		if (y > CAR_LIGHT_UP_CLIP)
+		{
+			y = CAR_LIGHT_UP_CLIP;
+			x = x > 0.0f ? sqrt(1 - y * y) : -sqrt(1 - y * y);
+		}
+	}
+	vec3 r_far = x * x_far + y * y_far;
+	vec3 support_far = center_far + r_far;
+	vec3 support_near = center_near + CAR_LIGHT_NEAR / (CAR_LIGHT_NEAR + CAR_LIGHT_RANGE) * r_far;
+	return dot(support_near, dir) > dot(support_far, dir) ? support_near : support_far;
 }
 
 bool collisionTest(const BoundAABB& primary, const BoundEllipticFrustum& secondary)
@@ -203,7 +242,7 @@ bool collisionTest(const BoundEllipticFrustum& primary, const BoundAABB& seconda
 	{
 		x /= d;
 		y /= d;
-		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - primary.near_far_ratio) / center_dist };
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1.0f - primary.near_far_ratio) / center_dist };
 		n = normalize(n);
 		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
 		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
@@ -246,7 +285,7 @@ void collisionTests(const BoundEllipticFrustum& primary, const BoundAABB* bounds
 		{
 			x /= d;
 			y /= d;
-			vec3 n{ -x * (ra * ra), -y * (rb * rb), -(1 - primary.near_far_ratio) / center_dist };
+			vec3 n{ -x * (ra * ra), -y * (rb * rb), -(1.0f - primary.near_far_ratio) / center_dist };
 			n = normalize(n);
 			n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
 			float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
@@ -305,7 +344,7 @@ bool collisionTest(const BoundEllipticFrustum& primary, const BoundOBB& secondar
 	{
 		x /= d;
 		y /= d;
-		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - primary.near_far_ratio) / center_dist };
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1.0f - primary.near_far_ratio) / center_dist };
 		n = normalize(n);
 		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
 		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
@@ -340,7 +379,99 @@ bool collisionTest(const BoundEllipticFrustum& primary, const BoundFrustum& seco
 	{
 		x /= d;
 		y /= d;
-		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1 - primary.near_far_ratio) / center_dist };
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1.0f - primary.near_far_ratio) / center_dist };
+		n = normalize(n);
+		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
+		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
+		if (dot(n, secondary.support(n)) <= plane_d)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void collisionTests(const BoundCarLight& primary, const BoundAABB* bounds, int count, bool* results)
+{
+	vec3 abs_up_plane_n = abs(primary.up_plane.normal);
+	vec3 frustum_dir = primary.center_near - primary.center_far;
+	float center_dist = length(frustum_dir);
+	frustum_dir *= 1.0f / center_dist;
+	vec3 abs_frustum_dir = abs(frustum_dir);
+	float ra = 1.0f / length(primary.x_far);
+	float rb = 1.0f / length(primary.y_far);
+	vec3 frustum_x = ra * primary.x_far;
+	vec3 frustum_y = rb * primary.y_far;
+	float d_far = dot(frustum_dir, primary.center_far);
+	float d_near = dot(frustum_dir, primary.center_near);
+	for (int i = 0; i < count; i++)
+	{
+		vec3 box_center = bounds[i].center();
+		vec3 box_half_size = 0.5f * bounds[i].size();
+		float m_up = dot(primary.up_plane.normal, box_center) + primary.up_plane.d;
+		float r_up = dot(abs_up_plane_n, box_half_size);
+		if (m_up + r_up <= 0)
+		{
+			results[i] = false;
+			continue;
+		}
+		float m = dot(frustum_dir, box_center);
+		float r = dot(abs_frustum_dir, box_half_size);
+		if (m + r <= d_far || m - r >= d_near)
+		{
+			results[i] = false;
+			continue;
+		}
+		vec3 v = box_center - primary.center_far;
+		float x = dot(v, frustum_x);
+		float y = dot(v, frustum_y);
+		float d = sqrt(x * x * (ra * ra) + y * y * (rb * rb));
+		if (d > 0.0f)
+		{
+			x /= d;
+			y /= d;
+			vec3 n{ -x * (ra * ra), -y * (rb * rb), -(1.0f - CAR_LIGHT_NEAR / (CAR_LIGHT_NEAR + CAR_LIGHT_RANGE)) / center_dist };
+			n = normalize(n);
+			n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
+			float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);
+			if (dot(n, box_center) + dot(abs(n), box_half_size) <= plane_d)
+			{
+				results[i] = false;
+				continue;
+			}
+		}
+		results[i] = true;
+	}
+}
+
+bool collisionTest(const BoundCarLight& primary, const BoundOBB& secondary)
+{
+	if (dot(primary.up_plane.normal, secondary.support(primary.up_plane.normal))+ primary.up_plane.d <= 0.0f)
+	{
+		return false;
+	}
+	vec3 frustum_dir = primary.center_near - primary.center_far;
+	float center_dist = length(frustum_dir);
+	frustum_dir *= 1.0f / center_dist;
+	vec3 support_min, support_max;
+	secondary.biSupport(frustum_dir, support_max, support_min);
+	if (dot(frustum_dir, support_max) <= dot(frustum_dir, primary.center_far) || dot(frustum_dir, support_min) >= dot(frustum_dir, primary.center_near))
+	{
+		return false;
+	}
+	float x_far_len = length(primary.x_far);
+	float y_far_len = length(primary.y_far);
+	vec3 frustum_x = 1.0f / x_far_len * primary.x_far;
+	vec3 frustum_y = 1.0f / y_far_len * primary.y_far;
+	vec3 v = secondary.center - primary.center_far;
+	float x = dot(v, frustum_x);
+	float y = dot(v, frustum_y);
+	float d = sqrt(x * x / (x_far_len * x_far_len) + y * y / (y_far_len * y_far_len));
+	if (d > 0.0f)
+	{
+		x /= d;
+		y /= d;
+		vec3 n{ -x / (x_far_len * x_far_len), -y / (y_far_len * y_far_len), -(1.0f - CAR_LIGHT_NEAR / (CAR_LIGHT_NEAR + CAR_LIGHT_RANGE)) / center_dist };
 		n = normalize(n);
 		n = n.x * frustum_x + n.y * frustum_y + n.z * frustum_dir;
 		float plane_d = dot(primary.center_far + x * frustum_x + y * frustum_y, n);

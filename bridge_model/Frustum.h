@@ -4,13 +4,6 @@
 #undef NEAR
 #undef FAR
 
-struct Plane
-{
-	glm::vec3 normal;
-	float d;
-	// n * v + d = 0
-};
-
 class Frustum
 {
 public:
@@ -47,6 +40,8 @@ public:
 
 	bool cullingTest(const BoundEllipticFrustum& bound) const;
 	INTERSECTION_TEST_RESULT intersectionTest(const BoundEllipticFrustum& bound) const;
+
+	bool cullingTest(const BoundCarLight& bound) const;
 
 	const Plane& getPlane(PLANE_INDEX plane) const
 	{

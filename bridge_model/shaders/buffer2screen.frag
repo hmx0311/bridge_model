@@ -3,11 +3,11 @@ layout(binding = 1) uniform sampler2D bloomBuffer;
 
 in vec2 texCoord;
 
-out vec3 fragColor;
+out vec3 frag_color;
 
 void main()
 {
     ivec2 tex_idx = ivec2(gl_FragCoord);
     vec3 color = texelFetch(colorBuffer, tex_idx, 0).rgb + texture(bloomBuffer, texCoord).rgb;
-    fragColor = pow(1 - 1 / (1 + color + color * color), vec3(1 / 2.2));
+    frag_color = pow(1 - 1 / (1 + color + color * color), vec3(1 / 2.2));
 }

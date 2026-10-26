@@ -24,4 +24,9 @@ using glm::findMSB;
 #define BUFFER_NAME(name) name;
 #endif // __cplusplus
 
+#define RENDER_TARGET_COLOR				0
+#define RENDER_TARGET_BLOOM				1
+#define RENDER_TARGET_DELTA_POSITION	2
+#define RENDER_TARGET_ALBEDO			3
+
 #endif // !COMMON_DEFINES_H

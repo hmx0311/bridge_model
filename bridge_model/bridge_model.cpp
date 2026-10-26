@@ -64,7 +64,7 @@ bool show_fps = false;
 bool need_update_view = true;
 
 GLuint render_FBO;
-GLuint render_texs[3];
+GLuint render_texs[4];
 
 GLuint taa_FBOs[2];
 struct TAATextures
@@ -867,12 +867,12 @@ static void drawGraphics()
 		{
 			vec4 pos;
 			vec4 dir;
-			BoundEllipticFrustum bound;
+			BoundCarLight bound;
 			float distance_to_camera;
 			ivec2* light_map_grid;
 		};
 		static std::vector<CarLightInfo>car_light_infos;
-		static BoundEllipticFrustum tile_light_bounds[2 * MAX_CAR_CNT];
+		static BoundCarLight tile_light_bounds[2 * MAX_CAR_CNT];
 		car_light_infos.clear();
 		int num_car_lights = 2 * logical_data.num_light_on_cars;
 		int cnt = 0;
@@ -883,8 +883,7 @@ static void drawGraphics()
 			const vec4& light_dir = logical_data.car_light_dir[i];
 			vec4 light_x = normalize(vec4{ light_dir.y, -light_dir.x, 0.0f, 0.0f });
 			vec4 light_y = vec4{ cross(vec3{ light_x }, vec3{ light_dir }), 0.0f };
-
-			BoundEllipticFrustum bound{ mat4{ light_x, light_y, -light_dir, light_pos }, CAR_LIGHT_V_RAD, CAR_LIGHT_ASPECT , CAR_LIGHT_NEAR, CAR_LIGHT_NEAR + CAR_LIGHT_RANGE };
+			BoundCarLight bound{ mat4{ light_x, light_y, -light_dir, light_pos } };
 			if (camera_frustum.cullingTest(bound))
 			{
 				constexpr float POS_OFFSET = CAR_LIGHT_NEAR + TILE_LIGHT_POSITION_MAP_GRID_LENGTH;
@@ -1085,6 +1084,12 @@ static void drawGraphics()
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glNamedFramebufferTexture(render_FBO, GL_DEPTH_ATTACHMENT, taa_texs[frame_idx & 1].depth, 0);
+	float depth_value = 1.0f;
+	glClearNamedFramebufferfv(render_FBO, GL_DEPTH, 0, &depth_value);
+	glClearNamedFramebufferfv(render_FBO, GL_COLOR, RENDER_TARGET_COLOR, &sun.sky_color.r);
+	glClearNamedFramebufferfv(render_FBO, GL_COLOR, RENDER_TARGET_BLOOM, COLOR_BLACK);
+	glClearNamedFramebufferfv(render_FBO, GL_COLOR, RENDER_TARGET_DELTA_POSITION, ZERO_VEC);
+	glClearNamedFramebufferfv(render_FBO, GL_COLOR, RENDER_TARGET_ALBEDO, COLOR_BLACK);
 	if (sun.light_dir_and_radius.z > 0)
 	{
 		glBindTextureUnit(1, shadow_day_tex);
@@ -1137,12 +1142,9 @@ static void drawGraphics()
 		glDepthFunc(GL_LESS);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, render_FBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
-		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
 		glViewport(0, 0, window_width, window_height);
-		GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_NONE, GL_COLOR_ATTACHMENT2 };
-		glDrawBuffers(3, attachments);
+		GLuint attachments[4] = { GL_COLOR_ATTACHMENT0, GL_NONE, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+		glDrawBuffers(4, attachments);
 		glUseProgram(SP_car_day);
 		car_VAO.bindCurrent();
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
@@ -1225,13 +1227,9 @@ static void drawGraphics()
 		glDisable(GL_POLYGON_OFFSET_FILL);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, render_FBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		glClearBufferfv(GL_COLOR, 0, &sun.sky_color.r);
-		glClearBufferfv(GL_COLOR, 1, COLOR_BLACK);
-		glClearBufferfv(GL_COLOR, 2, ZERO_VEC);
 		glViewport(0, 0, window_width, window_height);
-		GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_NONE, GL_COLOR_ATTACHMENT2 };
-		glDrawBuffers(3, attachments);
+		GLuint attachments[4] = { GL_COLOR_ATTACHMENT0, GL_NONE, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+		glDrawBuffers(4, attachments);
 		glUseProgram(SP_highway_night);
 		glBindVertexArray(bridge_VAO);
 		glDrawElements(GL_TRIANGLES, BRIDGE_EBO_SIZE, GL_UNSIGNED_INT, 0);
@@ -1241,15 +1239,15 @@ static void drawGraphics()
 		drawTerrainMesh(camera_frustum);
 		glUseProgram(SP_car_night);
 		attachments[1] = GL_COLOR_ATTACHMENT1;
-		glDrawBuffers(3, attachments);
+		glDrawBuffers(4, attachments);
 		car_VAO.bindCurrent();
 		glDrawElementsInstanced(GL_TRIANGLES, CAR_EBO_SIZE, GL_UNSIGNED_INT, 0, num_visible_cars);
 	}
 	if (sun.light_dir_and_radius.z > -0.2f)
 	{
 		glUseProgram(SP_sun);
-		GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-		glDrawBuffers(3, attachments);
+		GLuint attachments[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+		glDrawBuffers(4, attachments);
 		glBindVertexArray(sun_VAO);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, SUN_VBO_SIZE);
 	}
@@ -1258,13 +1256,13 @@ static void drawGraphics()
 
 	glBindVertexArray(tex_blit_VAO);
 	glBindFramebuffer(GL_FRAMEBUFFER, taa_FBOs[frame_idx & 1]);
-	glBindTextureUnit(0, render_texs[0]);
+	glBindTextureUnit(0, render_texs[RENDER_TARGET_COLOR]);
 	glBindTextureUnit(1, taa_texs[1 - (frame_idx & 1)].color);
-	glBindTextureUnit(2, render_texs[1]);
+	glBindTextureUnit(2, render_texs[RENDER_TARGET_BLOOM]);
 	glBindTextureUnit(3, taa_texs[1 - (frame_idx & 1)].bloom);
 	glBindTextureUnit(4, taa_texs[frame_idx & 1].depth);
 	glBindTextureUnit(5, taa_texs[1 - (frame_idx & 1)].depth);
-	glBindTextureUnit(6, render_texs[2]);
+	glBindTextureUnit(6, render_texs[RENDER_TARGET_DELTA_POSITION]);
 	for (int i = 0; i < 4; i++)
 	{
 		glBindTextureUnit(7 + i, taa_texs[1 - (frame_idx & 1)].stats[i]);
@@ -1299,7 +1297,7 @@ static void drawGraphics()
 	if (show_fps && fps > 0.0f)
 	{
 		char str[40];
-		static int displayed_fps = round(fps), displayed_tick_rate = round(tick_rate);
+		static int displayed_fps = lround(fps), displayed_tick_rate = lround(tick_rate);
 		static float cumulative_fps_diff = 0.0f, cumulative_tick_rate_diff = 0.0f;
 		if (fps > displayed_fps + 0.5f)
 		{
@@ -1311,7 +1309,7 @@ static void drawGraphics()
 		}
 		if (abs(cumulative_fps_diff) > 1.0f)
 		{
-			displayed_fps = round(fps);
+			displayed_fps = lround(fps);
 			cumulative_fps_diff = 0.0f;
 		}
 		if (tick_rate > displayed_tick_rate + 0.5f)
@@ -1324,7 +1322,7 @@ static void drawGraphics()
 		}
 		if (abs(cumulative_tick_rate_diff) > 1.0f)
 		{
-			displayed_tick_rate = round(tick_rate);
+			displayed_tick_rate = lround(tick_rate);
 			cumulative_tick_rate_diff = 0.0f;
 		}
 		sprintf_s(str, 40, "fps: %d|%d", displayed_fps, displayed_tick_rate);
@@ -1370,9 +1368,9 @@ static void onResize(GLFWwindow*, int width, int height)
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
 	bloom_buffer_width = std::min(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
 
-	glDeleteTextures(3, render_texs);
-	glCreateTextures(GL_TEXTURE_2D, 3, render_texs);
-	for (int i = 0; i < 3; i++)
+	glDeleteTextures(4, render_texs);
+	glCreateTextures(GL_TEXTURE_2D, 4, render_texs);
+	for (int i = 0; i < 4; i++)
 	{
 		glTextureStorage2D(render_texs[i], 1, GL_RGBA16F, width, height);
 		glNamedFramebufferTexture(render_FBO, GL_COLOR_ATTACHMENT0 + i, render_texs[i], 0);

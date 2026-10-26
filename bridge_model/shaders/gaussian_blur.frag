@@ -2,7 +2,7 @@ layout(binding = 0) uniform sampler2D image;
 
 const float weight[12] = float[] (0.112275173, 0.107956897, 0.095961686, 0.078825671, 0.059798785, 0.041859149, 0.027005903, 0.016034755, 0.00874623, 0.004373115, 0.001999138, 0.000832974);
 
-out vec3 fragColor;
+out vec3 frag_color;
 
 void main()
 {
@@ -13,5 +13,5 @@ void main()
         result += texelFetch(image, tex_coord + ivec2(i, 0), 0).rgb * weight[i];
         result += texelFetch(image, tex_coord - ivec2(i, 0), 0).rgb * weight[i];
     }
-    fragColor = result;
+    frag_color = result;
 }

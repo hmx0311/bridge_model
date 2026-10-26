@@ -18,9 +18,10 @@ in flat int aMaterialIdx;
 in flat vec3 carColor;
 in flat int instanceId;
 
-layout(location = 0) out vec3 fragColor;
-layout(location = 1) out vec3 bloomColor;
-layout(location = 2) out vec3 delta_position;
+layout(location = RENDER_TARGET_COLOR) out vec3 frag_color;
+layout(location = RENDER_TARGET_BLOOM) out vec3 frag_bloom;
+layout(location = RENDER_TARGET_DELTA_POSITION) out vec3 frag_delta_position;
+layout(location = RENDER_TARGET_ALBEDO) out vec3 frag_albedo;
 
 void main()
 {
@@ -35,6 +36,7 @@ void main()
 	{
 		material = materials[aMaterialIdx];
 	}
+	frag_albedo = material.albedo;
 	vec3 color = material.albedo;
 	float maxColor = max(max(color.r, color.g), color.b);
 	if(maxColor <= 1.0)
@@ -69,7 +71,7 @@ void main()
 
 	float fog_factor = fogFactor(world_position);
 	color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
-	fragColor = color;
-	bloomColor = maxColor > 1 ? color : vec3(0.0);
-	delta_position = delta_position_in_view;
+	frag_color = color;
+	frag_bloom = maxColor > 1 ? color : vec3(0.0);
+	frag_delta_position = delta_position_in_view;
 }

@@ -3,20 +3,21 @@
 #include "lighting_night.glslh"
 #include "fog.glslh"
 
-layout(binding = 0) uniform sampler2D albedo;
+layout(binding = 0) uniform sampler2D albedo_tex;
 
 in vec3 world_position;
 in vec3 position_in_view;
 in vec3 aNormal;
 in vec2 aTexCoord;
 
-layout(location = 0) out vec3 fragColor;
-layout(location = 2) out vec3 delta_position;
+layout(location = RENDER_TARGET_COLOR) out vec3 frag_color;
+layout(location = RENDER_TARGET_DELTA_POSITION) out vec3 frag_delta_position;
+layout(location = RENDER_TARGET_ALBEDO) out vec3 frag_albedo;
 
 void main()
 {
-	vec3 color = texture(albedo, aTexCoord).rgb;
-	
+	vec3 color = texture(albedo_tex, aTexCoord).rgb;
+	frag_albedo = color;
 	vec3 lighting = sun.ambient;
 	ivec2 grid_idx = ivec2(1.0 / TILE_LIGHT_AFFECTED_MAP_GRID_LENGTH * world_position.xy + 0.5 * vec2(TILE_LIGHT_AFFECTED_MAP_SIZE_X, TILE_LIGHT_AFFECTED_MAP_SIZE_Y));
 	ivec2 idx_range = grid_idx.x < 0 || grid_idx.x >= TILE_LIGHT_AFFECTED_MAP_SIZE_X || grid_idx.y < 0 || grid_idx.y >= TILE_LIGHT_AFFECTED_MAP_SIZE_Y ?
@@ -37,6 +38,6 @@ void main()
 	color *= lighting;
 	
 	float fog_factor = fogFactor(world_position);
-	fragColor = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
-	delta_position = vec3(0.0);
+	frag_color = fog_factor * color + (1.0 - fog_factor) * sun.sky_color.rgb;
+	frag_delta_position = vec3(0.0);
 }
