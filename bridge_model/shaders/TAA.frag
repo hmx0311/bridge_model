@@ -14,22 +14,25 @@ layout(binding = 0) uniform sampler2D color_tex;
 layout(binding = 1) uniform sampler2D color_old_tex;
 layout(binding = 2) uniform sampler2D bloom_tex;
 layout(binding = 3) uniform sampler2D bloom_old_tex;
-layout(binding = 4) uniform sampler2D depth_tex;
-layout(binding = 5) uniform sampler2D depth_old_tex;
-layout(binding = 6) uniform sampler2D delta_position_tex;
-layout(binding = 7) uniform sampler2D stats_tex0;
-layout(binding = 8) uniform sampler2D stats_tex1;
-layout(binding = 9) uniform sampler2D stats_tex2;
-layout(binding = 10) uniform sampler2D stats_tex3;
+layout(binding = 4) uniform sampler2D albedo_tex;
+layout(binding = 5) uniform sampler2D albedo_old_tex;
+layout(binding = 6) uniform sampler2D depth_tex;
+layout(binding = 7) uniform sampler2D depth_old_tex;
+layout(binding = 8) uniform sampler2D delta_position_tex;
+layout(binding = 9) uniform sampler2D stats_tex0;
+layout(binding = 10) uniform sampler2D stats_tex1;
+layout(binding = 11) uniform sampler2D stats_tex2;
+layout(binding = 12) uniform sampler2D stats_tex3;
 
 in vec2 texCoord;
 
 layout(location = 0) out vec4 frag_color;
 layout(location = 1) out vec4 frag_bloom;
-layout(location = 2) out vec4 frag_stats0;
-layout(location = 3) out vec4 frag_stats1;
-layout(location = 4) out vec4 frag_stats2;
-layout(location = 5) out vec4 frag_stats3;
+layout(location = 2) out vec4 frag_albedo;
+layout(location = 3) out vec4 frag_stats0;
+layout(location = 4) out vec4 frag_stats1;
+layout(location = 5) out vec4 frag_stats2;
+layout(location = 6) out vec4 frag_stats3;
 
 const float frame_count = 20.0;
 
@@ -152,6 +155,7 @@ void main()
 	
 	vec4 color = texelFetch(color_tex, ivec2(gl_FragCoord), 0);
 	vec4 bloom = texelFetch(bloom_tex, ivec2(gl_FragCoord), 0);
+	vec3 albedo = texelFetch(albedo_tex, ivec2(gl_FragCoord), 0).rgb;
 
 	vec3 position_nearest = depthToPosition(texelFetch(depth_tex, ivec2(gl_FragCoord), 0).x, uv, camera.z_near);
 	vec3 position_farthest = position_nearest;

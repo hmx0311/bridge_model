@@ -71,6 +71,7 @@ struct TAATextures
 {
 	GLuint color;
 	GLuint bloom;
+	GLuint albedo;
 	GLuint depth;
 	GLuint stats[4];
 }taa_texs[2];
@@ -261,7 +262,7 @@ static void init()
 
 	glCreateFramebuffers(1, &render_FBO);
 	glCreateFramebuffers(2, taa_FBOs);
-	GLuint attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5 };
+	GLuint attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6 };
 	glNamedFramebufferDrawBuffers(taa_FBOs[0], sizeof(attachments) / sizeof(GLuint), attachments);
 	glNamedFramebufferDrawBuffers(taa_FBOs[1], sizeof(attachments) / sizeof(GLuint), attachments);
 
@@ -1260,12 +1261,14 @@ static void drawGraphics()
 	glBindTextureUnit(1, taa_texs[1 - (frame_idx & 1)].color);
 	glBindTextureUnit(2, render_texs[RENDER_TARGET_BLOOM]);
 	glBindTextureUnit(3, taa_texs[1 - (frame_idx & 1)].bloom);
-	glBindTextureUnit(4, taa_texs[frame_idx & 1].depth);
-	glBindTextureUnit(5, taa_texs[1 - (frame_idx & 1)].depth);
-	glBindTextureUnit(6, render_texs[RENDER_TARGET_DELTA_POSITION]);
+	glBindTextureUnit(4, render_texs[RENDER_TARGET_ALBEDO]);
+	glBindTextureUnit(5, taa_texs[1 - (frame_idx & 1)].albedo);
+	glBindTextureUnit(6, taa_texs[frame_idx & 1].depth);
+	glBindTextureUnit(7, taa_texs[1 - (frame_idx & 1)].depth);
+	glBindTextureUnit(8, render_texs[RENDER_TARGET_DELTA_POSITION]);
 	for (int i = 0; i < 4; i++)
 	{
-		glBindTextureUnit(7 + i, taa_texs[1 - (frame_idx & 1)].stats[i]);
+		glBindTextureUnit(9 + i, taa_texs[1 - (frame_idx & 1)].stats[i]);
 	}
 	glUseProgram(SP_TAA);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -1388,6 +1391,10 @@ static void onResize(GLFWwindow*, int width, int height)
 		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT1, taa_texs[i].bloom, 0);
+		glTextureStorage2D(taa_texs[i].albedo, 1, GL_RGBA16F, width, height);
+		glTextureParameteri(taa_texs[i].albedo, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(taa_texs[i].albedo, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT2, taa_texs[i].albedo, 0);
 		glTextureStorage2D(taa_texs[i].depth, 1, GL_DEPTH_COMPONENT24, width, height);
 		glTextureParameteri(taa_texs[i].depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTextureParameteri(taa_texs[i].depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1396,7 +1403,7 @@ static void onResize(GLFWwindow*, int width, int height)
 			glTextureStorage2D(taa_texs[i].stats[j], 1, GL_RGBA16F, width, height);
 			glTextureParameteri(taa_texs[i].stats[j], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTextureParameteri(taa_texs[i].stats[j], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT2 + j, taa_texs[i].stats[j], 0);
+			glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT3 + j, taa_texs[i].stats[j], 0);
 		}
 	}
 
