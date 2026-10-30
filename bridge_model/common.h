@@ -18,3 +18,6 @@ inline uint64_t getTimestampMicroseconds()
 {
 	return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
+
+std::pair<const void*, int> getResource(const char* name, const char* type);
+std::pair<const void*, int> getResource(int name, const char* type);

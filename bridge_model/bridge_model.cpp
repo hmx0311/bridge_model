@@ -71,9 +71,9 @@ struct TAATextures
 {
 	GLuint color;
 	GLuint bloom;
-	GLuint albedo;
+	GLuint albedo_and_chroma_variance;
 	GLuint depth;
-	GLuint stats[4];
+	GLuint stats[3];
 }taa_texs[2];
 
 constexpr int BLOOM_BUFFER_HEIGHT = 540;
@@ -262,7 +262,7 @@ static void init()
 
 	glCreateFramebuffers(1, &render_FBO);
 	glCreateFramebuffers(2, taa_FBOs);
-	GLuint attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5, GL_COLOR_ATTACHMENT6 };
+	GLuint attachments[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5 };
 	glNamedFramebufferDrawBuffers(taa_FBOs[0], sizeof(attachments) / sizeof(GLuint), attachments);
 	glNamedFramebufferDrawBuffers(taa_FBOs[1], sizeof(attachments) / sizeof(GLuint), attachments);
 
@@ -319,29 +319,20 @@ static void init()
 	glTextureParameteri(shadow_night_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTextureStorage3D(shadow_night_tex, 1, GL_DEPTH_COMPONENT24, SHADOW_NIGHT_TEX_SIZE, SHADOW_NIGHT_TEX_SIZE, NUM_TILE_LIGHT_SHADOW_LAYERS);
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &text_atlas_tex);
-	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TEXT_ATLAS), L"TEXTURE");
-	if (rc_info != nullptr)
+	auto [text_tex_data, _] = getResource(IDR_TEXT_ATLAS, "TEXTURE");
+	if (text_tex_data == nullptr)
 	{
-		HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-		if (rc_data != nullptr)
-		{
-			const char* data = (const char*)(LockResource(rc_data));
-			glTextureStorage2D(text_atlas_tex, 1, GL_R8, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y);
-			glTextureSubImage2D(text_atlas_tex, 0, 0, 0, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y, GL_RED, GL_UNSIGNED_BYTE, data);
-			glTextureParameteri(text_atlas_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(text_atlas_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTextureParameteri(text_atlas_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTextureParameteri(text_atlas_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		}
-		else
-		{
-			printf("ERROR: Can't Load Resource Text Altas\n");
-		}
+		printf("ERROR: Can't Get Resource Text Altas\n");
 	}
 	else
 	{
-		printf("ERROR: Can't Find Resource Text Altas\n");
+		glCreateTextures(GL_TEXTURE_2D, 1, &text_atlas_tex);
+		glTextureStorage2D(text_atlas_tex, 1, GL_R8, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y);
+		glTextureSubImage2D(text_atlas_tex, 0, 0, 0, TEXT_WIDTH * TEXT_ALTAS_CNT_X, TEXT_HEIGHT * TEXT_ALTAS_CNT_Y, GL_RED, GL_UNSIGNED_BYTE, text_tex_data);
+		glTextureParameteri(text_atlas_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(text_atlas_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(text_atlas_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(text_atlas_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 
 	glGenVertexArrays(1, &attri_less_VAO);
@@ -545,9 +536,7 @@ static void drawGraphics()
 		}
 		while (!grids_to_calc.empty())
 		{
-			uint32_t level = grids_to_calc.front().level;
-			size_t x = grids_to_calc.front().x;
-			size_t y = grids_to_calc.front().y;
+			auto [level, x, y] = grids_to_calc.front();
 			grids_to_calc.pop_front();
 			BoundAABB bound = sceneGridBound(level, x, y);
 			vec3 half_size = 0.5f * bound.size();
@@ -693,9 +682,7 @@ static void drawGraphics()
 			}
 			while (!grids_to_calc.empty())
 			{
-				uint32_t level = grids_to_calc.front().level;
-				size_t x = grids_to_calc.front().x;
-				size_t y = grids_to_calc.front().y;
+				auto [level, x, y] = grids_to_calc.front();
 				grids_to_calc.pop_front();
 				BoundAABB bound = sceneGridBound(level, x, y);
 				INTERSECTION_TEST_RESULT result = camera_level_frustum.intersectionTest(bound);
@@ -781,6 +768,7 @@ static void drawGraphics()
 				z_mins[i] = z_mins[i + 1] = z_mins[i + 2] = z_mins[i + 3] = group_z_min;
 			}
 		}
+		Frustum shadow_frustums[CSM_LEVELS];
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
 			Frustum shadow_frustum(sun_shadow_view, x_mins[i], x_maxs[i], y_mins[i], y_maxs[i], 0.0f, 1.0f);
@@ -796,10 +784,8 @@ static void drawGraphics()
 			int test_cnt = 0;
 			while (!grids_to_calc.empty())
 			{
-				test_cnt++;
-				uint32_t level = grids_to_calc.front().level;
-				size_t x = grids_to_calc.front().x;
-				size_t y = grids_to_calc.front().y;
+				test_cnt++; 
+				auto [level, x, y] = grids_to_calc.front();
 				grids_to_calc.pop_front();
 				BoundAABB bound = sceneGridBound(level, x, y);
 				auto& p = shadow_frustum.getPlane(Frustum::NEAR);
@@ -824,8 +810,8 @@ static void drawGraphics()
 				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
 			}
 			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
-			float x_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (x_maxs[i] - x_mins[i]));
-			float y_padding = std::max(MAX_PENUMBRA_RADIUS, MIN_PADDING * (y_maxs[i] - y_mins[i]));
+			float x_padding = MAX_PENUMBRA_RADIUS + MIN_PADDING * (x_maxs[i] - x_mins[i]);
+			float y_padding = MAX_PENUMBRA_RADIUS + MIN_PADDING * (y_maxs[i] - y_mins[i]);
 			float z_padding = std::max(x_padding / (x_maxs[i] - x_mins[i]), y_padding / (y_maxs[i] - y_mins[i])) * (z_max - z_mins[i]);
 			mat4 shadow_mat = ortho(x_mins[i] - x_padding, x_maxs[i] + x_padding, y_mins[i] - y_padding, y_maxs[i] + y_padding, -z_max, -z_mins[i] + z_padding) * sun_shadow_view;
 			sun_shadow.view_proj[i] = shadow_mat;
@@ -835,10 +821,6 @@ static void drawGraphics()
 				0.0f, 0.0f, 0.5f, 0.0f,
 				0.5f, 0.5f, 0.5f, 1.0f
 			} *shadow_mat;
-		}
-		Frustum shadow_frustums[CSM_LEVELS];
-		for (int i = 0; i < CSM_LEVELS; i++)
-		{
 			shadow_frustums[i] = Frustum{ sun_shadow.view_proj[i] };
 			car_sun_shadow_transform[i].clear();
 		}
@@ -1262,11 +1244,11 @@ static void drawGraphics()
 	glBindTextureUnit(2, render_texs[RENDER_TARGET_BLOOM]);
 	glBindTextureUnit(3, taa_texs[1 - (frame_idx & 1)].bloom);
 	glBindTextureUnit(4, render_texs[RENDER_TARGET_ALBEDO]);
-	glBindTextureUnit(5, taa_texs[1 - (frame_idx & 1)].albedo);
+	glBindTextureUnit(5, taa_texs[1 - (frame_idx & 1)].albedo_and_chroma_variance);
 	glBindTextureUnit(6, taa_texs[frame_idx & 1].depth);
 	glBindTextureUnit(7, taa_texs[1 - (frame_idx & 1)].depth);
 	glBindTextureUnit(8, render_texs[RENDER_TARGET_DELTA_POSITION]);
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < sizeof(TAATextures::stats) / sizeof(GLuint); i++)
 	{
 		glBindTextureUnit(9 + i, taa_texs[1 - (frame_idx & 1)].stats[i]);
 	}
@@ -1391,10 +1373,10 @@ static void onResize(GLFWwindow*, int width, int height)
 		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT1, taa_texs[i].bloom, 0);
-		glTextureStorage2D(taa_texs[i].albedo, 1, GL_RGBA16F, width, height);
-		glTextureParameteri(taa_texs[i].albedo, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(taa_texs[i].albedo, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT2, taa_texs[i].albedo, 0);
+		glTextureStorage2D(taa_texs[i].albedo_and_chroma_variance, 1, GL_RGBA16F, width, height);
+		glTextureParameteri(taa_texs[i].albedo_and_chroma_variance, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(taa_texs[i].albedo_and_chroma_variance, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT2, taa_texs[i].albedo_and_chroma_variance, 0);
 		glTextureStorage2D(taa_texs[i].depth, 1, GL_DEPTH_COMPONENT24, width, height);
 		glTextureParameteri(taa_texs[i].depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTextureParameteri(taa_texs[i].depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

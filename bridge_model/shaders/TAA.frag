@@ -15,24 +15,22 @@ layout(binding = 1) uniform sampler2D color_old_tex;
 layout(binding = 2) uniform sampler2D bloom_tex;
 layout(binding = 3) uniform sampler2D bloom_old_tex;
 layout(binding = 4) uniform sampler2D albedo_tex;
-layout(binding = 5) uniform sampler2D albedo_old_tex;
+layout(binding = 5) uniform sampler2D albedo_old_and_chroma_variance_tex;
 layout(binding = 6) uniform sampler2D depth_tex;
-layout(binding = 7) uniform sampler2D depth_old_tex;
+layout(binding = 7) uniform sampler2D depth_last_tex;
 layout(binding = 8) uniform sampler2D delta_position_tex;
 layout(binding = 9) uniform sampler2D stats_tex0;
 layout(binding = 10) uniform sampler2D stats_tex1;
 layout(binding = 11) uniform sampler2D stats_tex2;
-layout(binding = 12) uniform sampler2D stats_tex3;
 
 in vec2 texCoord;
 
 layout(location = 0) out vec4 frag_color;
 layout(location = 1) out vec4 frag_bloom;
-layout(location = 2) out vec4 frag_albedo;
+layout(location = 2) out vec4 frag_albedo_and_chroma_variance;
 layout(location = 3) out vec4 frag_stats0;
 layout(location = 4) out vec4 frag_stats1;
 layout(location = 5) out vec4 frag_stats2;
-layout(location = 6) out vec4 frag_stats3;
 
 const float frame_count = 20.0;
 
@@ -77,23 +75,23 @@ vec4 CatmullRomFilter(vec2 uv)
 
 vec3 rgb2YCoCg(vec3 c) 
 {
-    float Y  =  0.25 * c.r + 0.5 *c.g + 0.25 * c.b;
-    float Co =  0.5  * c.r - 0.5 * c.b;
-    float Cg = -0.25 * c.r + 0.5 * c.g - 0.25 * c.b;
-    return vec3(Y, Co, Cg);
+	float Y  =  0.25 * c.r + 0.5 *c.g + 0.25 * c.b;
+	float Co =  0.5  * c.r - 0.5 * c.b;
+	float Cg = -0.25 * c.r + 0.5 * c.g - 0.25 * c.b;
+	return vec3(Y, Co, Cg);
 }
 
 vec3 yCoCg2RGB(vec3 ycc) 
 {
-    float Y  = ycc.x;
-    float Co = ycc.y;
-    float Cg = ycc.z;
-    
-    float r = Y + Co - Cg;
-    float g = Y + Cg;
-    float b = Y - Co - Cg;
-    
-    return vec3(r, g, b);
+	float Y  = ycc.x;
+	float Co = ycc.y;
+	float Cg = ycc.z;
+	
+	float r = Y + Co - Cg;
+	float g = Y + Cg;
+	float b = Y - Co - Cg;
+	
+	return vec3(r, g, b);
 }
 
 vec3 depthToPosition(float depth, vec2 uv, float z_near)
@@ -105,22 +103,15 @@ vec3 depthToPosition(float depth, vec2 uv, float z_near)
 bool reprojection(vec3 position, vec3 delta_position, out vec2 uv_motion)
 {
 	vec4 position_in_screen = camera.projection * vec4(position, 1.0);
-	vec4 old_position_in_screen = camera.projection * camera.inv_delta_view * vec4(position - delta_position, 1.0);
-	if(old_position_in_screen.w <= 0 ||
-		old_position_in_screen.x <= -old_position_in_screen.w || old_position_in_screen.x >= old_position_in_screen.w ||
-		old_position_in_screen.y <= -old_position_in_screen.w || old_position_in_screen.y >= old_position_in_screen.w)
+	vec4 position_last_in_screen = camera.projection * camera.inv_delta_view * vec4(position - delta_position, 1.0);
+	if(position_last_in_screen.w <= 0 ||
+		position_last_in_screen.x <= -position_last_in_screen.w || position_last_in_screen.x >= position_last_in_screen.w ||
+		position_last_in_screen.y <= -position_last_in_screen.w || position_last_in_screen.y >= position_last_in_screen.w)
 	{
 		return false;
 	}
-	uv_motion = 0.5 * (old_position_in_screen.xy / old_position_in_screen.w - position_in_screen.xy / position_in_screen.w);
+	uv_motion = 0.5 * (position_last_in_screen.xy / position_last_in_screen.w - position_in_screen.xy / position_in_screen.w);
 	return true;
-}
-
-bool validateSplitIdx(int split1, int split2)
-{
-	int split_l = min(split1, split2);
-	int split_r = max(split1, split2);
-	return !(split_r - split_l < Y_HIST_EXTRA && split_l > Y_HIST_EXTRA - 1 && split_r < TAA_PERIOD + 1);
 }
 
 bool validateSplit(int begin, int end, int split, float mean_step2, float history[Y_HIST_LEN])
@@ -185,10 +176,10 @@ void main()
 	{
 		frag_color = color;
 		frag_bloom = bloom;
+		frag_albedo_and_chroma_variance = vec4(albedo, 0.0);
 		frag_stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
 		frag_stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(color.rgb).x, 0.0, 0.0);
-		frag_stats3 = vec4(1.0, 0.0, 0.0, 0.0);
+		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(albedo).x, 1.0, 0.0);
 		return;
 	}
 	
@@ -206,74 +197,89 @@ void main()
 
 	uv += uv_motion_nearest;
 	
-	vec3 position_old = depthToPosition(texture(depth_old_tex, uv).x, uv, camera.old_z_near);
-	float old_z_in_cur_nearest = dot(vec4(position_old, 1), camera.delta_view_z);
-	float old_z_in_cur_farthest = old_z_in_cur_nearest;
+	vec3 position_last = depthToPosition(texture(depth_last_tex, uv).x, uv, camera.old_z_near);
+	float z_last_in_cur_nearest = dot(vec4(position_last, 1), camera.delta_view_z);
+	float z_last_in_cur_farthest = z_last_in_cur_nearest;
 	for(int i = 0; i < 4; i++)
 	{
 		vec2 uv_offset = uv + offsets[i] * r_size.xy;
-		position_old = depthToPosition(texture(depth_old_tex, uv_offset).x, uv_offset, camera.old_z_near);
-		float old_z_in_cur = dot(vec4(position_old, 1), camera.delta_view_z);
-		old_z_in_cur_nearest = max(old_z_in_cur_nearest, old_z_in_cur);
-		old_z_in_cur_farthest = min(old_z_in_cur_farthest, old_z_in_cur);
+		position_last = depthToPosition(texture(depth_last_tex, uv_offset).x, uv_offset, camera.old_z_near);
+		float z_last_in_cur = dot(vec4(position_last, 1), camera.delta_view_z);
+		z_last_in_cur_nearest = max(z_last_in_cur_nearest, z_last_in_cur);
+		z_last_in_cur_farthest = min(z_last_in_cur_farthest, z_last_in_cur);
 	}
-	if(old_z_in_cur_farthest > 0.99 * (position_nearest.z - delta_position_nearest.z)
-		|| position_farthest.z - delta_position_farthest.z > 0.99 * old_z_in_cur_nearest)
+	if(z_last_in_cur_farthest > 0.99 * (position_nearest.z - delta_position_nearest.z)
+		|| position_farthest.z - delta_position_farthest.z > 0.99 * z_last_in_cur_nearest)
 	{
 		frag_color = color;
 		frag_bloom = bloom;
+		frag_albedo_and_chroma_variance = vec4(albedo, 0.0);
 		frag_stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
 		frag_stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(color.rgb).x, 0.0, 0.0);
-		frag_stats3 = vec4(1.0, 0.0, 0.0, 0.0);
+		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(albedo).x, 1.0, 0.0);
 		return;
 	}
 	
-	vec4 old_bloom = textureLod(bloom_old_tex, uv, 0.0);
-	vec4 color_old = CatmullRomFilter(uv);
-	vec3 ycc_old = rgb2YCoCg(color_old.rgb);
-	vec3 ycc = rgb2YCoCg(color.rgb);
+	vec3 lighting = color.rgb / (albedo + EPSILON16F);
+	vec3 box_min_lighting = lighting;
+	vec3 box_max_lighting = lighting;
+	vec3 ycc = rgb2YCoCg(albedo);
 	vec3 box_min_ycc = ycc;
 	vec3 box_max_ycc = ycc;
-#undef SAMPLE
-#define SAMPLE(X,Y) \
-	{\
-		vec3 neighbor_ycc = rgb2YCoCg(texelFetch(color_tex, ivec2(gl_FragCoord) + ivec2(X, Y), 0).rgb);\
-		box_min_ycc = min(box_min_ycc, neighbor_ycc);\
-		box_max_ycc = max(box_max_ycc, neighbor_ycc);\
+
+	ivec2 box_offsets[4] = { {0, -1}, {-1, 0}, {1, 0}, {0, 1} };
+	for(int i = 0; i < 4; i++)
+	{
+		vec3 neighbor_color = texelFetch(color_tex, ivec2(gl_FragCoord) + box_offsets[i], 0).rgb;
+		vec3 neighbor_albedo = texelFetch(albedo_tex, ivec2(gl_FragCoord) + box_offsets[i], 0).rgb;
+		vec3 neighbor_lighting = neighbor_color / (neighbor_albedo + EPSILON16F);
+		box_min_lighting = min(box_min_lighting, neighbor_lighting);
+		box_max_lighting = max(box_max_lighting, neighbor_lighting);
+		vec3 neighbor_ycc = rgb2YCoCg(neighbor_albedo);
+		box_min_ycc = min(box_min_ycc, neighbor_ycc);
+		box_max_ycc = max(box_max_ycc, neighbor_ycc);
 	}
 	
-	SAMPLE(0, -1)
-	SAMPLE(-1,0)
-	SAMPLE(1, 0)
-	SAMPLE(0, 1)
-#undef SAMPLE
-
-	vec3 ycc_diff = ycc - ycc_old;	
-	vec3 clamp_ycc = ycc_old - clamp(ycc_old, box_min_ycc, box_max_ycc);
-	
+	vec4 color_old = CatmullRomFilter(uv);
+	vec4 bloom_old = textureLod(bloom_old_tex, uv, 0.0);
+	vec3 albedo_old;
 	float Y_history[Y_HIST_LEN];
 	float blend_factor_old, chroma_variance, motion_diff_old;
-	{
+	{ 
+		vec4 ac = texture(albedo_old_and_chroma_variance_tex, uv);
+		albedo_old = ac.rgb;
+		chroma_variance = ac.w;
 		vec4 s0 = texture(stats_tex0, uv);
 		vec4 s1 = texture(stats_tex1, uv);
 		vec4 s2 = texture(stats_tex2, uv);
-		vec4 s3 = texture(stats_tex3, uv);
 		Y_history[0] = s0.x; Y_history[1] = s0.y; Y_history[2] = s0.z; Y_history[3] = s0.w;
 		Y_history[4] = s1.x; Y_history[5] = s1.y; Y_history[6] = s1.z; Y_history[7] = s1.w;
 		Y_history[8] = s2.x; Y_history[9] = s2.y; Y_history[10] = ycc.x;
-		blend_factor_old = s3.x;
-		chroma_variance = s3.z;
-		motion_diff_old = s3.w;
+		blend_factor_old = s2.z;
+		motion_diff_old = s2.w;
 	}
+	vec3 lighting_old = color_old.rgb / (albedo_old + EPSILON16F);
+	vec3 ycc_old = rgb2YCoCg(albedo_old.rgb);
 	float motion_confidence = clamp(1 + (motion_diff - motion_diff_old) / 3.0, 0.0, 1.0);
 	float chroma_tolerance = sqrt(chroma_variance) * motion_confidence + EPSILON16F;
 	
+	vec3 ycc_diff = ycc - ycc_old;
 	float chroma_diff_length = length(ycc_diff.yz) + EPSILON16F;
+	float Y_diff_length = abs(ycc_diff.x) + EPSILON16F;
+	vec3 clamp_ycc = ycc_old - clamp(ycc_old, box_min_ycc, box_max_ycc);
 	float chroma_clamp_length = length(clamp_ycc.yz);
+	float Y_clamp_length = abs(clamp_ycc.x);
+
+	vec3 lighting_diff = lighting - lighting_old;
+	float lighting_diff_length = length(lighting_diff) + EPSILON16F;
+	vec3 lighting_clamp = lighting_old - clamp(lighting_old, box_min_lighting, box_max_lighting);
+	float lighting_clamp_length = length(lighting_clamp);
+
+	float lighting_extra_clip = max(0.0, lighting_clamp_length / lighting_diff_length - max(chroma_clamp_length / chroma_diff_length, Y_clamp_length / Y_diff_length));
+
 	chroma_clamp_length = max(0, min(chroma_clamp_length, chroma_diff_length - 3.0 * chroma_tolerance));
 	float chroma_clip_strenth = chroma_clamp_length / chroma_diff_length;
-	
+
 	int Y_valid_begin;
 	for(Y_valid_begin = Y_HIST_LEN - 2; Y_valid_begin > 0 && Y_history[Y_valid_begin - 1] >= 0; Y_valid_begin--);
 	Y_valid_begin = max(Y_valid_begin, int(round((1 - motion_confidence) * (Y_HIST_LEN - 1))));
@@ -283,13 +289,10 @@ void main()
 	}
 	int Y_valid_cnt = Y_HIST_LEN - Y_valid_begin;
 	
-	float Y_diff_length = abs(ycc_diff.x) + EPSILON16F;
-	float Y_clamp_length;
 	
 	if(Y_valid_cnt > 2)
 	{
 		int split = Y_valid_begin;
-		int split1 = Y_valid_begin;
 		float max_split_k = -1.0;
 		float Y_sum_l = 0.0, Y_sum_r = 0.0;
 		for(int i = Y_valid_begin; i < Y_HIST_LEN; i++)
@@ -320,60 +323,9 @@ void main()
 		}
 		Y_sum2_step -= (Y_history[split - 1] - Y_history[split]) * (Y_history[split - 1] - Y_history[split]);
 		
-		if(Y_valid_cnt > 3 + 3 * extra_split_gap)
+		if(!validateSplit(Y_valid_begin, Y_HIST_LEN, split, Y_sum2_step / (Y_valid_cnt - 2), Y_history))
 		{
-			max_split_k = -1.0;
-			Y_sum_l = 0;
-			Y_sum_r = Y_sum_split_l;
-			for(int i = Y_valid_begin + 1; i < split - extra_split_gap; i++)
-			{
-				Y_sum_l += Y_history[i - 1];
-				Y_sum_r -= Y_history[i - 1];
-				float Y_mean_diff = Y_sum_l / (i - Y_valid_begin) - Y_sum_r / (split - i);
-				float split_k = Y_mean_diff * Y_mean_diff * (i - Y_valid_begin) * (split - i);
-				if(split_k > max_split_k)
-				{
-					max_split_k = split_k;
-					split1 = i;
-				}
-			}
-			Y_sum_l = 0;
-			Y_sum_r = Y_sum_split_r;
-			for(int i = split + 1 + extra_split_gap; i < Y_HIST_LEN - extra_split_gap; i++)
-			{
-				Y_sum_l += Y_history[i - 1];
-				Y_sum_r -= Y_history[i - 1];
-				float Y_mean_diff = Y_sum_l / (i - split) - Y_sum_r / (Y_HIST_LEN - i);
-				float split_k = Y_mean_diff * Y_mean_diff * (i - split) * (Y_HIST_LEN - i);
-				if(split_k > max_split_k)
-				{
-					max_split_k = split_k;
-					split1 = i;
-				}
-			}
-			if(validateSplitIdx(split1, split))
-			{
-				Y_sum2_step -= (Y_history[split1 - 1] - Y_history[split1]) * (Y_history[split1 - 1] - Y_history[split1]);
-				if(split1 > split)
-				{
-					int temp = split1;
-					split1 = split;
-					split = temp;
-				}
-				if(!validateSplit(Y_valid_begin, split, split1, Y_sum2_step / (Y_valid_cnt - 3), Y_history))
-				{
-					Y_sum2_step += (Y_history[split1 - 1] - Y_history[split1]) * (Y_history[split1 - 1] - Y_history[split1]);
-					split1 = Y_valid_begin;
-				}
-			}
-			else
-			{
-				split1 = Y_valid_begin;
-			}
-		}
-		if(!validateSplit(split1, Y_HIST_LEN, split, Y_sum2_step / (Y_valid_cnt - (split1 == Y_valid_begin ? 2 : 3)), Y_history))
-		{
-			split = split1;
+			split = Y_valid_begin;
 		}
 		if(Y_valid_begin == 0)
 		{
@@ -391,33 +343,12 @@ void main()
 		int split_n = Y_HIST_LEN - split;
 		if(split_n > 2)
 		{
-			float Y_sum = 0.0, XY_sum = 0.0;
+			float Y_sum = 0.0;
 			for (int i = 0; i < split_n; i++) 
 			{
 				Y_sum  += Y_history[i + split];
-				XY_sum += i * Y_history[i + split];
 			}
-			float X_sum = split_n * (split_n - 1) / 2.0;
-			float X_sum2 = (split_n - 1) * split_n * (2 * split_n - 1) / 6.0;
-			float X_mean  = X_sum / split_n;
-			float Y_mean  = Y_sum / split_n;
-
-			float covXY  = XY_sum - split_n * X_mean * Y_mean;
-			float varX   = X_sum2 - split_n * X_mean * X_mean;
-			
-			float slope = covXY / varX;
-			float intercept = Y_mean - slope * X_mean;
-
-			float Y_pred_linear = slope * (split_n - 1) + intercept;
-			float SSE_linear = 0.0;
-			for (int i = 0; i < split_n; i++)
-			{
-				float pred = slope * i + intercept;
-				float err = Y_history[i + split] - pred;
-				SSE_linear += err * err;
-			}
-			float MSE_linear = SSE_linear / (split_n - 2);
-			float SEM_linear = sqrt(MSE_linear * (4.0 * split_n - 2.0) / (split_n * (split_n + 1.0)));
+			float Y_mean  = Y_sum / split_n;			
 			
 			float SSE_discrete = 0.0;
 			for (int i = 0; i < split_n; i++)
@@ -425,52 +356,31 @@ void main()
 				float err = Y_history[i + split] - Y_mean;
 				SSE_discrete += err * err;
 			}
-			float MSE_discrete = SSE_discrete / (split_n - 1);
-			float SEM_discrete = sqrt(MSE_discrete / split_n);
+			float MSE = SSE_discrete / (split_n - 1);
 			
-			float Y_pred, SEM;
-			if(Y_valid_begin == 0)
-			{
-				float dAICc = split_n * log(MSE_linear / (MSE_discrete + EPSILON)) + 4.0 * (split_n) / (split_n - 3.0) - 2.0 * (split_n) / (split_n - 2.0);
-				float percent = 1.0 / (1.0 + exp(-0.5 * dAICc));
-				Y_pred = mix(Y_pred_linear, Y_mean, percent);
-				SEM = mix(SEM_linear, SEM_discrete, percent);
-			}
-			else
-			{
-				Y_pred = Y_pred_linear;
-				SEM = min(SEM_linear, SEM_discrete);
-			}
+			float Y_pred = Y_mean;
 			float spatial_weight = 0;
-			if(Y_valid_cnt <= 3 + 3 * extra_split_gap)
+			if(Y_valid_cnt <= 3)
 			{
-				spatial_weight = (4 + 3 * extra_split_gap - Y_valid_cnt) / (1.0 + 3 * extra_split_gap);
+				spatial_weight = (4 - Y_valid_cnt) / (4.0);
 			}
-			Y_clamp_length = max(spatial_weight * abs(clamp_ycc.x), abs(ycc_old.x - Y_pred) - SEM);
+			Y_clamp_length = clamp(abs(ycc_old.x - Y_pred) - sqrt(MSE), spatial_weight * Y_clamp_length, Y_clamp_length);
 		}
-		else
-		{
-			Y_clamp_length = 1.5 * abs(clamp_ycc.x);
-		}
-	}
-	else
-	{
-		Y_clamp_length = 1.5 * abs(clamp_ycc.x);
 	}
 	
-	float Y_clip_strenth = min(1, Y_clamp_length / Y_diff_length);
+	float Y_clip_strenth = Y_clamp_length / Y_diff_length;
 	
 	float blend_factor = 1.0 / frame_count;
-	blend_factor += (1 - blend_factor) * max(chroma_clip_strenth, Y_clip_strenth);
+	blend_factor += (1 - blend_factor) * (max(chroma_clip_strenth, Y_clip_strenth) + lighting_extra_clip);
 	blend_factor = max(blend_factor, 1 - motion_confidence);
 	blend_factor = max(blend_factor, blend_factor_old / (1 + blend_factor_old));
 	
 	chroma_variance = mix(chroma_variance, chroma_diff_length * chroma_diff_length, 1.0 / TAA_PERIOD);
 	
-	frag_color = vec4(yCoCg2RGB(mix(ycc_old, ycc, blend_factor)), mix(color_old.a, color.a, blend_factor));
-	frag_bloom = mix(old_bloom, bloom, blend_factor);
+	frag_color = mix(color_old, color, blend_factor);
+	frag_bloom = mix(bloom_old, bloom, blend_factor);
+	frag_albedo_and_chroma_variance = vec4(mix(albedo_old, albedo, blend_factor), chroma_variance);
 	frag_stats0 = vec4(Y_history[1], Y_history[2], Y_history[3], Y_history[4]);
 	frag_stats1 = vec4(Y_history[5], Y_history[6], Y_history[7], Y_history[8]);
-	frag_stats2 = vec4(Y_history[9], ycc.x, 0.0, 0.0);
-	frag_stats3 = vec4(blend_factor, 0.0, chroma_variance, motion_diff);
+	frag_stats2 = vec4(Y_history[9], ycc.x, blend_factor, motion_diff);
 }

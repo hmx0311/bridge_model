@@ -105,6 +105,7 @@
     <ClCompile Include="Bound.cpp" />
     <ClCompile Include="bridge_model.cpp" />
     <ClCompile Include="Car.cpp" />
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="Frustum.cpp" />
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="GPUTripleBuffer.cpp" />

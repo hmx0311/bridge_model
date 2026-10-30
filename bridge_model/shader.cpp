@@ -1,17 +1,18 @@
-#include <Windows.h>
-
 #include "shader.h"
 
 #include <memory>
 #include <vector>
 #include <string>
 
+#include "common.h"
+
+static const char* version_str = "#version 430 core\n";
+
 GLuint loadShader(const char* shader_name, GLenum type)
 {
-	HRSRC rc_info = FindResourceA(nullptr, shader_name, "SHADER");
-	if (rc_info == nullptr)
+	auto shader_source = getResource(shader_name, "SHADER");
+	if (shader_source.first == nullptr)
 	{
-		printf("\nERROR: Can't Find Resource %s\n", shader_name);
 		return 0;
 	}
 	std::vector<int> sizes;
@@ -22,14 +23,8 @@ GLuint loadShader(const char* shader_name, GLenum type)
 		int len;
 	};
 	std::vector<ShaderName> source_names;
-	sizes.push_back(SizeofResource(nullptr, rc_info));
-	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-	if (rc_data == nullptr)
-	{
-		printf("\nERROR: Can't Load Resource %s\n", shader_name);
-		return 0;
-	}
-	sources.push_back(static_cast<const char*>(LockResource(rc_data)));
+	sizes.push_back(shader_source.second);
+	sources.push_back(static_cast<const char*>(shader_source.first));
 	source_names.push_back({ shader_name, static_cast<int>(strlen(shader_name)) });
 	for (int i = 0; i < source_names.size(); i++)
 	{
@@ -113,20 +108,14 @@ GLuint loadShader(const char* shader_name, GLenum type)
 					}
 					if (!included)
 					{
-						HRSRC rc_info = FindResourceA(nullptr, std::string(source + name_begin, name_len).c_str(), "SHADER_HEADER");
-						if (rc_info == nullptr)
+						auto [header_soucre, size] = getResource(std::string(source + name_begin, name_len).c_str(), "SHADER_HEADER");
+						if (header_soucre == nullptr)
 						{
-							printf("\nERROR: Can't find include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
+							printf("\nERROR: Can't get include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
 							return 0;
 						}
-						sizes.insert(sizes.begin() + i + 1, SizeofResource(nullptr, rc_info));
-						HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-						if (rc_data == nullptr)
-						{
-							printf("\nERROR: Can't load include resource \"%.*s\" in %.*s line %d\n", name_len, source + name_begin, source_names[i].len, source_names[i].name, line_cnt);
-							return 0;
-						}
-						sources.insert(sources.begin() + i + 1, static_cast<const char*>(LockResource(rc_data)));
+						sizes.insert(sizes.begin() + i + 1, size);
+						sources.insert(sources.begin() + i + 1, static_cast<const char*>(header_soucre));
 						source_names.insert(source_names.begin() + i + 1, { source + name_begin, name_len });
 					}
 					len -= j;
@@ -174,7 +163,6 @@ GLuint loadShader(const char* shader_name, GLenum type)
 			j++;
 		}
 	}
-	const char* version_str = "#version 430 core\n";
 	sources.push_back(version_str);
 	sizes.push_back(-1);
 	std::reverse(sources.begin(), sources.end());
@@ -208,9 +196,39 @@ GLuint loadShader(const char* shader_name, GLenum type)
 	if (status == GL_FALSE)
 	{
 		printf("\nERROR: Shader \"%s\" Compilation Error\n", shader_name);
-		for (const char* source : sources)
+		int total_lines = 1;
+		char last = '\n';
+		std::reverse(source_names.begin(), source_names.end());
+		for (int i = 0; i < sources.size(); i++)
 		{
-			printf("%s", source);
+			const char* source = sources[i];
+			int size = sizes[i];
+			if (size < 0)
+			{
+				size = INT_MAX;
+			}
+			int file_lines = 1;
+			if (i >= sources.size() - source_names.size())
+			{
+				auto [source_begin, _] = i == sources.size() - 1 ? getResource(shader_name, "SHADER") :
+					getResource(std::string(source_names[i + source_names.size() - sources.size()].name, source_names[i + source_names.size() - sources.size()].len).c_str(), "SHADER_HEADER");
+				for (const char* p = static_cast<const char*>(source_begin); p != source; p++)
+				{
+					if (*p == '\n')
+					{
+						file_lines++;
+					}
+				}
+			}
+			for (int j = 0; j < size && source[j] != '\0'; j++)
+			{
+				if (last == '\n')
+				{
+					printf("%d\t%d\t", total_lines++, file_lines++);
+				}
+				last = source[j];
+				putchar(source[j]);
+			}
 		}
 		int len;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);

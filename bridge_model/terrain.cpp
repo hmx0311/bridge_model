@@ -1,9 +1,8 @@
-#include <Windows.h>
-
 #include "terrain.h"
 
 #include <memory>
 
+#include "common.h"
 #include "StaticQuadTree.h"
 #include "Frustum.h"
 #include "Bound.h"
@@ -82,27 +81,21 @@ TileTree tiles;
 void buildTerrainMesh()
 {
 	constexpr int VERT_SIZE = (NUM_TERRAIN_GRID_X + 1) * (NUM_TERRAIN_GRID_Y + 1);
-	HRSRC rc_info = FindResource(nullptr, MAKEINTRESOURCE(IDR_TERRAIN_HEIGHT), L"TEXTURE");
-	if (rc_info == nullptr)
-	{
-		printf("ERROR: Can't Find Resource Text Altas\n");
-		return;
-	}
-	HGLOBAL rc_data = LoadResource(nullptr, rc_info);
-	if (SizeofResource(nullptr, rc_info) != VERT_SIZE * sizeof(uint16))
-	{
-		printf("ERROR: Invalid terrian height data size\n");
-		return;
-	}
+	auto [rc_data, rc_size] = getResource(IDR_TERRAIN_HEIGHT, "TEXTURE");
 	if (rc_data == nullptr)
 	{
-		printf("ERROR: Can't Load Resource Text Altas\n");
+		printf("ERROR: Can't Get Resource Text Altas\n");
+		return;
+	}
+	if (rc_size != VERT_SIZE * sizeof(uint16))
+	{
+		printf("ERROR: Invalid terrian height data size\n");
 		return;
 	}
 
 	auto positions = std::make_unique_for_overwrite<vec3[][NUM_TERRAIN_GRID_Y + 1]>(NUM_TERRAIN_GRID_X + 1);
 
-	char* height_data = static_cast<char*>(LockResource(rc_data));
+	const char* height_data = static_cast<const char*>(rc_data);
 
 	for (int i = 0; i <= NUM_TERRAIN_GRID_Y; i++)
 	{
