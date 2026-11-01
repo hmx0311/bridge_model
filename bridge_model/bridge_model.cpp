@@ -771,6 +771,19 @@ static void drawGraphics()
 		Frustum shadow_frustums[CSM_LEVELS];
 		for (int i = 0; i < CSM_LEVELS; i++)
 		{
+			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
+			float x_padding = MAX_PENUMBRA_RADIUS + MIN_PADDING * (x_maxs[i] - x_mins[i]);
+			float y_padding = MAX_PENUMBRA_RADIUS + MIN_PADDING * (y_maxs[i] - y_mins[i]);
+			x_mins[i] -= x_padding;
+			x_maxs[i] += x_padding;
+			y_mins[i] -= y_padding;
+			y_maxs[i] += y_padding;
+			float x_offset = (TAA_OFFSETS[camera.taa_phase].x - 0.5f) * (x_maxs[i] - x_mins[i]) / SHADOW_DAY_TEX_SIZE;
+			float y_offset = (TAA_OFFSETS[camera.taa_phase].y - 0.5f) * (y_maxs[i] - y_mins[i]) / SHADOW_DAY_TEX_SIZE;
+			x_mins[i] += x_offset;
+			x_maxs[i] += x_offset;
+			y_mins[i] += y_offset;
+			y_maxs[i] += y_offset;
 			Frustum shadow_frustum(sun_shadow_view, x_mins[i], x_maxs[i], y_mins[i], y_maxs[i], 0.0f, 1.0f);
 			float z_max = -FLT_MAX;
 			static CircularQueue<QuadTreeIdx> grids_to_calc(5);
@@ -809,11 +822,8 @@ static void drawGraphics()
 				grids_to_calc.emplace_back(level + 1, 2 * x, 2 * y + 1);
 				grids_to_calc.emplace_back(level + 1, 2 * x + 1, 2 * y + 1);
 			}
-			constexpr float MIN_PADDING = (1 / (1 - 2 * MIN_SHADOW_MAP_PADDING) - 1) / 2;
-			float x_padding = MAX_PENUMBRA_RADIUS + MIN_PADDING * (x_maxs[i] - x_mins[i]);
-			float y_padding = MAX_PENUMBRA_RADIUS + MIN_PADDING * (y_maxs[i] - y_mins[i]);
 			float z_padding = std::max(x_padding / (x_maxs[i] - x_mins[i]), y_padding / (y_maxs[i] - y_mins[i])) * (z_max - z_mins[i]);
-			mat4 shadow_mat = ortho(x_mins[i] - x_padding, x_maxs[i] + x_padding, y_mins[i] - y_padding, y_maxs[i] + y_padding, -z_max, -z_mins[i] + z_padding) * sun_shadow_view;
+			mat4 shadow_mat = ortho(x_mins[i], x_maxs[i], y_mins[i], y_maxs[i], -z_max, -z_mins[i] + z_padding) * sun_shadow_view;
 			sun_shadow.view_proj[i] = shadow_mat;
 			sun_shadow.tex[i] = mat4{
 				0.5f, 0.0f, 0.0f, 0.0f,
@@ -830,7 +840,7 @@ static void drawGraphics()
 			BoundAABB car_bound{ car_local_bound, logical_data.car_transform[i] };
 			for (int j = 0; j < CSM_LEVELS; j++)
 			{
-				if (shadow_frustums[j].cullingTestNoNearFar(car_bound))
+				if (shadow_frustums[j].cullingTest(car_bound))
 				{
 					car_sun_shadow_transform[j].push_back(logical_data.car_transform[i]);
 				}

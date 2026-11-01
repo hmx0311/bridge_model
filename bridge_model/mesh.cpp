@@ -211,6 +211,7 @@ static void initTex()
 	glTextureStorage2D(highway_tex, 10, GL_RGB8, 8192, 4096);
 	glTextureSubImage2D(highway_tex, 0, 0, 0, 8192, 4096, GL_RGB, GL_FLOAT, highway_tex_data.get());
 	glTextureParameterf(highway_tex, GL_TEXTURE_MAX_ANISOTROPY, max_TexAni);
+	glTextureParameterf(highway_tex, GL_TEXTURE_LOD_BIAS, -0.3f);
 	glTextureParameteri(highway_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTextureParameteri(highway_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTextureParameteri(highway_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
