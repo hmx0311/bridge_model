@@ -59,15 +59,15 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 		temp = cross(u_dir, surface_normal);
 		dzduv.t = dot(temp, shadow_mat_z) / (dot(v_dir, temp) * shadow_scale_v);
 	}
-	int blocker_cnt = 0;
-	float block_dist = 0;
+	float block_dist = 0.0;
 	float total_weight = 0.0;
 	float blocker_search_r = min((shadow_coord.z - nearest_depth) * shadow_inv_scale_z * penumbra_ratio, MAX_PENUMBRA_RADIUS);
+	float min_block_dist = blocker_search_r / penumbra_ratio;
 	float min_unblock_r = blocker_search_r;
 	uint pixel_seed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
 	for (int i = 0; i < NUM_BLOCKER_SAMPLE; i++)
 	{
-		float r = blocker_search_r * (i + 0.5) / NUM_BLOCKER_SAMPLE;
+		float r = blocker_search_r * i / (NUM_BLOCKER_SAMPLE - float(camera.taa_phase) / TAA_PERIOD);
 		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed) + float(camera.taa_phase) / TAA_PERIOD);
 		vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
 		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * r);
@@ -79,7 +79,10 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 			float weight = (2 + k) / (1 + k * r / blocker_search_r);
 			total_weight += weight;
 			block_dist += weight * dist;
-			blocker_cnt++;
+			if(min_unblock_r > r || dist * penumbra_ratio >= r)
+			{
+				min_block_dist = min(min_block_dist, dist);
+			}
 		}
 		else
 		{
@@ -91,7 +94,7 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 		return 1.0;
 	}
 	block_dist /= total_weight;
-	float penumbra_radius = min(penumbra_ratio * block_dist, MAX_PENUMBRA_RADIUS);
+	float penumbra_radius = penumbra_ratio * min(min_block_dist, block_dist);
 	if (min_unblock_r >= min(blocker_search_r, penumbra_radius + 4.0 / NUM_BLOCKER_SAMPLE * blocker_search_r))
 	{
 		return 0.0;
