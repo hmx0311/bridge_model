@@ -3,7 +3,7 @@
 #define Y_HIST_LEN 11
 #define Y_HIST_EXTRA 3
 
-#define EPSILON16F 0.01
+#define EPSILON16F 1e-3
 #define EPSILON 1e-6
 #define INFINITY 1e20
 #define INVALID_Y -100.0
@@ -171,6 +171,7 @@ void main()
 	}
 	
 	vec3 delta_position_nearest = texelFetch(delta_position_tex, in_position_nearest, 0).xyz;
+	vec3 delta_position_farthest = texelFetch(delta_position_tex, in_position_farthest, 0).xyz;
 	vec2 uv_motion_nearest;
 	if(!reprojection(position_nearest, delta_position_nearest, uv_motion_nearest))
 	{
@@ -182,20 +183,7 @@ void main()
 		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(albedo).x, 1.0, 0.0);
 		return;
 	}
-	
-	vec3 delta_position_farthest = texelFetch(delta_position_tex, in_position_farthest, 0).xyz;
-	vec2 uv_motion_farthest;
-	float motion_diff;
-	if(!reprojection(position_farthest, delta_position_farthest, uv_motion_farthest))
-	{
-		 motion_diff = 0.0;
-	}
-	else
-	{
-		motion_diff = length((uv_motion_farthest - uv_motion_nearest) * textureSize(color_tex, 0).xy);
-	}
-
-	uv += uv_motion_nearest;
+	uv += uv_motion_nearest;	
 	
 	vec3 position_last = depthToPosition(texture(depth_last_tex, uv).x, uv, camera.old_z_near);
 	float z_last_in_cur_nearest = dot(vec4(position_last, 1), camera.delta_view_z);
@@ -208,8 +196,8 @@ void main()
 		z_last_in_cur_nearest = max(z_last_in_cur_nearest, z_last_in_cur);
 		z_last_in_cur_farthest = min(z_last_in_cur_farthest, z_last_in_cur);
 	}
-	if(z_last_in_cur_farthest > 0.99 * (position_nearest.z - delta_position_nearest.z)
-		|| position_farthest.z - delta_position_farthest.z > 0.99 * z_last_in_cur_nearest)
+	if(z_last_in_cur_farthest - (position_nearest.z - delta_position_nearest.z) > position_nearest.z - position_farthest.z + EPSILON16F
+		|| position_farthest.z - delta_position_farthest.z - z_last_in_cur_nearest > z_last_in_cur_nearest - z_last_in_cur_farthest + EPSILON16F)
 	{
 		frag_color = color;
 		frag_bloom = bloom;
@@ -219,7 +207,18 @@ void main()
 		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(albedo).x, 1.0, 0.0);
 		return;
 	}
-	
+
+	vec2 uv_motion_farthest;
+	float motion_diff;
+	if(!reprojection(position_farthest, delta_position_farthest, uv_motion_farthest))
+	{
+		 motion_diff = 0.0;
+	}
+	else
+	{
+		motion_diff = length((uv_motion_farthest - uv_motion_nearest) * textureSize(color_tex, 0).xy);
+	}
+		
 	vec3 lighting = color.rgb / (albedo + EPSILON16F);
 	vec3 box_min_lighting = lighting;
 	vec3 box_max_lighting = lighting;
@@ -227,7 +226,7 @@ void main()
 	vec3 box_min_ycc = ycc;
 	vec3 box_max_ycc = ycc;
 
-	ivec2 box_offsets[4] = { {0, -1}, {-1, 0}, {1, 0}, {0, 1} };
+	ivec2 box_offsets[4] = { { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 } };
 	for(int i = 0; i < 4; i++)
 	{
 		vec3 neighbor_color = texelFetch(color_tex, ivec2(gl_FragCoord) + box_offsets[i], 0).rgb;
@@ -371,6 +370,7 @@ void main()
 	float Y_clip_strenth = Y_clamp_length / Y_diff_length;
 	
 	float blend_factor = 1.0 / frame_count;
+	float bloom_blend_factor = blend_factor + (1 - blend_factor) * max(chroma_clip_strenth, Y_clip_strenth);
 	blend_factor += (1 - blend_factor) * (max(chroma_clip_strenth, Y_clip_strenth) + lighting_extra_clip);
 	blend_factor = max(blend_factor, 1 - motion_confidence);
 	blend_factor = max(blend_factor, blend_factor_old / (1 + blend_factor_old));
@@ -378,7 +378,7 @@ void main()
 	chroma_variance = mix(chroma_variance, chroma_diff_length * chroma_diff_length, 1.0 / TAA_PERIOD);
 	
 	frag_color = mix(color_old, color, blend_factor);
-	frag_bloom = mix(bloom_old, bloom, blend_factor);
+	frag_bloom = mix(bloom_old, bloom, bloom_blend_factor);
 	frag_albedo_and_chroma_variance = vec4(mix(albedo_old, albedo, blend_factor), chroma_variance);
 	frag_stats0 = vec4(Y_history[1], Y_history[2], Y_history[3], Y_history[4]);
 	frag_stats1 = vec4(Y_history[5], Y_history[6], Y_history[7], Y_history[8]);
