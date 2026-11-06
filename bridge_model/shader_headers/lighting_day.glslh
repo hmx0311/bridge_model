@@ -65,10 +65,11 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 	float min_block_dist = blocker_search_r / penumbra_ratio;
 	float min_unblock_r = blocker_search_r;
 	uint pixel_seed = uint(gl_FragCoord.x * 193.0 + gl_FragCoord.y * 97.0);
+	float taa_jitter = fract(float(camera.taa_phase + pixel_seed & 0xffff) / TAA_PERIOD);
 	for (int i = 0; i < NUM_BLOCKER_SAMPLE; i++)
 	{
-		float r = blocker_search_r * i / (NUM_BLOCKER_SAMPLE - float(camera.taa_phase) / TAA_PERIOD);
-		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed) + float(camera.taa_phase) / TAA_PERIOD);
+		float r = blocker_search_r * max(0.0, i - taa_jitter) / (NUM_BLOCKER_SAMPLE - 1);
+		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed) + taa_jitter);
 		vec2 coord_offset = r * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
 		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * r);
 		float dist = shadow_coord.z - texture(shadow_tex_depth, vec3(shadow_coord.xy + coord_offset, level)).x;
@@ -101,11 +102,12 @@ float shadowPCSS(vec3 world_position, vec3 dpdx, vec3 dpdy, vec3 surface_normal,
 	}
 	float shadow = 0.0;
 	pixel_seed = (pixel_seed ^ 0x9e3779b9u) * 0x85ebca6bu;
+	taa_jitter = fract(float(camera.taa_phase + pixel_seed & 0xffff) / TAA_PERIOD);
 	int sample_cnt = max(1, int(4 * sample_cnt_factor * sqrt(penumbra_radius / min(duvdx_len, duvdy_len))));
-	for (int idx = 0; idx < sample_cnt; idx++)
+	for (int i = 0; i < sample_cnt; i++)
 	{
-		float r = sqrt((idx + float(camera.taa_phase) / TAA_PERIOD) / sample_cnt);
-		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(idx) ^ pixel_seed) + float(camera.taa_phase) / TAA_PERIOD);
+		float r = sqrt((i + fract(float(camera.taa_phase + taa_jitter) / TAA_PERIOD)) / sample_cnt);
+		float angle = 2 * 3.1415927 * (2.3283064e-10 * bitfieldReverse(uint(i) ^ pixel_seed) + taa_jitter);
 		vec2 coord_offset = r * penumbra_radius * vec2(cos(angle) * shadow_scale_u, sin(angle) * shadow_scale_v);
 		vec2 coord = shadow_coord.xy + coord_offset;
 		float offset_z = min(0.0, dot(coord_offset, dzduv) - 0.01 * penumbra_radius * r);
