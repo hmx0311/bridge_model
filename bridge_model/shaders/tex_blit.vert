@@ -1,9 +1,9 @@
 layout(location = 0) in vec2 vertex;
 
-out vec2 texCoord;
+out vec2 tex_coord;
 
 void main()
 {
-	texCoord = 0.5 * vertex + 0.5;
+	tex_coord = 0.5 * vertex + 0.5;
 	gl_Position = vec4(vertex, 0.0, 1.0);
 }
