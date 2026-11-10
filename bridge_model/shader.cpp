@@ -167,6 +167,9 @@ GLuint loadShader(const char* shader_name, GLenum type)
 	sizes.push_back(-1);
 	std::reverse(sources.begin(), sources.end());
 	std::reverse(sizes.begin(), sizes.end());
+
+	GLint status;
+	GLuint shader = glCreateShader(type);
 #if 1
 	std::string cource_str;
 	for (int i = 0; i < sources.size(); i++)
@@ -180,15 +183,12 @@ GLuint loadShader(const char* shader_name, GLenum type)
 			cource_str.append(sources[i], sizes[i]);
 		}
 	}
-	sources.clear();
-	sources.push_back(cource_str.c_str());
-	sizes.clear();
-	sizes.push_back(-1);
-#endif
-
-	GLint status;
-	GLuint shader = glCreateShader(type);
+	const char* str = cource_str.c_str();
+	GLint size = -1;
+	glShaderSource(shader, 1, &str, &size);
+#else
 	glShaderSource(shader, sources.size(), sources.data(), sizes.data());
+#endif
 	glCompileShader(shader);
 
 	// check for errors

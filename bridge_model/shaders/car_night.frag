@@ -36,37 +36,41 @@ void main()
 	{
 		material = materials[aMaterialIdx];
 	}
-	frag_albedo = material.albedo;
 	vec3 color = material.albedo;
 	float maxColor = max(max(color.r, color.g), color.b);
+	vec3 lighting = sun.ambient;
+	int lightingOffset = instanceId * LIGHTING_SIZE_PER_CAR;
+	int end = lightingOffset + 1 + car_lighting.light_indices[lightingOffset];
+	for(int i = lightingOffset + 1; i < end; i++)
+	{
+		int light_idx = car_lighting.light_indices[i];
+		vec3 light_dir = world_position - vec3(tile_lights[light_idx].position);
+		float light_distance = length(light_dir);
+		light_dir /= light_distance;
+		float intensity = -dot(light_dir, aNormal) / (light_distance * light_distance);
+		if(intensity > 0.0)
+		{
+			if(material.shininess > 0.0)
+			{
+				vec3 halfway = normalize(-light_dir + view_dir);
+				float HdotN = dot(halfway, aNormal);
+				if(HdotN > 0)
+				{
+					intensity += pow(HdotN, material.shininess);
+				}
+			}
+			intensity *= lightCoverage(world_position, light_idx);
+			lighting += intensity * CAR_LIGHT_INTENSITY;
+		}
+	}		
 	if(maxColor <= 1.0)
 	{
-		vec3 lighting = sun.ambient;
-		int lightingOffset = instanceId * LIGHTING_SIZE_PER_CAR;
-		int end = lightingOffset + 1 + car_lighting.light_indices[lightingOffset];
-		for(int i = lightingOffset + 1; i < end; i++)
-		{
-			int light_idx = car_lighting.light_indices[i];
-			vec3 light_dir = world_position - vec3(tile_lights[light_idx].position);
-			float light_distance = length(light_dir);
-			light_dir /= light_distance;
-			float intensity = -dot(light_dir, aNormal) / (light_distance * light_distance);
-			if(intensity > 0.0)
-			{
-				if(material.shininess > 0.0)
-				{
-					vec3 halfway = normalize(-light_dir + view_dir);
-					float HdotN = dot(halfway, aNormal);
-					if(HdotN > 0)
-					{
-						intensity += pow(HdotN, material.shininess);
-					}
-				}
-				intensity *= lightCoverage(world_position, light_idx);
-				lighting += intensity * CAR_LIGHT_INTENSITY;
-			}
-		}
 		color *= lighting;
+		frag_albedo = material.albedo;
+	}
+	else
+	{
+		frag_albedo = color / lighting;
 	}
 
 	float fog_factor = fogFactor(world_position);

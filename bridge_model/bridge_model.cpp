@@ -796,7 +796,7 @@ static void drawGraphics()
 			int test_cnt = 0;
 			while (!grids_to_calc.empty())
 			{
-				test_cnt++; 
+				test_cnt++;
 				auto [level, x, y] = grids_to_calc.front();
 				grids_to_calc.pop_front();
 				BoundAABB bound = sceneGridBound(level, x, y);
@@ -1267,7 +1267,6 @@ static void drawGraphics()
 	glBindFramebuffer(GL_FRAMEBUFFER, bloom_FBOs[0]);
 	glViewport(0, 0, bloom_buffer_width, BLOOM_BUFFER_HEIGHT);
 	glBindTextureUnit(0, taa_texs[frame_idx & 1].bloom);
-	glGenerateMipmap(GL_TEXTURE_2D);
 	glUseProgram(SP_tex_blit);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
@@ -1353,14 +1352,18 @@ static void onResize(GLFWwindow*, int width, int height)
 	window_width = width;
 	window_height = height;
 	need_update_view = true;
+	float aspect = static_cast<float>(width) / height;
 
 	float tan_half_fov_y = tan(0.5f * FOV_Y);
-	float tan_half_fov_x = tan_half_fov_y * width / height;
+	float tan_half_fov_x = tan_half_fov_y * aspect;
 	glProgramUniform2f(SP_TAA, glGetUniformLocation(SP_TAA, "tan_half_fov"), tan_half_fov_x, tan_half_fov_y);
 
 	GLint max_tex_size;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
-	bloom_buffer_width = std::min(BLOOM_BUFFER_HEIGHT * (width + 1) / (height + 1), max_tex_size);
+	bloom_buffer_width = std::min<int>(round(BLOOM_BUFFER_HEIGHT * aspect), max_tex_size);
+	glProgramUniform2i(SP_tex_blit, glGetUniformLocation(SP_tex_blit, "sample_cnt"),
+		(width + bloom_buffer_width - 1) / bloom_buffer_width,
+		(height + BLOOM_BUFFER_HEIGHT - 1) / BLOOM_BUFFER_HEIGHT);
 
 	glDeleteTextures(4, render_texs);
 	glCreateTextures(GL_TEXTURE_2D, 4, render_texs);
@@ -1378,9 +1381,11 @@ static void onResize(GLFWwindow*, int width, int height)
 		glTextureParameteri(taa_texs[i].color, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTextureParameteri(taa_texs[i].color, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT0, taa_texs[i].color, 0);
-		glTextureStorage2D(taa_texs[i].bloom, 4, GL_RGBA16F, width, height);
+		glTextureStorage2D(taa_texs[i].bloom, 1, GL_RGBA16F, width, height);
 		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(taa_texs[i].bloom, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glNamedFramebufferTexture(taa_FBOs[i], GL_COLOR_ATTACHMENT1, taa_texs[i].bloom, 0);
 		glTextureStorage2D(taa_texs[i].albedo_and_chroma_variance, 1, GL_RGBA16F, width, height);
 		glTextureParameteri(taa_texs[i].albedo_and_chroma_variance, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

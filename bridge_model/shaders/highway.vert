@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec3 vertex;
 layout(location = 1) in vec3 normal;
-layout(location = 2) in vec2 texCoord;
+layout(location = 2) in vec2 tex_coord;
 
 out vec3 world_position;
 out vec3 position_in_view;
@@ -14,7 +14,7 @@ void main()
 	world_position = vertex;
 	position_in_view = ((camera.view) * vec4(vertex, 1.0)).xyz;
 	aNormal = normal;
-	aTexCoord = texCoord;
+	aTexCoord = tex_coord;
 	gl_Position = camera.projection * vec4(position_in_view, 1.0);
 	gl_Position.xy += camera.taa_offset * gl_Position.w;
 }
