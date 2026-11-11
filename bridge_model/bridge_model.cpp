@@ -37,6 +37,17 @@ extern "C" __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 
 using namespace glm;
 
+GLint window_width, window_height;
+
+constexpr float FOV_Y = pi<float>() / 4;
+constexpr float MIN_VIEW_Z_NEAR = 0.6f;
+constexpr float MIN_VIEW_DISTANCE = 2.0f;
+constexpr float MAX_VIEW_DISTANCE = 800.0f;
+float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 150.0f;
+uint32_t focus_move_dir = 0;
+bool show_fps = false;
+bool need_update_view = true;
+
 constexpr float TERRAIN_LOD_FACTOR = 2000.0f;
 
 constexpr float MAX_CSM_RATIO = 3.6f;
@@ -50,18 +61,6 @@ GLuint shadow_mip_gen_sampler;
 constexpr int SHADOW_NIGHT_TEX_SIZE = 8192;
 GLuint shadow_night_FBO;
 GLuint shadow_night_tex;
-
-constexpr float FOV_Y = pi<float>() / 4;
-constexpr float MIN_VIEW_Z_NEAR = 0.6f;
-constexpr float MIN_VIEW_DISTANCE = 2.0f;
-constexpr float MAX_VIEW_DISTANCE = 800.0f;
-
-GLint window_width, window_height;
-
-float aim_azimuth = 0.3f, aim_relative_depression = 0.2f, aim_view_distance = 150.0f;
-uint32_t focus_move_dir = 0;
-bool show_fps = false;
-bool need_update_view = true;
 
 GLuint render_FBO;
 GLuint render_texs[4];
