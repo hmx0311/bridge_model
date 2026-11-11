@@ -263,18 +263,21 @@ void main()
 	float chroma_tolerance = sqrt(chroma_variance) * motion_confidence + EPSILON16F;
 	
 	vec3 ycc_diff = ycc - ycc_old;
-	float chroma_diff_length = length(ycc_diff.yz) + EPSILON16F;
-	float Y_diff_length = abs(ycc_diff.x) + EPSILON16F;
 	vec3 clamp_ycc = ycc_old - clamp(ycc_old, box_min_ycc, box_max_ycc);
-	float chroma_clamp_length = length(clamp_ycc.yz);
+	float chroma_diff_length = length(ycc_diff.yz) + EPSILON16F;
+	float chroma_clamp_length = max(0.0, length(clamp_ycc.yz) - EPSILON16F);
+	float Y_epsilon = EPSILON16F * (ycc.x + ycc_old.x + EPSILON16F);
+	float Y_diff_length = abs(ycc_diff.x) + Y_epsilon;
 	float Y_clamp_length = abs(clamp_ycc.x);
 
 	vec3 lighting_diff = lighting - lighting_old;
-	float lighting_diff_length = length(lighting_diff) + EPSILON16F;
 	vec3 lighting_clamp = lighting_old - clamp(lighting_old, box_min_lighting, box_max_lighting);
-	float lighting_clamp_length = length(lighting_clamp);
+	float lighting_epsilon = 3.0 * EPSILON16F * (length(lighting + lighting_old) + EPSILON16F);
+	float lighting_diff_length = length(lighting_diff) + lighting_epsilon;
+	float lighting_clamp_length = length(lighting_clamp) - lighting_epsilon;
 
-	float lighting_extra_clip = max(0.0, lighting_clamp_length / lighting_diff_length - max(chroma_clamp_length / chroma_diff_length, Y_clamp_length / Y_diff_length));
+	float lighting_extra_clip = max(0.0, lighting_clamp_length / lighting_diff_length - max(chroma_clamp_length / chroma_diff_length, Y_clamp_length / Y_diff_length));	
+	Y_clamp_length = max(0.0, Y_clamp_length - Y_epsilon);
 
 	chroma_clamp_length = max(0, min(chroma_clamp_length, chroma_diff_length - 3.0 * chroma_tolerance));
 	float chroma_clip_strenth = chroma_clamp_length / chroma_diff_length;
@@ -286,8 +289,7 @@ void main()
 	{
 		Y_history[i] = INVALID_Y;
 	}
-	int Y_valid_cnt = Y_HIST_LEN - Y_valid_begin;
-	
+	int Y_valid_cnt = Y_HIST_LEN - Y_valid_begin;	
 	
 	if(Y_valid_cnt > 2)
 	{
