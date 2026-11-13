@@ -1,7 +1,7 @@
 #include "camera_defines.h"
 
-#define Y_HIST_LEN 11
-#define Y_HIST_EXTRA 3
+#define Y_HIST_LEN 12
+#define Y_HIST_EXTRA (Y_HIST_LEN - TAA_PERIOD)
 
 #define EPSILON16F 1e-3
 #define EPSILON 1e-6
@@ -149,9 +149,7 @@ void main()
 	vec3 albedo = texelFetch(albedo_tex, ivec2(gl_FragCoord), 0).rgb;
 
 	vec3 position_nearest = depthToPosition(texelFetch(depth_tex, ivec2(gl_FragCoord), 0).x, uv, camera.z_near);
-	vec3 position_farthest = position_nearest;
 	ivec2 frag_coord_nearest = ivec2(gl_FragCoord);
-	ivec2 frag_coord_farthest = frag_coord_nearest;
 	const ivec2 offsets[4] = { ivec2(-1, -1), ivec2(1, 1), ivec2(1, -1), ivec2(-1, 1) };
 	
 	for(int i = 0; i < 4 ;i++ )
@@ -163,15 +161,9 @@ void main()
 			position_nearest = offset_position;
 			frag_coord_nearest = offset_frag_coord;
 		}
-		if(offset_position.z < position_farthest.z)
-		{
-			position_farthest = offset_position;
-			frag_coord_farthest = offset_frag_coord;
-		}
 	}
 	
 	vec3 delta_position_nearest = texelFetch(delta_position_tex, frag_coord_nearest, 0).xyz;
-	vec3 delta_position_farthest = texelFetch(delta_position_tex, frag_coord_farthest, 0).xyz;
 	vec2 uv_motion_nearest;
 	if(!reprojection(position_nearest, delta_position_nearest, uv_motion_nearest))
 	{
@@ -180,44 +172,23 @@ void main()
 		frag_albedo_and_chroma_variance = vec4(albedo, 0.0);
 		frag_stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
 		frag_stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(albedo).x, 1.0, 0.0);
+		frag_stats2 = vec4(INVALID_Y, INVALID_Y, rgb2YCoCg(albedo).x, 1.0);
 		return;
 	}
-	uv += uv_motion_nearest;	
+	uv += uv_motion_nearest;
 	
-	vec3 position_last = depthToPosition(texture(depth_last_tex, uv).x, uv, camera.old_z_near);
-	float z_last_in_cur_nearest = dot(vec4(position_last, 1), camera.delta_view_z);
-	float z_last_in_cur_farthest = z_last_in_cur_nearest;
+	float z_last_in_cur = dot(vec4(depthToPosition(textureLod(depth_last_tex, uv, 0.0).x, uv, camera.old_z_near), 1), camera.delta_view_z);
+	float z_last_in_cur_nearest = z_last_in_cur;
+	float z_last_in_cur_diffs[4];
 	for(int i = 0; i < 4; i++)
 	{
 		vec2 uv_offset = uv + offsets[i] * r_size.xy;
-		position_last = depthToPosition(texture(depth_last_tex, uv_offset).x, uv_offset, camera.old_z_near);
-	float z_last_in_cur = dot(vec4(position_last, 1), camera.delta_view_z);
-		z_last_in_cur_nearest = max(z_last_in_cur_nearest, z_last_in_cur);
-		z_last_in_cur_farthest = min(z_last_in_cur_farthest, z_last_in_cur);
+		float z_last_in_cur_offset = dot(vec4(depthToPosition(textureLod(depth_last_tex, uv_offset, 0.0).x, uv_offset, camera.old_z_near), 1), camera.delta_view_z);
+		z_last_in_cur_diffs[i] = abs(z_last_in_cur_offset - z_last_in_cur);
+		z_last_in_cur_nearest = max(z_last_in_cur_nearest, z_last_in_cur_offset);
 	}
-	if(z_last_in_cur_farthest - (position_nearest.z - delta_position_nearest.z) > position_nearest.z - position_farthest.z + EPSILON16F
-		|| position_farthest.z - delta_position_farthest.z - z_last_in_cur_nearest > z_last_in_cur_nearest - z_last_in_cur_farthest + EPSILON16F)
-	{
-		frag_color = color;
-		frag_bloom = bloom;
-		frag_albedo_and_chroma_variance = vec4(albedo, 0.0);
-		frag_stats0 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		frag_stats1 = vec4(INVALID_Y, INVALID_Y, INVALID_Y, INVALID_Y);
-		frag_stats2 = vec4(INVALID_Y, rgb2YCoCg(albedo).x, 1.0, 0.0);
-		return;
-	}
-
-	vec2 uv_motion_farthest;
-	float motion_diff;
-	if(!reprojection(position_farthest, delta_position_farthest, uv_motion_farthest))
-	{
-		 motion_diff = 0.0;
-	}
-	else
-	{
-		motion_diff = length((uv_motion_farthest - uv_motion_nearest) * textureSize(color_tex, 0).xy);
-	}
+	float geometry_stability_last = max(min(z_last_in_cur_diffs[0], z_last_in_cur_diffs[1]), min(z_last_in_cur_diffs[2], z_last_in_cur_diffs[3]));
+	float geometry_clip_tolarance = clamp(2.0 - (z_last_in_cur_nearest - (position_nearest.z - delta_position_nearest.z)) / (geometry_stability_last + EPSILON16F), 0.0, 1.0);
 		
 	vec3 lighting = color.rgb / (albedo + EPSILON16F);
 	vec3 box_min_lighting = lighting;
@@ -243,7 +214,7 @@ void main()
 	vec4 bloom_old = textureLod(bloom_old_tex, uv, 0.0);
 	vec3 albedo_old;
 	float Y_history[Y_HIST_LEN];
-	float blend_factor_old, chroma_variance, motion_diff_old;
+	float blend_factor_old, chroma_variance;
 	{ 
 		vec4 ac = textureLod(albedo_old_and_chroma_variance_tex, uv, 0.0);
 		albedo_old = ac.rgb;
@@ -253,14 +224,12 @@ void main()
 		vec4 s2 = textureLod(stats_tex2, uv, 0.0);
 		Y_history[0] = s0.x; Y_history[1] = s0.y; Y_history[2] = s0.z; Y_history[3] = s0.w;
 		Y_history[4] = s1.x; Y_history[5] = s1.y; Y_history[6] = s1.z; Y_history[7] = s1.w;
-		Y_history[8] = s2.x; Y_history[9] = s2.y; Y_history[10] = ycc.x;
-		blend_factor_old = s2.z;
-		motion_diff_old = s2.w;
+		Y_history[8] = s2.x; Y_history[9] = s2.y; Y_history[10] = s2.z; Y_history[11] = ycc.x;
+		blend_factor_old = s2.w;
 	}
 	vec3 lighting_old = color_old.rgb / (albedo_old + EPSILON16F);
 	vec3 ycc_old = rgb2YCoCg(albedo_old.rgb);
-	float motion_confidence = clamp(1 + (motion_diff - motion_diff_old) / 2.0, 0.0, 1.0);
-	float chroma_tolerance = sqrt(chroma_variance) * motion_confidence + EPSILON16F;
+	float chroma_tolerance = sqrt(chroma_variance) * geometry_clip_tolarance + EPSILON16F;
 	
 	vec3 ycc_diff = ycc - ycc_old;
 	vec3 clamp_ycc = ycc_old - clamp(ycc_old, box_min_ycc, box_max_ycc);
@@ -284,7 +253,6 @@ void main()
 
 	int Y_valid_begin;
 	for(Y_valid_begin = Y_HIST_LEN - 2; Y_valid_begin > 0 && Y_history[Y_valid_begin - 1] >= 0; Y_valid_begin--);
-	Y_valid_begin = max(Y_valid_begin, int(round((1 - motion_confidence) * (Y_HIST_LEN - 1))));
 	for(int i = 0; i < Y_valid_begin; i++)
 	{
 		Y_history[i] = INVALID_Y;
@@ -306,9 +274,8 @@ void main()
 			float diff = Y_history[i] - Y_history[i + 1];
 			Y_sum2_step += diff * diff;
 		}
-		int extra_split_gap = (position_farthest.z - position_nearest.z) / position_farthest.z < 0.1 ? 0: 1;
 		float Y_sum_split_l = Y_sum_l , Y_sum_split_r = Y_sum_r;
-		for(int i = Y_valid_begin + 1; i < Y_HIST_LEN - extra_split_gap; i++)
+		for(int i = Y_valid_begin + 1; i < Y_HIST_LEN; i++)
 		{
 			Y_sum_l += Y_history[i - 1];
 			Y_sum_r -= Y_history[i - 1];
@@ -364,7 +331,7 @@ void main()
 			{
 				spatial_weight = (4 - Y_valid_cnt) / 4.0;
 			}
-			Y_clamp_length = clamp(abs(ycc_old.x - Y_mean) - sqrt(MSE), spatial_weight * Y_clamp_length, Y_clamp_length);
+			Y_clamp_length = clamp(abs(ycc_old.x - Y_mean) - sqrt(MSE) * geometry_clip_tolarance, spatial_weight * Y_clamp_length, Y_clamp_length);
 		}
 	}
 	
@@ -382,5 +349,5 @@ void main()
 	frag_albedo_and_chroma_variance = vec4(mix(albedo_old, albedo, blend_factor), chroma_variance);
 	frag_stats0 = vec4(Y_history[1], Y_history[2], Y_history[3], Y_history[4]);
 	frag_stats1 = vec4(Y_history[5], Y_history[6], Y_history[7], Y_history[8]);
-	frag_stats2 = vec4(Y_history[9], ycc.x, blend_factor, motion_diff);
+	frag_stats2 = vec4(Y_history[9], Y_history[10], ycc.x, blend_factor);
 }
